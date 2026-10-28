@@ -1,0 +1,15 @@
+{
+  "name": "akase",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Akase (Ayo / Okwe) — the Nigerian seed board game in real 3D, for phone and computer.",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "engines": { "node": ">=20" }
+}
