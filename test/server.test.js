@@ -51,18 +51,24 @@ test("host creates, friend joins by code, moves go to both, an out-of-turn move 
   const err = await b.next("error");
   assert.equal(err.code, "turn"); assert.equal(err.re, "move");
 
+  // a move travels small: seat, pit, how many moves have been played and both scores — no events, no history; the boards rebuild the rest
   a.send({ t: "move", pit: 2 });
   const ma = await a.next("move"), mb = await b.next("move");
-  assert.equal(ma.pit, 2); assert.equal(ma.seat, 0); assert.deepEqual(mb.state, ma.state);
-  assert.equal(ma.events[0].type, "pickup");
+  assert.deepEqual(ma, mb); assert.deepEqual(ma, { t: "move", seat: 0, pit: 2, n: 1, stores: [0, 0] });
+  assert.ok(JSON.stringify(ma).length < 60);
   const g = replay([2], "ncho");
-  assert.deepEqual(ma.state.pits, g.pits); assert.equal(ma.state.turn, 1);
+  assert.deepEqual(ma.stores, g.stores);
 
   // the friend plays a legal reply; both boards agree with the engine
   const m2 = legalMoves(g)[0];
   b.send({ t: "move", pit: m2 });
   const ra = await a.next("move"); await b.next("move");
-  assert.deepEqual(ra.state.pits, replay([2, m2], "ncho").pits);
+  assert.equal(ra.n, 2); assert.deepEqual(ra.stores, replay([2, m2], "ncho").stores);
+
+  // a board that has fallen behind asks for the whole room and gets it, marked as a resync
+  a.send({ t: "sync" });
+  const synced = await a.next("room");
+  assert.equal(synced.resync, true); assert.deepEqual(synced.room.state.moves, [2, m2]); assert.equal(synced.room.state.quiet, replay([2, m2], "ncho").quiet);
 
   // a third phone cannot take a seat, and nonsense is answered, never crashed on
   const c = client(); await c.open;
@@ -89,13 +95,14 @@ test("host creates, friend joins by code, moves go to both, an out-of-turn move 
   await bad.close();
 
   // play the game out from both ends, then a rematch both agree to
-  let state = back.room.state;
+  let state = back.room.state; const moves = state.moves.slice();
   const sockets = [a, b2]; let n = 0;
   while (!state.over && n++ < 400) {
-    const cur = replay(state.moves, state.variant, state.rules);
-    sockets[cur.turn].send({ t: "move", pit: legalMoves(cur)[0] });
+    const cur = replay(moves, state.variant, state.rules);
+    const pit = legalMoves(cur)[0]; sockets[cur.turn].send({ t: "move", pit });
     const [x, y] = await Promise.all([a.next("move"), b2.next("move")]);
-    assert.deepEqual(x.state, y.state); state = x.state;
+    assert.deepEqual(x, y); assert.equal(x.pit, pit); moves.push(pit);
+    state = replay(moves, state.variant, state.rules); assert.equal(x.n, moves.length); assert.deepEqual(x.stores, state.stores); // the small message agrees with the engine every move
   }
   assert.ok(state.over);
   a.send({ t: "rematch" });

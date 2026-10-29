@@ -3,7 +3,7 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "../server/index.js";
 import { Online, stateFrom, inviteLink, ERROR_TEXT } from "../web/online.js";
-import { legalMoves, replay } from "../engine/ayo.js";
+import { legalMoves, replay, applyMove } from "../engine/ayo.js";
 
 const srv = createServer({ sweepEvery: 60_000 });
 await new Promise((r) => srv.server.listen(0, "127.0.0.1", r));
@@ -36,10 +36,11 @@ test("host creates, friend joins by code, moves reach both boards, a wrong-turn 
   const refused = once(friend, "error"); friend.move(6);
   const err = await refused; assert.equal(err.code, "turn"); assert.equal(err.msg, ERROR_TEXT.turn); assert.equal(err.re, "move");
 
-  // the host's move arrives at both boards with the engine's events; the local state matches the engine
+  // the host's move arrives at both boards; the client rebuilds the engine's events and the position from the small message, and they match the engine
   const [ma, mb] = await Promise.all([once(host, "move"), once(friend, "move"), host.move(2)]);
   assert.equal(ma.pit, 2); assert.equal(ma.seat, 0); assert.deepEqual(ma.state, mb.state); assert.equal(ma.events[0].type, "pickup");
   const g = replay([2], "ncho"); assert.deepEqual(stateFrom(ma.state).pits, g.pits); assert.equal(stateFrom(ma.state).turn, 1);
+  assert.deepEqual(ma.events, applyMove(replay([], "ncho"), 2).events); assert.deepEqual(host.room.state.moves, [2]);
   const m2 = legalMoves(g)[0];
   const [ra] = await Promise.all([once(host, "move"), once(friend, "move"), friend.move(m2)]);
   assert.deepEqual(ra.state.moves, [2, m2]);

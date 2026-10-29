@@ -188,7 +188,9 @@ let state = newGame(settings.game, settings.rules()); let busy = false; let sele
 let stats = { biggest: 0, captures: 0, started: Date.now() };
 
 // ---------- a friend online: the board joins a room (?room=CODE from the invite link) and animates the moves the server sends ----------
-// The server runs the same engine and is the referee; this board only asks for a move and shows what comes back.
+// The server runs the same engine and is the referee; this board only asks for a move and shows what comes back. A move
+// travels as a few dozen bytes (seat, pit, move count, scores): online.js rebuilds the seeds' path with the same engine, so a
+// weak signal carries a whole game in less data than one photo; if a board ever disagrees it fetches the whole room.
 const roomParam = params.get('still') ? null : params.get('room');
 const online = !!roomParam;
 let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
@@ -257,13 +259,15 @@ function startOnline() {
     syncRoom(room); $('#gameover').hidden = !state.over; if (state.over) gameOver();
     if (back) toast('Back at the board'); else if (!friend) toast(`Room ${code} — share this page's link`);
   });
-  net.on('room', ({ room, started }) => {
+  net.on('room', ({ room, started, resync }) => {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
+    if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
     if (!had && friend) { toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); }
     if (started) { stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
-  net.on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); });
+  net.on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
+  net.on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
   net.on('shout', ({ seat, id }) => showShout(seat, id));
   net.on('error', (e) => {
     busy = false;

@@ -3,18 +3,37 @@
 //
 //   const net = new Online(wsUrl);
 //   net.on('joined', ({ seat, room }) => …)   // seated (also after a reconnect: the room carries the whole game)
-//   net.on('move',   ({ seat, pit, events, state }) => …)
-//   net.on('room',   ({ room, started }) => …) // presence, a rematch asked for, a new game started
+//   net.on('move',   ({ seat, pit, events, state }) => …) // events and state rebuilt here with the engine from the small message the server sends
+//   net.on('room',   ({ room, started, resync }) => …) // presence, a rematch asked for, a new game started; resync: the whole room after this board fell behind
+//   net.on('resync', ({ why }) => …)           // this board could not rebuild a move and has asked for the room (a 'room' with resync follows)
 //   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
 //   net.create({ variant, rules, name }) / net.join(code, name) / net.rejoin(code, token) / net.move(pit) / net.shout(id) / net.rematch() / net.leave()
 
+import { applyMove } from '../engine/ayo.js';
+
 export const BACKOFF_MS = [800, 1600, 3200, 6400, 10000]; // between reconnect attempts, then every 10 s
 
 // The game as the server shows it, made into an engine-shaped state the board can read (legalMoves, replay for undo-less play).
 export function stateFrom(pub) {
-  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: 0, over: !!pub.over, winner: pub.over ? pub.winner : null };
+  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null };
+}
+// The other way round: an engine state as the server would show it (what a 'move' carries once rebuilt).
+export function publicFrom(s) {
+  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, variant: s.variant, rules: { ...s.rules } };
+}
+
+// A move arrives small — {seat, pit, n, stores} — because every board has the same engine as the server. Rebuild the
+// events (the seeds' whole path) and the new position from the room's game; n (moves played) and the scores must agree,
+// or this board has fallen behind and the whole room is fetched instead. Returns {events, state} or null.
+export function rebuildMove(pub, m) {
+  if (!pub || !Array.isArray(pub.pits)) return null;
+  let r; try { r = applyMove(stateFrom(pub), m.pit); } catch { return null; }
+  const s = r.state;
+  if (s.moves.length !== m.n) return null;
+  if (!Array.isArray(m.stores) || m.stores[0] !== s.stores[0] || m.stores[1] !== s.stores[1]) return null;
+  return { events: r.events, state: publicFrom(s) };
 }
 
 // The invite link for a room: the app's own address with ?room=CODE.
@@ -87,8 +106,17 @@ export class Online {
       case 'joined':
         this.seat = m.seat; this.code = m.code; this.token = m.token; this.room = m.room; this.intent = { t: 'rejoin', code: m.code, token: m.token };
         return this.emit('joined', { seat: m.seat, code: m.code, token: m.token, room: m.room });
-      case 'room': this.room = m.room; return this.emit('room', { room: m.room, started: !!m.started });
-      case 'move': if (this.room) this.room.state = m.state; return this.emit('move', { seat: m.seat, pit: m.pit, events: m.events, state: m.state });
+      case 'room': this.room = m.room; return this.emit('room', { room: m.room, started: !!m.started, resync: !!m.resync });
+      case 'move': {
+        let events = m.events, state = m.state; // an older server still sends the whole thing
+        if (!events || !state) {
+          const r = rebuildMove(this.room && this.room.state, m);
+          if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'move' }); } // behind, somehow: ask for the whole room rather than guess
+          events = r.events; state = r.state;
+        }
+        if (this.room) this.room.state = state;
+        return this.emit('move', { seat: m.seat, pit: m.pit, events, state });
+      }
       case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
       case 'error':
         if (m.code === 'swept' || (m.code === 'notfound' && m.re === 'rejoin') || m.code === 'token') { this.token = null; this.intent = null; } // nothing left to come back to

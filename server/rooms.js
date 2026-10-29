@@ -147,8 +147,16 @@ export class Rooms {
   seatOf(room, token) { const seat = room.seats.findIndex((s) => s && s.token === token); if (seat < 0) fail("token", "that seat is not yours"); return seat; }
 }
 
-// The game as the clients see it. moves lets a client rebuild the position with the shared engine (replay) and check it matches.
+// The game as the clients see it. moves lets a client rebuild the position with the shared engine (replay) and check it matches;
+// quiet (moves since the last capture) is sent too, so a board that applies the next move itself ends a stalemate on the same move the server does.
 export function publicState(g) {
-  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), over: g.over, winner: g.winner, variant: g.variant, rules: { ...g.rules } };
+  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, variant: g.variant, rules: { ...g.rules } };
+}
+
+// What travels for a move: the seat, the pit, how many moves have been played and both scores — a few dozen bytes.
+// Each board has the same engine and rebuilds the events and the position itself; the scores and the count let it
+// check it agrees, and ask for the whole room ({t:"sync"}) if it does not. A relay turn's events alone can run to kilobytes.
+export function moveMessage({ seat, pit, state }) {
+  return { t: "move", seat, pit, n: state.moves.length, stores: state.stores.slice() };
 }
 export { replay };

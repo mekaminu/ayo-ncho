@@ -1,7 +1,9 @@
 // Ayo & Nchò server: serves the web app and runs the online rooms (WebSockets at /ws, the same rules engine as the board).
 // Protocol (JSON, one object per message):
-//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token} | {t:"move", pit} | {t:"rematch"} | {t:"shout", id} | {t:"ping"}
-//   server → {t:"joined", code, token, seat, room} | {t:"room", room} (presence, rematch, new game) | {t:"move", seat, pit, events, state} | {t:"shout", seat, id} | {t:"error", code, msg} | {t:"pong"}
+//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"shout", id} | {t:"ping"}
+//   server → {t:"joined", code, token, seat, room} | {t:"room", room} (presence, rematch, new game; resync:true when asked for) | {t:"move", seat, pit, n, stores} | {t:"shout", seat, id} | {t:"error", code, msg} | {t:"pong"}
+// A move travels small (see moveMessage in rooms.js): both boards run the same engine and rebuild the seeds' path themselves;
+// n (moves played) and stores let a board check it agrees, and {t:"sync"} fetches the whole room when it does not.
 // A shout is one of the fixed phrases in web/shouts.js, sent by id to both boards (the sender's too, so it sees it went).
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
 import express from "express";
@@ -9,7 +11,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { Rooms, RoomError, normaliseCode } from "./rooms.js";
+import { Rooms, RoomError, normaliseCode, moveMessage } from "./rooms.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -51,7 +53,8 @@ export function createServer({ rooms = new Rooms(), sweepEvery = 60 * 1000 } = {
           case "create": if (ws.room) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name }));
           case "join": if (ws.room) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.join(m.code, { name: m.name }));
           case "rejoin": if (ws.room) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.rejoin(m.code, m.token));
-          case "move": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.move(ws.room, ws.token, m.pit); return broadcast(ws.room, { t: "move", ...r }); }
+          case "move": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.move(ws.room, ws.token, m.pit); return broadcast(ws.room, moveMessage(r)); }
+          case "sync": { if (!ws.room) throw new RoomError("unseated", "join a room first"); return send(ws, { t: "room", room: rooms.snapshot(ws.room), resync: true }); }
           case "shout": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.shout(ws.room, ws.token, m.id); return broadcast(ws.room, { t: "shout", ...r }); }
           case "rematch": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.rematch(ws.room, ws.token); return broadcast(ws.room, { t: "room", room: r.room, started: r.started }); }
           default: return send(ws, { t: "error", code: "bad", msg: "unknown message" });

@@ -4,5 +4,5 @@ The Nigerian seed-and-board game (Ayo among the Yoruba, Nchò/Okwe among the Igb
 
 - `engine/` — rules and the computer opponent (shared by browser and server)
 - `web/` — the game (Three.js board; physics and screens arrive per `docs/build-plan.md`; `online.js` is the board's end of a room: open `/?room=new` on one phone, the invite link `/?room=CODE` on the other; `shouts.js` is the fixed phrases friends shout across the board)
-- `server/` — Express plus the online rooms (`rooms.js`: a four-letter code, two seats, every move checked by the engine, reconnect by token; WebSockets at `/ws`, protocol in `index.js`)
+- `server/` — Express plus the online rooms (`rooms.js`: a four-letter code, two seats, every move checked by the engine, reconnect by token, each move sent as a few dozen bytes that the board rebuilds with the shared engine; WebSockets at `/ws`, protocol in `index.js`)
 - `npm test` — engine, rooms, server and online-client tests · `npm start` — serve locally on :3000 · `python3 tools/render.py out.png --online` — two headless phones play a move each through the real server
