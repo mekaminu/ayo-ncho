@@ -116,6 +116,9 @@ button{font-family:inherit}
 .face{display:inline-block;width:36px;height:36px;border-radius:50%;overflow:hidden;flex:none;background:var(--soft);border:1px solid var(--line)}
 .face.s{width:20px;height:20px;margin-right:6px;vertical-align:middle;border:0}
 .face.m{width:40px;height:40px}
+#oppFace{width:44px;height:44px;transition:border-color .3s}
+#oppFace.react{animation:react .6s cubic-bezier(.3,1.5,.5,1);border-color:var(--brass)}
+@keyframes react{0%{transform:scale(1)}35%{transform:scale(1.22) rotate(-7deg)}65%{transform:scale(.97) rotate(4deg)}100%{transform:scale(1)}}
 .pill{display:inline-flex;align-items:center}
 #bubble{position:fixed;left:max(18px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 64px);max-width:min(70vw,280px);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:14px 14px 14px 4px;padding:9px 12px;font-size:13px;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:pop .25s ease-out;pointer-events:none;z-index:2}
 #rec{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);display:flex;align-items:center;gap:8px;background:rgba(13,9,6,.75);border:1px solid var(--line);border-radius:999px;padding:6px 12px 6px 10px;font-size:12px;color:var(--fg);pointer-events:none;z-index:3;animation:pop .25s ease-out}
@@ -141,7 +144,7 @@ button{font-family:inherit}
 .wide .homeTop{align-self:flex-start;padding-top:calc(env(safe-area-inset-top,0px) + 34px)}
 .wide .homeBottom{width:min(40vw,380px);justify-content:center;padding-bottom:0}
 .wide .setBody{max-width:560px;width:100%;margin:0 auto}
-@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast{animation:none}}
+@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react{animation:none}}
 </style>
 </head>
 <body class="screen">

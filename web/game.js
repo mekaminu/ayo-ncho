@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { newGame, applyMove, legalMoves, replay, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
-import { CHARACTERS, line } from './characters.js';
+import { CHARACTERS, line, faceFor, MOOD_FOR } from './characters.js';
 import { decideQuality, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
@@ -193,7 +193,7 @@ async function hint() {
 }
 
 function paintFaces() {
-  $('#oppFace').innerHTML = CHARACTERS[level].face;
+  $('#oppFace').innerHTML = faceFor(level, mood);
   document.querySelectorAll('.pill[data-level]').forEach((b) => { b.querySelector('.face').innerHTML = CHARACTERS[b.dataset.level].face; });
   document.querySelectorAll('[data-face]').forEach((f) => { f.innerHTML = CHARACTERS[f.dataset.face].face; });
 }
@@ -265,10 +265,10 @@ async function play(pit) {
   busy = false; refreshStatic(); save();
   if (state.over) return gameOver();
   if (state.turn === ai) {
-    showTurn(); await wait(350);
+    showTurn(); await wait(350); if (mood === 'calm') react('think');
     const m = await aiMove(state);
     if (m === null || state.turn !== ai) return;
-    select(m); await wait(550); // show which pit the opponent chose
+    if (mood === 'think') react('calm'); select(m); await wait(550); // show which pit the opponent chose
     await play(m);
   }
 }
@@ -279,6 +279,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play'
   $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings';
   body.classList.toggle('screen', which !== 'play'); body.classList.toggle('playing', which === 'play');
   if (which === 'home') { paintHome(); idle = true; } else idle = false;
+  if (which === 'play') blinkLoop(); else { clearTimeout(blinkTimer); if (mood !== 'calm' && mood !== 'think') react('calm'); }
 }
 let idle = true; // the home screen slowly turns the board
 function paintHome() {
@@ -300,8 +301,20 @@ function paintSettings() {
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
 }
+// ---------- the opponent's face reacts: a mood for a moment, then back to calm; blinks now and then while waiting ----------
+let mood = 'calm', moodTimer = null, blinkTimer = null;
+function react(next, ms = 2600) {
+  if (params.get('still')) return; clearTimeout(moodTimer); mood = next; const f = $('#oppFace'); f.innerHTML = faceFor(level, mood);
+  if (next !== 'calm' && next !== 'blink' && next !== 'think') { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); }
+  if (next !== 'calm' && next !== 'think') moodTimer = setTimeout(() => react('calm'), ms);
+}
+function blinkLoop() { // a blink every few seconds, only on a calm face, never under reduced motion
+  clearTimeout(blinkTimer); if (reduceMotion || params.get('still')) return;
+  blinkTimer = setTimeout(() => { if (mood === 'calm' && body.classList.contains('playing')) { $('#oppFace').innerHTML = faceFor(level, 'blink'); setTimeout(() => { if (mood === 'calm') $('#oppFace').innerHTML = faceFor(level, 'calm'); }, 130); } blinkLoop(); }, 2800 + Math.random() * 4200);
+}
 let bubbleTimer = null;
 function say(moment) {
+  react(MOOD_FOR[moment] || 'calm');
   const text = line(level, moment); if (!text || params.get('still')) return;
   const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, 2600);
 }
@@ -331,7 +344,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
     }));
   }
 });
-document.querySelectorAll('.choose[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); paintSettings(); refreshStatic(); click(1.2, 0.05); }));
+document.querySelectorAll('.choose[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); mood = 'calm'; paintSettings(); refreshStatic(); click(1.2, 0.05); }));
 document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('click', () => { prefs.set('game.variant', b.dataset.game); prefs.set('rules.capture', ''); prefs.set('rules.relay', ''); prefs.set('rules.last8', ''); paintHome(); click(1.2, 0.05); }));
 document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); paintHome(); click(1.2, 0.05); }));
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
@@ -420,7 +433,7 @@ function resume() {
   return false;
 }
 function newRound() { state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); setTimeout(() => say('start'), 600); }
-function kickAi() { if (state.turn === ai && !state.over) (async () => { busy = true; await wait(400); busy = false; const m = await aiMove(state); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
+function kickAi() { if (state.turn === ai && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 function undo() {
   if (busy || state.moves.length < 2) return;
   const moves = state.moves.slice(0, state.turn === you ? -2 : -1);
@@ -497,7 +510,7 @@ if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get mood() { return mood; }, quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
