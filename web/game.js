@@ -25,7 +25,12 @@ const sim = new SeedSim();
 // camera: the board upright in your hands, you at the near end
 let theta = 0, phi = 0.72, dist = 1.55; const target = new THREE.Vector3(0, 0.02, 0.02);
 function placeCam() { camera.position.set(target.x + dist * Math.sin(phi) * Math.sin(theta), target.y + dist * Math.cos(phi), target.z + dist * Math.sin(phi) * Math.cos(theta)); camera.lookAt(target); }
-function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); if (w > h * 1.1) { dist = 1.25; phi = 0.62; } }
+let wide = false;
+function resize() {
+  const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+  const nowWide = w > h * 1.1; if (nowWide !== wide) { wide = nowWide; dist = wide ? 1.8 : 1.55; phi = wide ? 0.5 : 0.72; theta = 0; }
+  document.documentElement.classList.toggle('wide', wide);
+}
 addEventListener('resize', resize); resize();
 
 // ---------- seeds ----------
@@ -229,20 +234,31 @@ function undo() {
 
 // ---------- input ----------
 const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null, dragged = false;
-canvas.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY, t: theta, p: phi }; dragged = false; canvas.setPointerCapture(e.pointerId); });
+const fingers = new Map(); let pinch = null; // two-finger zoom on the phone
+const clampDist = () => { dist = Math.min(2.4, Math.max(0.8, dist)); };
+canvas.addEventListener('pointerdown', (e) => {
+  fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
+  if (fingers.size === 2) { const [a, b] = [...fingers.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), dist0: dist }; down = null; dragged = true; return; }
+  down = { x: e.clientX, y: e.clientY, t: theta, p: phi }; dragged = false;
+});
 canvas.addEventListener('pointermove', (e) => {
+  if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && fingers.size === 2) { const [a, b] = [...fingers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); dist = pinch.dist0 * (pinch.d0 / Math.max(d, 1)); clampDist(); return; }
   if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y; if (Math.hypot(dx, dy) > 8) dragged = true;
   if (dragged) { theta = down.t - dx * 0.006; phi = Math.min(1.3, Math.max(0.35, down.p - dy * 0.006)); }
 });
+const lift = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch = null; };
+canvas.addEventListener('pointercancel', (e) => { lift(e); down = null; });
 canvas.addEventListener('pointerup', (e) => {
-  const wasDrag = dragged; down = null; if (wasDrag || busy || state.over || state.turn !== you) return;
+  const wasPinch = !!pinch || fingers.size > 1; lift(e);
+  const wasDrag = dragged; down = null; if (wasPinch || wasDrag || busy || state.over || state.turn !== you) return;
   ptr.set((e.clientX / canvas.clientWidth) * 2 - 1, -(e.clientY / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(board.targets)[0]; if (!hit) return deselect();
   const pit = hit.object.userData.pit; const legal = legalMoves(state);
   if (!legal.includes(pit)) { if (pit < 6 && state.pits[pit] > 0) $('#hint').textContent = 'you must give the other side seeds'; else shake(pit); return; }
   if (selected === pit) play(pit); else select(pit);
 });
-canvas.addEventListener('wheel', (e) => { dist = Math.min(2.4, Math.max(0.8, dist + e.deltaY * 0.001)); }, { passive: true });
+canvas.addEventListener('wheel', (e) => { dist += e.deltaY * 0.001; clampDist(); }, { passive: true });
 function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; tween(260, (t) => { board.ring.position.x = x + Math.sin(t * Math.PI * 4) * 0.006 * (1 - t); }).then(() => { if (selected === null) board.ring.visible = false; else { board.ring.position.x = pitCenters[selected][0]; board.ring.position.z = pitCenters[selected][1]; } }); click(0.5, 0.05); }
 
 $('#undo').addEventListener('click', undo);

@@ -43,6 +43,14 @@ canvas{display:block;width:100vw;height:100vh;touch-action:none}
 .segbtn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
 .btn.ghost{background:none;color:var(--brass);border:1px solid rgba(230,183,111,.5)}
 .btn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+/* Fold open and Mac: the board fills the height; the two player cards sit beside it, the toolbar down the right edge */
+.wide .hud{right:auto;left:0;width:min(34vw,300px);padding:0 0 0 max(24px,env(safe-area-inset-left,0px));flex-direction:column;align-items:flex-start;gap:4px}
+.wide .hud .col{align-items:flex-start}
+.wide .hud.top{top:calc(env(safe-area-inset-top,0px) + 24px)}
+.wide .hud.bottom{bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
+.wide .hud .score{font-size:40px}
+.wide .bar{left:auto;right:0;bottom:50%;transform:translateY(50%);flex-direction:column;padding:0 max(24px,env(safe-area-inset-right,0px)) 0 0}
+.wide #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 24px);left:50%}
 @media (prefers-reduced-motion:reduce){.score.bump,.card{animation:none}}
 </style>
 </head>

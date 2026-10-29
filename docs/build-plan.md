@@ -47,7 +47,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [x] Seed physics (purpose-built in web/physics.js rather than Rapier: smaller, no wasm download, full control): dropped seeds fall, bounce off the carved bowl, roll down its slope, get shoved aside by seeds already there, settle; never below the wood; snap to a slot after 1.1 s whatever happens
 - [x] Physics only runs for seeds in flight; a settled board costs nothing
 - [x] Sound, synthesised on the device (no audio files): seed-on-wood knock with a noise burst, pitch rising with pit fullness, bounce ticks, cluster rattle on pick-up, capture scoop sweep, win chime; haptic tap per seed on phone
-- [ ] Fold open layout (two-column: board left, opponent card right) and Mac window layout; pinch to zoom, drag to tilt, never lose the board
+- [x] Fold-open and Mac layout (board fills the height, player cards down the left, toolbar down the right); pinch to zoom on the phone, wheel on the Mac, drag to tilt, clamped so the board never leaves the frame; `tools/render.py --wide` renders it
 
 ### Sat 31 Oct — screens around the board
 - [ ] Mockups on Meka's Design canvas: Home, Game over, Settings (boxed, segmented, minimal); `[!]` until his yes
