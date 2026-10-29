@@ -30,6 +30,21 @@ export function browserEnv(pref, param) {
   return { saveData: !!c.saveData, effectiveType: c.effectiveType, deviceMemory: nav.deviceMemory, cores: nav.hardwareConcurrency, pref, param };
 }
 
+// Seed physics: the falling, bouncing, rolling seeds — or, on the weakest phones, a plain flight from hand to pit
+// (every seed still moves one per pit; it just lands without the bounce-and-roll). Settings → Feel → Seed physics.
+//   pref:  'auto' | 'on' | 'off'
+//   lite:  the picture-quality decision above (auto follows it: the lighter board also drops the physics)
+//   param: the ?physics= URL value, if any (for renders and tests)
+// Returns { physics: boolean, reason: string }.
+export function decidePhysics({ pref = 'auto', lite = false, param } = {}) {
+  if (param === '0' || param === 'false') return { physics: false, reason: 'asked for in the address' };
+  if (param === '1' || param === 'true') return { physics: true, reason: 'asked for in the address' };
+  if (pref === 'off') return { physics: false, reason: 'chosen in Settings' };
+  if (pref === 'on') return { physics: true, reason: 'chosen in Settings' };
+  if (lite) return { physics: false, reason: 'the lighter board is on' };
+  return { physics: true, reason: 'auto' };
+}
+
 // What each tier means for the scene.
 export function tier(lite) {
   return lite

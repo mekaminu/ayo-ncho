@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { newGame, applyMove, legalMoves, replay, owner, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
 import { CHARACTERS, line, faceFor, MOOD_FOR } from './characters.js';
-import { decideQuality, browserEnv, tier } from './quality.js';
+import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { Online, stateFrom, inviteLink } from './online.js';
@@ -22,6 +22,8 @@ const phone = Math.min(innerWidth, innerHeight) < 500;
 // picture quality: the full board, or a lighter one on slow phones and slow connections (Settings → Feel → Lighter board)
 const quality = decideQuality(browserEnv(prefs.get('quality', 'auto'), params.get('lite')));
 const Q = tier(quality.lite);
+// seed physics: the bounce-and-roll, or a plain flight from hand to pit on the weakest phones (Settings → Feel → Seed physics; Auto follows the lighter board)
+let PHYS = decidePhysics({ pref: prefs.get('physics', 'auto'), lite: quality.lite, param: params.get('physics') });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.lite ? Q.maxPixelRatio : phone ? 1.5 : 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -113,7 +115,9 @@ function fly(m, home, ms = 170, lift = 0.09) {
 }
 
 // drop a seed into a bowl with real-ish physics: it falls, bounces, rolls and is nudged by the seeds already there
+// (with physics off, the seed still flies pit to pit in a small arc and lands in its slot: every move is shown, nothing rolls)
 function drop(m, home, flight = 0.22) {
+  if (!PHYS.physics) return fly(m, home, Math.round(flight * 1000), 0.06);
   homes[home].push(m); m.userData.home = home; const target = slotPos(home, homes[home].length - 1);
   const others = homes[home].filter((o) => o !== m);
   const p = sim.toss(m, target, others, m.scale.y * 0.95, reduceMotion ? 0.05 : flight);
@@ -398,6 +402,7 @@ function paintSettings() {
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1');
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
+  set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
 }
 // ---------- the opponent's face reacts: a mood for a moment, then back to calm; blinks now and then while waiting ----------
@@ -440,6 +445,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
       else if (name === 'seeds') { if (v === 'stones' && !unlocked(streak, 'stones')) return; prefs.set('seeds', v); applySeedSet(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto')) { prefs.set('quality', v); save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
+      else if (name === 'physics') { prefs.set('physics', v); PHYS = decidePhysics({ pref: v, lite: quality.lite, param: params.get('physics') }); toast(PHYS.physics ? 'Seeds bounce and roll again' : 'Seeds fly straight to their pit'); } // applies to the next seed, no new game
       paintSettings(); click(1.2, 0.05);
     }));
   }
@@ -614,7 +620,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

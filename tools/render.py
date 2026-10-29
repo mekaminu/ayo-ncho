@@ -3,13 +3,14 @@
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
 #        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
+#        add --nophysics to play with the seed physics off (seeds fly straight to their pit, as on the weakest phones) and check the setting took
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --online: start the real server (node server/index.js), open a room from one phone (?room=new), join it from a second (?room=CODE),
 #                  play a move from each end and check both boards followed, then shout both ways; the picture is the friend's view (the far seat,
 #                  pits nearest them) with the host's shout up by the host's face
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -90,9 +91,10 @@ with sync_playwright() as p:
     pg.route("https://fonts.googleapis.com/**", lambda r: r.abort())
     if os.path.exists(three):
         pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=three, content_type="text/javascript"))
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1" if smoke else "?capture=1&stay=home" if home else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1" if smoke else "?capture=1&stay=home" if home else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
-    print("quality:", pg.evaluate("JSON.stringify(window.__ayo.quality)"))
+    q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
+    assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
     if smoke:
         before = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position

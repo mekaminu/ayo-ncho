@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { decideQuality, tier } from "../web/quality.js";
+import { decideQuality, decidePhysics, tier } from "../web/quality.js";
 
 test("a good phone on a good connection gets the full board", () => {
   const q = decideQuality({ saveData: false, effectiveType: "4g", deviceMemory: 8, cores: 8, pref: "auto" });
@@ -35,4 +35,15 @@ test("the lighter tier is lighter in every dimension", () => {
   assert.ok(b.woodW < a.woodW && b.woodH < a.woodH && b.clothS < a.clothS && b.seedS < a.seedS);
   assert.ok(b.topSegs[0] < a.topSegs[0] && b.topSegs[1] < a.topSegs[1]);
   assert.ok(b.seedSegs[0] < a.seedSegs[0] && b.shadow < a.shadow && b.maxPixelRatio < a.maxPixelRatio && b.anisotropy < a.anisotropy);
+});
+
+test("seed physics follows the lighter board unless Settings or the address say otherwise", () => {
+  assert.deepEqual(decidePhysics({ pref: "auto", lite: false }), { physics: true, reason: "auto" });
+  assert.equal(decidePhysics({ pref: "auto", lite: true }).physics, false);
+  assert.match(decidePhysics({ pref: "auto", lite: true }).reason, /lighter board/);
+  assert.equal(decidePhysics({ pref: "on", lite: true }).physics, true);
+  assert.equal(decidePhysics({ pref: "off", lite: false }).physics, false);
+  assert.equal(decidePhysics({ pref: "on", lite: false, param: "0" }).physics, false);
+  assert.equal(decidePhysics({ pref: "off", lite: true, param: "1" }).physics, true);
+  assert.equal(decidePhysics({}).physics, true);
 });
