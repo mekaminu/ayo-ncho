@@ -8,12 +8,11 @@
 // Variants:
 //   "ayo"  — Yoruba Ayo / Oware rules: capture when the LAST seed lands in an opponent pit making 2 or 3,
 //            sweeping backwards through consecutive opponent pits that are also 2 or 3. Lap skips the origin pit.
-//            You must feed an opponent who has no seeds when you can (grand slam forbidden: a move that would
-//            capture ALL the opponent's seeds captures nothing).
-//   "okwe" — Igbo Okwe family: same sowing, but capture on 4 ("ukwu"): whenever a sown seed makes ANY pit 4,
-//            the owner of that pit's SIDE... (varies by family). Our default Okwe: the sower takes any pit they
-//            bring to 4 during sowing; the final pit's owner takes it if the last seed makes 4. Marked for
-//            confirmation against Meka's family rules — see docs/build-plan.md "Needs Meka".
+//            Feed rule; a move that would capture ALL the opponent's seeds captures nothing (grand slam).
+//   "ncho" — Nchò, the way Meka's family plays (confirmed 29 Oct 2026): any pit that reaches 4 during sowing
+//            goes to the OWNER of that side, whoever sowed; except that if the sower's LAST seed makes a pit on the
+//            opponent's side 4, the SOWER takes it. Several pits can be captured in one move. When 8 seeds are
+//            left on the board, whoever makes the next capture takes all 8. Feed rule applies.
 
 export const PITS = 12;
 export const PER_SIDE = 6;
@@ -21,7 +20,8 @@ export const TOTAL_SEEDS = 48;
 export const WIN_SEEDS = 25;
 export const QUIET_LIMIT = 60; // moves without a capture before the game is called
 
-export function newGame(variant = "ayo") {
+export const VARIANTS = ["ncho", "ayo"];
+export function newGame(variant = "ncho") {
   return {
     variant,
     pits: Array(PITS).fill(4),
@@ -94,36 +94,56 @@ export function applyMove(state, pit) {
 
   const me = state.turn;
   const events = [{ type: "pickup", pit, n: state.pits[pit] }];
-  const { pits, last } = sow(state.pits, pit);
-  // record drops in order for the animation
-  {
-    let n = state.pits[pit];
-    let i = pit;
+  const stores = state.stores.slice();
+  let pits, captured = [];
+  if (state.variant === "ncho") {
+    pits = state.pits.slice();
+    const boardBefore = pits.reduce((a, b) => a + b, 0);
+    let n = pits[pit]; pits[pit] = 0; let i = pit;
     while (n > 0) {
       i = (i + 1) % PITS;
       if (i === pit) continue;
+      pits[i] += 1; n -= 1;
       events.push({ type: "drop", pit: i });
-      n -= 1;
+      if (pits[i] === 4) {
+        const by = (n === 0 && owner(i) !== me) ? me : owner(i);
+        stores[by] += 4; pits[i] = 0; captured.push(i);
+        events.push({ type: "capture", pits: [i], by, n: 4 });
+      }
     }
-  }
-
-  const stores = state.stores.slice();
-  let captured = [];
-  if (state.variant === "okwe") {
-    captured = okweCaptures(state.pits, pits, pit, last, me);
+    // Last 8: whoever makes the capture that leaves 4 on the board takes those too.
+    const left = pits.reduce((a, b) => a + b, 0);
+    if (captured.length && boardBefore <= 8 && left > 0) {
+      const by = events.filter((e) => e.type === "capture").pop().by; const taken = [];
+      for (let k = 0; k < PITS; k++) if (pits[k]) { taken.push(k); }
+      stores[by] += left; for (const k of taken) pits[k] = 0;
+      events.push({ type: "capture", pits: taken, by, n: left });
+    }
   } else {
+    ({ pits } = sow(state.pits, pit));
+    const { last } = sow(state.pits, pit);
+    {
+      let n = state.pits[pit];
+      let i = pit;
+      while (n > 0) {
+        i = (i + 1) % PITS;
+        if (i === pit) continue;
+        events.push({ type: "drop", pit: i });
+        n -= 1;
+      }
+    }
     captured = ayoCaptures(pits, last, me);
     // Grand slam rule: if this would take every seed the opponent has, capture nothing.
     const oppSide = sideOf(opponent(me));
     const oppTotal = oppSide.reduce((n, i) => n + pits[i], 0);
     const takeTotal = captured.reduce((n, i) => n + pits[i], 0);
     if (captured.length && takeTotal === oppTotal) captured = [];
-  }
-  if (captured.length) {
-    let n = 0;
-    for (const i of captured) { n += pits[i]; pits[i] = 0; }
-    stores[me] += n;
-    events.push({ type: "capture", pits: captured.slice(), by: me, n });
+    if (captured.length) {
+      let n = 0;
+      for (const i of captured) { n += pits[i]; pits[i] = 0; }
+      stores[me] += n;
+      events.push({ type: "capture", pits: captured.slice(), by: me, n });
+    }
   }
 
   const next = {
@@ -136,19 +156,6 @@ export function applyMove(state, pit) {
   };
   finish(next, events);
   return { state: next, events };
-}
-
-// Okwe-style capture on 4 (placeholder until Meka's family rules are confirmed).
-function okweCaptures(before, after, from, last, player) {
-  const taken = [];
-  for (let i = 0; i < PITS; i++) {
-    if (i === from) continue;
-    if (after[i] === 4 && before[i] < 4) {
-      // the pit that reached 4 by the LAST seed goes to the sower; any other pit that reached 4 goes to its owner
-      if (i === last || owner(i) === player) taken.push(i);
-    }
-  }
-  return taken;
 }
 
 // Decide whether the game has ended and settle leftover seeds.

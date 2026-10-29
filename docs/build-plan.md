@@ -20,7 +20,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 
 ## Needs Meka
 
-- [!] Confirm the family rules: capture on 2 or 3 (Ayo, the default) or the Okwe way? Skip the start pit on a lap? Game ends when one side is empty? (engine has Ayo + an Okwe placeholder)
+- [x] Family rules confirmed 29 Oct: Nchò (capture on 4, see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka may send more rules: fold them in when they arrive.
 - [!] Create the GitHub repo github.com/mekaminu/ayo-ncho (private) so the runs can push
 - [!] Home / game-over / settings mockups: his yes before they are built (runs make the mockups first)
 
@@ -53,7 +53,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [ ] Mockups on Meka's Design canvas: Home, Game over, Settings (boxed, segmented, minimal); `[!]` until his yes
 - [ ] Home: one-tap Play vs computer, level picker, continue last game, Play with friends (coming)
 - [ ] First-game tutorial: three prompts in the first game, then never again
-- [ ] Settings: wood finish (mahogany / iroko / ebony), seed set, sound, haptics, count badges on/off, rules variant
+- [ ] Settings: wood finish (mahogany / iroko / ebony), seed set, sound, haptics, count badges on/off (the Nchò/Ayo picker already lives in the Rules card)
 - [ ] Installable (manifest + service worker): offline play vs computer with no signal
 
 ### Sun 1 Nov — opponents with character, polish, deploy

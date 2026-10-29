@@ -6,13 +6,13 @@ import { chooseMove } from "../engine/ai.js";
 function rng(seed) { let s = seed; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
 
 test("a fresh board has 48 seeds, 4 per pit", () => {
-  const g = newGame();
+  const g = newGame("ayo");
   assert.equal(totalSeeds(g), TOTAL_SEEDS);
   assert.deepEqual(g.pits, Array(12).fill(4));
 });
 
 test("sowing goes anticlockwise and skips the origin pit on a lap", () => {
-  let g = newGame();
+  let g = newGame("ayo");
   g.pits = [15, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
   g.stores = [TOTAL_SEEDS - 15, 0];
   const { state } = applyMove(g, 0);
@@ -23,7 +23,7 @@ test("sowing goes anticlockwise and skips the origin pit on a lap", () => {
 });
 
 test("captures sweep back through opponent pits of 2 or 3", () => {
-  let g = newGame();
+  let g = newGame("ayo");
   g.pits = [0, 0, 0, 0, 0, 3, 1, 2, 1, 4, 4, 4];
   g.stores = [TOTAL_SEEDS - 19, 0];
   const { state, events } = applyMove(g, 5);
@@ -34,7 +34,7 @@ test("captures sweep back through opponent pits of 2 or 3", () => {
 });
 
 test("grand slam captures nothing", () => {
-  let g = newGame();
+  let g = newGame("ayo");
   g.pits = [0, 0, 0, 0, 0, 2, 1, 1, 0, 0, 0, 0];
   g.stores = [TOTAL_SEEDS - 4, 0];
   const { state } = applyMove(g, 5);
@@ -43,7 +43,7 @@ test("grand slam captures nothing", () => {
 });
 
 test("feed rule: must give an empty opponent seeds when you can", () => {
-  let g = newGame();
+  let g = newGame("ayo");
   g.pits = [1, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0];
   g.stores = [TOTAL_SEEDS - 3, 0];
   assert.deepEqual(legalMoves(g), [5]);
@@ -51,7 +51,7 @@ test("feed rule: must give an empty opponent seeds when you can", () => {
 });
 
 test("game ends at 25 captured", () => {
-  let g = newGame();
+  let g = newGame("ayo");
   g.pits = [0, 0, 0, 0, 0, 2, 1, 2, 0, 0, 4, 4];
   g.stores = [23, 12];
   const { state } = applyMove(g, 5);
@@ -62,7 +62,7 @@ test("game ends at 25 captured", () => {
 test("seed count is conserved through 300 random games", () => {
   const r = rng(42);
   for (let n = 0; n < 300; n++) {
-    let g = newGame();
+    let g = newGame(n % 2 ? "ayo" : "ncho");
     let guard = 0;
     while (!g.over && guard++ < 400) {
       const moves = legalMoves(g);
@@ -72,7 +72,7 @@ test("seed count is conserved through 300 random games", () => {
       for (const p of g.pits) assert.ok(p >= 0);
     }
     assert.ok(g.over, "game should finish");
-    assert.equal(replay(g.moves).stores.join(), g.stores.join(), "replay matches");
+    assert.equal(replay(g.moves, g.variant).stores.join(), g.stores.join(), "replay matches");
   }
 });
 
@@ -80,7 +80,7 @@ test("hard beats easy most of the time", () => {
   const r = rng(7);
   let hardWins = 0;
   for (let n = 0; n < 12; n++) {
-    let g = newGame();
+    let g = newGame(n % 2 ? "ayo" : "ncho");
     const hardIs = n % 2; // alternate sides
     let guard = 0;
     while (!g.over && guard++ < 400) {
@@ -90,4 +90,31 @@ test("hard beats easy most of the time", () => {
     if (g.winner === hardIs) hardWins++;
   }
   assert.ok(hardWins >= 9, `hard won ${hardWins}/12`);
+});
+
+test("ncho: a pit reaching 4 mid-sow goes to its side's owner; the last seed making 4 on the other side goes to the sower", () => {
+  let g = newGame("ncho");
+  // player 0 sows 5 seeds from pit 2 into 3,4,5,6,7. Pit 4 has 3 → 4 (own side: mine). Pit 7 has 3 → 4 by the LAST seed on their side: mine too.
+  g.pits = [0, 0, 5, 0, 3, 0, 3, 3, 0, 0, 0, 0]; g.stores = [17, 17];
+  const { state, events } = applyMove(g, 2);
+  assert.equal(state.stores[0], 17 + 8);
+  assert.equal(state.stores[1], 17 + 4, "pit 6 reached 4 from a seed that was not the last: the opponent owns that side, so they take it");
+  assert.equal(state.pits[6], 0);
+});
+
+test("ncho: sowing into the other side and making 4 (not the last seed) gives them the pit", () => {
+  let g = newGame("ncho");
+  g.pits = [0, 0, 0, 0, 0, 2, 3, 0, 0, 0, 4, 8]; g.stores = [15, 16];
+  const { state } = applyMove(g, 5); // seeds land in 6 (3→4, theirs, not last) and 7
+  assert.equal(state.stores[1], 20);
+  assert.equal(state.stores[0], 15);
+});
+
+test("ncho: with 8 seeds left, the next capture takes everything", () => {
+  let g = newGame("ncho");
+  g.pits = [0, 0, 0, 0, 3, 1, 3, 1, 0, 0, 0, 0]; g.stores = [20, 20];
+  const { state } = applyMove(g, 5); // 1 seed: pit 6 3→4, last seed, their side → mine, and the other 4 follow
+  assert.equal(state.stores[0], 28);
+  assert.equal(state.over, true);
+  assert.equal(state.winner, 0);
 });

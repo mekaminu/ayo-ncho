@@ -138,7 +138,7 @@ function setBadge(i, n) { badges[i].textContent = n; badges[i].classList.toggle(
 function tickScore(el, n) { el.textContent = n; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
 // ---------- game state ----------
-const variant = prefs.get('variant', 'ayo');
+const variant = prefs.get('variant', 'ncho');
 const level = prefs.get('level', 'medium');
 let state = newGame(variant); let busy = false; let selected = null;
 const you = 0, ai = 1;
@@ -167,7 +167,8 @@ function select(i) {
 function deselect() { selected = null; board.ring.visible = false; board.glow.visible = false; showTurn(); }
 
 // Play a move's events on the board, one seed at a time.
-async function animate(events, mover) {
+async function animate(events, prevStores) {
+  const shown = prevStores.slice();
   for (const e of events) {
     if (e.type === 'pickup') {
       const picked = homes[e.pit].splice(0); const [cx, cz] = pitCenters[e.pit];
@@ -182,21 +183,20 @@ async function animate(events, mover) {
     } else if (e.type === 'capture') {
       await wait(160); scoop();
       const store = e.by === you ? 'S0' : 'S1'; const scoreEl = e.by === you ? $('#myScore') : $('#oppScore');
-      let running = state.stores[e.by] - e.n; // the state we hold is already after the move; count up from before
       for (const pit of e.pits) {
         const taken = homes[pit].splice(0); setBadge(pit, 0);
-        for (const m of taken) { drop(m, store, 0.3).then(() => { running++; tickScore(scoreEl, running); click(0.6, 0.1); buzz(12); }); await wait(70); }
+        for (const m of taken) { drop(m, store, 0.3).then(() => { shown[e.by]++; tickScore(scoreEl, shown[e.by]); click(0.6, 0.1); buzz(12); }); await wait(70); }
         await wait(120);
       }
-      await wait(300);
+      await wait(e.pits.length > 1 ? 300 : 160);
     }
   }
 }
 
 async function play(pit) {
   const { state: next, events } = applyMove(state, pit);
-  state = next; busy = true; deselect(); $('#undo').disabled = true;
-  await animate(events, state.turn === you ? ai : you); // state.turn already flipped
+  const prevStores = state.stores; state = next; busy = true; deselect(); $('#undo').disabled = true;
+  await animate(events, prevStores);
   busy = false; refreshStatic(); save();
   if (state.over) return gameOver();
   if (state.turn === ai) {
@@ -249,6 +249,12 @@ $('#undo').addEventListener('click', undo);
 $('#newGame').addEventListener('click', newRound);
 $('#rematch').addEventListener('click', newRound);
 $('#rulesBtn').addEventListener('click', () => { $('#rules').hidden = !$('#rules').hidden; });
+$('#rulesNcho').hidden = variant !== 'ncho'; $('#rulesAyo').hidden = variant !== 'ayo';
+$('#gameName').textContent = variant === 'ncho' ? 'Nchò' : 'Ayo';
+document.querySelectorAll('[data-variant]').forEach((b) => {
+  b.setAttribute('aria-pressed', b.dataset.variant === variant);
+  b.addEventListener('click', () => { if (b.dataset.variant === variant) return; prefs.set('variant', b.dataset.variant); prefs.set('game', 'null'); location.reload(); });
+});
 $('#rulesClose').addEventListener('click', () => { $('#rules').hidden = true; });
 const soundBtn = $('#soundBtn'); const paintSound = () => soundBtn.setAttribute('aria-pressed', soundOn());
 soundBtn.addEventListener('click', () => { prefs.set('sound', soundOn() ? '0' : '1'); paintSound(); click(1, 0.08); }); paintSound();
