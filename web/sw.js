@@ -1,6 +1,6 @@
 // Offline play: cache the app shell, the engine and three.js so Play vs computer works with no signal.
-const VERSION = 'ayo-v6';
-const SHELL = ['./', './index.html', './game.js', './board.js', './physics.js', './textures.js', './characters.js', './quality.js', './streak.js', './clip.js', './online.js', './ai-worker.js', './engine/ayo.js', './engine/ai.js', './manifest.webmanifest', './icon.svg', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js'];
+const VERSION = 'ayo-v7';
+const SHELL = ['./', './index.html', './game.js', './board.js', './physics.js', './textures.js', './characters.js', './quality.js', './streak.js', './clip.js', './online.js', './shouts.js', './ai-worker.js', './engine/ayo.js', './engine/ai.js', './manifest.webmanifest', './icon.svg', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

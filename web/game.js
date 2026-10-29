@@ -7,6 +7,7 @@ import { decideQuality, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { Online, stateFrom, inviteLink } from './online.js';
+import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -200,8 +201,28 @@ function showTurnOnline() {
   $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : net.status === 'connecting' ? 'connecting…' : 'no connection')
     : waiting ? `room ${net.code || ''}` : !friend.online ? 'away — their seat is held' : state.over ? '' : mine ? 'waiting' : 'their move';
   $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine ? (selected === null ? 'tap a pit on your side to sow' : 'tap again to sow, or pick another') : '';
-  $('#undo').disabled = true; $('#hintBtn').disabled = true;
+  $('#undo').disabled = true; $('#hintBtn').disabled = true; $('#shoutBtn').disabled = waiting || link;
 }
+// ---------- shouts: a fixed phrase sent by id to both boards; theirs pops by their face with a knock, yours sits by your name ----------
+const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
+for (const s of SHOUTS) { const b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.text; b.dataset.id = s.id; b.addEventListener('click', () => sendShout(s.id)); shoutMenu.appendChild(b); }
+function toggleShoutMenu(open = shoutMenu.hidden) { shoutMenu.hidden = !open; $('#shoutBtn').setAttribute('aria-expanded', String(open)); }
+function sendShout(id) {
+  toggleShoutMenu(false); if (!net || !friend) return false;
+  const t = performance.now(); if (t - shoutAt < SHOUT_GAP_MS) return false; // one at a time, like the server says
+  if (!net.shout(id)) return false; shoutAt = t; click(1.3, 0.05); return true;
+}
+function showShout(seat, id) {
+  const text = shoutText(id); if (!text) return;
+  if (seat === them) {
+    const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, SHOUT_SHOW_MS);
+    const f = $('#oppFace'); if (!reduceMotion) { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); }
+    shoutKnocks(id).forEach((p, i) => setTimeout(() => click(p, 0.1), i * 110)); buzz([15, 30, 15]);
+  } else {
+    const b = $('#myBubble'); b.textContent = text; b.hidden = false; clearTimeout(myBubbleTimer); myBubbleTimer = setTimeout(() => { b.hidden = true; }, SHOUT_SHOW_MS);
+  }
+}
+$('#shoutBtn').addEventListener('click', () => { if (!friend) return toast('Waiting for a friend'); toggleShoutMenu(); click(1.2, 0.05); });
 function syncRoom(room) { // the room as the server shows it: the friend's seat and the whole game
   friend = room.players[them] || null;
   const s = stateFrom(room.state);
@@ -239,6 +260,7 @@ function startOnline() {
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
   net.on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); });
+  net.on('shout', ({ seat, id }) => showShout(seat, id));
   net.on('error', (e) => {
     busy = false;
     if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomParam, myName()); } // our old seat is gone: take the free one
@@ -248,7 +270,7 @@ function startOnline() {
   net.on('status', () => { if (seated) showTurn(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) net.wake(); });
   addEventListener('online', () => net.wake());
-  showScreen('play'); $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = '';
+  body.classList.add('online'); showScreen('play'); $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = '';
   $('#oppFace').innerHTML = initialFace('?');
   if (roomParam === 'new') net.create({ variant: settings.game, rules: settings.rules(), name: myName() });
   else if (held && held.code === roomParam.toUpperCase()) net.rejoin(held.code, held.token);
@@ -355,6 +377,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play'
   $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings';
   body.classList.toggle('screen', which !== 'play'); body.classList.toggle('playing', which === 'play');
   if (which === 'home') { paintHome(); idle = true; } else idle = false;
+  if (which !== 'play' && !shoutMenu.hidden) toggleShoutMenu(false);
   if (which === 'play') blinkLoop(); else { clearTimeout(blinkTimer); if (mood !== 'calm' && mood !== 'think') react('calm'); }
 }
 let idle = true; // the home screen slowly turns the board
@@ -511,7 +534,7 @@ function resume() {
   return false;
 }
 function newRound() { state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); setTimeout(() => say('start'), 600); }
-function kickAi() { if (state.turn === ai && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
+function kickAi() { if (state.turn === them && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 function undo() {
   if (busy || online || state.moves.length < 2) return;
   const moves = state.moves.slice(0, state.turn === you ? -2 : -1);
@@ -546,6 +569,7 @@ const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null, d
 const fingers = new Map(); let pinch = null; // two-finger zoom on the phone
 const clampDist = () => { dist = Math.min(2.4, Math.max(0.8, dist)); };
 canvas.addEventListener('pointerdown', (e) => {
+  if (!shoutMenu.hidden) toggleShoutMenu(false); // a tap on the board closes the shout row
   fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
   if (fingers.size === 2) { const [a, b] = [...fingers.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), dist0: dist }; down = null; dragged = true; return; }
   down = { x: e.clientX, y: e.clientY, t: theta, p: phi }; dragged = false;
@@ -590,7 +614,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

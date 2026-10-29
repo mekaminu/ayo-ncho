@@ -5,7 +5,8 @@
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --online: start the real server (node server/index.js), open a room from one phone (?room=new), join it from a second (?room=CODE),
-#                  play a move from each end and check both boards followed; the picture is the friend's view (the far seat, pits nearest them)
+#                  play a move from each end and check both boards followed, then shout both ways; the picture is the friend's view (the far seat,
+#                  pits nearest them) with the host's shout up by the host's face
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv
@@ -64,7 +65,19 @@ if online:
         assert after != mid and after == friend.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')"), "the host's board did not follow the friend's move"
         assert host.evaluate("window.__ayo.state.moves.length") == 2 and friend.evaluate("window.__ayo.state.moves.length") == 2
         print("online: moves", host.evaluate("JSON.stringify(window.__ayo.state.moves)"), "scores", host.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]"), "friend sees", friend.evaluate("document.querySelector('#oppName').textContent"), "/", friend.evaluate("document.querySelector('#oppSub').textContent"))
-        friend.wait_for_timeout(300); friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(300); friend.screenshot(path=out, timeout=120000, animations="disabled")
+        # a shout: the host taps the shout chip and a phrase; it pops up by the host's face on the friend's phone (and by the host's own name)
+        for pg in (host, friend):
+            assert pg.evaluate("getComputedStyle(document.querySelector('#shoutBtn')).display") != "none", "the shout chip should show online"
+            assert pg.evaluate("getComputedStyle(document.querySelector('#undo')).display") == "none", "undo has no place online"
+        host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
+        host.click("#shoutMenu .pill[data-id=oya]")
+        friend.wait_for_function("!document.querySelector('#bubble').hidden && document.querySelector('#bubble').textContent==='Oya, your move!'", timeout=10000)
+        host.wait_for_function("!document.querySelector('#myBubble').hidden && document.querySelector('#myBubble').textContent==='Oya, your move!'", timeout=10000)
+        assert host.evaluate("document.querySelector('#shoutMenu').hidden"), "the shout row closes once a phrase is sent"
+        assert friend.evaluate("window.__ayo.shout('chai')") is True, "the friend can shout back"
+        host.wait_for_function("document.querySelector('#bubble').textContent==='Chai!'", timeout=10000)
+        print("online: shouts went both ways")
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out, timeout=120000, animations="disabled")
         b.close(); node.terminate()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)
@@ -89,6 +102,7 @@ with sync_playwright() as p:
         after = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         assert before != after, "board did not change"
         print("smoke: before", before, "after", after, "scores", pg.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]"))
+        assert pg.evaluate("getComputedStyle(document.querySelector('#shoutBtn')).display") == "none", "shouts are for friends online, not the computer"
         if clip:  # record the best turn so far as a short video, the way the Game over card's Clip button does
             pg.set_default_timeout(300000)
             r = pg.evaluate("window.__ayo.clip()")

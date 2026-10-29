@@ -44,6 +44,13 @@ test("host creates, friend joins by code, moves reach both boards, a wrong-turn 
   const [ra] = await Promise.all([once(host, "move"), once(friend, "move"), friend.move(m2)]);
   assert.deepEqual(ra.state.moves, [2, m2]);
 
+  // a shout reaches both boards, the sender's included; a second one straight after is refused in plain words
+  const [sa, sb] = await Promise.all([once(host, "shout"), once(friend, "shout"), host.shout("oya")]);
+  assert.deepEqual(sa, { seat: 0, id: "oya" }); assert.deepEqual(sb, { seat: 0, id: "oya" });
+  const hushed = once(host, "error"); host.shout("chai");
+  const h = await hushed; assert.equal(h.code, "hush"); assert.equal(h.msg, ERROR_TEXT.hush); assert.equal(h.re, "shout");
+  const [fa] = await Promise.all([once(host, "shout"), friend.shout("well")]); assert.deepEqual(fa, { seat: 1, id: "well" });
+
   // the host's phone loses signal: the socket dies under it; the client comes back with its token and the whole game
   const offline = once(friend, "room");
   const back = once(host, "joined", 8000);

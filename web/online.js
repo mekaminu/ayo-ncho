@@ -5,9 +5,10 @@
 //   net.on('joined', ({ seat, room }) => …)   // seated (also after a reconnect: the room carries the whole game)
 //   net.on('move',   ({ seat, pit, events, state }) => …)
 //   net.on('room',   ({ room, started }) => …) // presence, a rematch asked for, a new game started
+//   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
-//   net.create({ variant, rules, name }) / net.join(code, name) / net.rejoin(code, token) / net.move(pit) / net.rematch() / net.leave()
+//   net.create({ variant, rules, name }) / net.join(code, name) / net.rejoin(code, token) / net.move(pit) / net.shout(id) / net.rematch() / net.leave()
 
 export const BACKOFF_MS = [800, 1600, 3200, 6400, 10000]; // between reconnect attempts, then every 10 s
 
@@ -26,6 +27,7 @@ export const ERROR_TEXT = {
   notfound: 'No room with that code — check the link', taken: 'That room already has two players', waiting: 'Your friend has not joined yet',
   turn: 'Not your move', illegal: 'That pit cannot be played', over: 'The game is over', token: 'That seat is not yours', swept: 'The room has closed',
   full: 'Too many rooms open right now — try again in a minute', seated: 'Already at a board', unseated: 'Join a room first', variant: 'Unknown game',
+  hush: 'Easy — one shout at a time', bad: 'Something went wrong',
 };
 
 export class Online {
@@ -47,6 +49,7 @@ export class Online {
   ask(intent) { this.intent = intent; if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(intent)); else this.connect(); }
   move(pit) { return this.send({ t: 'move', pit }); }
   rematch() { return this.send({ t: 'rematch' }); }
+  shout(id) { return this.send({ t: 'shout', id }); }
   leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
 
   send(msg) {
@@ -86,6 +89,7 @@ export class Online {
         return this.emit('joined', { seat: m.seat, code: m.code, token: m.token, room: m.room });
       case 'room': this.room = m.room; return this.emit('room', { room: m.room, started: !!m.started });
       case 'move': if (this.room) this.room.state = m.state; return this.emit('move', { seat: m.seat, pit: m.pit, events: m.events, state: m.state });
+      case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
       case 'error':
         if (m.code === 'swept' || (m.code === 'notfound' && m.re === 'rejoin') || m.code === 'token') { this.token = null; this.intent = null; } // nothing left to come back to
         return this.emit('error', { code: m.code, msg: ERROR_TEXT[m.code] || m.msg || 'Something went wrong', re: m.re });

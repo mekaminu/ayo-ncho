@@ -6,6 +6,7 @@
 // token back and gets its seat and the whole game again. Rooms nobody has touched for a while are swept.
 import { randomUUID } from "node:crypto";
 import { newGame, applyMove, legalMoves, replay, RULES } from "../engine/ayo.js";
+import { isShout, mayShout } from "../web/shouts.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
 export const CODE_LENGTH = 4;
@@ -93,6 +94,18 @@ export class Rooms {
     const { state, events } = applyMove(g, pit);
     room.game = state; room.touchedAt = this.now();
     return { seat, pit, events, state: publicState(state) };
+  }
+
+  // A shout across the board: one of the fixed phrases (web/shouts.js), by id only, one at a time per seat.
+  shout(code, token, id) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
+    if (!isShout(id)) fail("bad", "not a shout");
+    const t = this.now();
+    if (!mayShout(room.seats[seat].shoutAt, t)) fail("hush", "one shout at a time");
+    room.seats[seat].shoutAt = t; room.touchedAt = t;
+    return { seat, id };
   }
 
   // Play again at the same board: when both seats have asked, a fresh game starts (the loser of the last game moves first).
