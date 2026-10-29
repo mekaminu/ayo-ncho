@@ -23,7 +23,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [x] Family rules confirmed 29 Oct: Nchò (relay sowing, capture on 4, last 8, bankruptcy, loop stop — see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka sent a rules write-up at 03:12: relay sowing taken as yes unless he says otherwise.
 - [!] Settings screen toggles Meka asked for from that write-up: capture on 2&3 vs 4 only, relay vs single lap. Mock them on the Settings mockup; build after his yes.
 - [!] Create the GitHub repo github.com/mekaminu/ayo-ncho (private) so the runs can push
-- [!] Home / game-over / settings mockups: his yes before they are built (runs make the mockups first)
+- [!] Home / Game over / Settings mockups made 29 Oct on the Design canvas "Ayo & Nchò — screens" (https://claude.ai/artifact/H75vS5iCT5X2Fmft4oYMXP): awaiting Meka's yes before they are built
 
 ## Daily plan
 
@@ -51,10 +51,10 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [x] Fold-open and Mac layout (board fills the height, player cards down the left, toolbar down the right); pinch to zoom on the phone, wheel on the Mac, drag to tilt, clamped so the board never leaves the frame; `tools/render.py --wide` renders it
 
 ### Sat 31 Oct — screens around the board
-- [ ] Mockups on Meka's Design canvas: Home, Game over, Settings (boxed, segmented, minimal); `[!]` until his yes
-- [ ] Home: one-tap Play vs computer, level picker, continue last game, Play with friends (coming)
+- [!] Mockups on Meka's Design canvas: Home, Game over, Settings — made 29 Oct, awaiting his yes (link under Needs Meka)
+- [!] Home: one-tap Play vs computer, level picker, continue last game, Play with friends (coming) — after the mockup's yes
 - [ ] First-game tutorial: three prompts in the first game, then never again
-- [ ] Settings: wood finish (mahogany / iroko / ebony), seed set, sound, haptics, count badges on/off (the Nchò/Ayo picker already lives in the Rules card)
+- [!] Settings: game, capture on 4 vs 2&3, relay vs single lap, last-8 toggle, wood finish, seed set, count badges, sound, haptics, sowing speed, opponent — after the mockup's yes (engine still needs the capture/relay toggles as options)
 - [ ] Installable (manifest + service worker): offline play vs computer with no signal
 
 ### Sun 1 Nov — opponents with character, polish, deploy
