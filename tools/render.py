@@ -19,7 +19,7 @@ with sync_playwright() as p:
     pg.route("https://fonts.googleapis.com/**", lambda r: r.abort())
     if os.path.exists(three):
         pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=three, content_type="text/javascript"))
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("" if smoke else "?still=1"), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1" if smoke else "?still=1"), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     if smoke:
         before = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")

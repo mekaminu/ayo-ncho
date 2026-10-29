@@ -1,6 +1,7 @@
 // The game: engine state → 3D seeds, animated move by move. Every move the picture shows comes from engine events.
 import * as THREE from 'three';
 import { newGame, applyMove, legalMoves, replay, WIN_SEEDS } from '/engine/ayo.js';
+import { SeedSim } from './physics.js';
 import { buildBoard, buildTable, buildLights, seedMaterial, seedGeometry, SEED_R, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -19,6 +20,7 @@ const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 20);
 const finish = params.get('finish') || prefs.get('finish', 'mahogany');
 const board = buildBoard(scene, finish); buildTable(scene); buildLights(scene);
 const seedMat = seedMaterial();
+const sim = new SeedSim();
 
 // camera: the board upright in your hands, you at the near end
 let theta = 0, phi = 0.72, dist = 1.55; const target = new THREE.Vector3(0, 0.02, 0.02);
@@ -85,13 +87,38 @@ function fly(m, home, ms = 170, lift = 0.09) {
   }, easeInOut).then(() => tween(90, (t) => { m.position.y = to.y + Math.sin(t * Math.PI) * 0.006; }));
 }
 
-// ---------- sound (tiny, synthesised; proper samples come later) ----------
+// drop a seed into a bowl with real-ish physics: it falls, bounces, rolls and is nudged by the seeds already there
+function drop(m, home, flight = 0.22) {
+  homes[home].push(m); m.userData.home = home; const target = slotPos(home, homes[home].length - 1);
+  const others = homes[home].filter((o) => o !== m);
+  const p = sim.toss(m, target, others, m.scale.y * 0.95, reduceMotion ? 0.05 : flight);
+  const entry = sim.live[sim.live.length - 1]; if (entry) entry.onBounce = (k) => { if (k > 0.25) tick(0.9 + k * 0.4, 0.05 * k); };
+  return p;
+}
+
+// ---------- sound (synthesised on the device; no audio files) ----------
 let actx = null; const soundOn = () => prefs.get('sound', '1') === '1';
+let noiseBuf = null;
+function ctx() { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (!noiseBuf) { noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.1, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } return actx; }
+// a seed landing on wood: a short knock (tone) plus a tiny burst of noise
 function click(pitch = 1, gain = 0.12) {
   if (!soundOn()) return; try {
-    actx = actx || new (window.AudioContext || window.webkitAudioContext)(); const t = actx.currentTime;
-    const o = actx.createOscillator(), g = actx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(1400 * pitch, t); o.frequency.exponentialRampToValueAtTime(500 * pitch, t + 0.05);
-    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.07); o.connect(g).connect(actx.destination); o.start(t); o.stop(t + 0.08);
+    const a = ctx(); const t = a.currentTime;
+    const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(1500 * pitch, t); o.frequency.exponentialRampToValueAtTime(420 * pitch, t + 0.045);
+    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.07); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.08);
+    const n = a.createBufferSource(); n.buffer = noiseBuf; const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2600 * pitch; f.Q.value = 1.2;
+    const ng = a.createGain(); ng.gain.setValueAtTime(gain * 0.5, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.03); n.connect(f).connect(ng).connect(a.destination); n.start(t); n.stop(t + 0.04);
+  } catch {}
+}
+const tick = (pitch, gain) => click(pitch, gain);
+// a handful of seeds picked up: a quick rattle
+function rattle(n) { for (let i = 0; i < Math.min(n, 6); i++) setTimeout(() => click(0.7 + Math.random() * 0.5, 0.04), i * 28 + Math.random() * 20); }
+// captured seeds scooped away: a short descending sweep
+function scoop() {
+  if (!soundOn()) return; try {
+    const a = ctx(); const t = a.currentTime; const n = a.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
+    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(600, t + 0.28);
+    const g = a.createGain(); g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3); n.connect(f).connect(g).connect(a.destination); n.start(t); n.stop(t + 0.32);
   } catch {}
 }
 const buzz = (ms) => { if (prefs.get('haptics', '1') === '1' && navigator.vibrate) navigator.vibrate(ms); };
@@ -145,20 +172,20 @@ async function animate(events, mover) {
     if (e.type === 'pickup') {
       const picked = homes[e.pit].splice(0); const [cx, cz] = pitCenters[e.pit];
       await Promise.all(picked.map((m, k) => tween(240, (t) => { m.position.y = surfaceY(m.position.x, m.position.z) + 0.02 + t * 0.14; m.position.x = THREE.MathUtils.lerp(m.position.x, cx + (k % 3 - 1) * 0.018, t * 0.8); m.position.z = THREE.MathUtils.lerp(m.position.z, cz + (Math.floor(k / 3) - 1) * 0.016, t * 0.8); }, easeOut)));
-      click(0.8, 0.08); setBadge(e.pit, 0); animate.cluster = picked;
+      rattle(picked.length); setBadge(e.pit, 0); animate.cluster = picked;
     } else if (e.type === 'drop') {
       const m = animate.cluster.shift(); const count = homes[e.pit].length + 1;
       // the cluster drifts along with the sowing hand
       const [cx, cz] = pitCenters[e.pit];
       animate.cluster.forEach((s, k) => tween(140, (t) => { s.position.x = THREE.MathUtils.lerp(s.position.x, cx + (k % 3 - 1) * 0.018, t); s.position.z = THREE.MathUtils.lerp(s.position.z, cz + (Math.floor(k / 3) - 1) * 0.016 - 0.03, t); }));
-      await fly(m, e.pit, 150, 0.04); click(1 + Math.min(count, 8) * 0.04); buzz(8); setBadge(e.pit, count);
+      await drop(m, e.pit); click(1 + Math.min(count, 8) * 0.04); buzz(8); setBadge(e.pit, count);
     } else if (e.type === 'capture') {
-      await wait(160);
+      await wait(160); scoop();
       const store = e.by === you ? 'S0' : 'S1'; const scoreEl = e.by === you ? $('#myScore') : $('#oppScore');
       let running = state.stores[e.by] - e.n; // the state we hold is already after the move; count up from before
       for (const pit of e.pits) {
         const taken = homes[pit].splice(0); setBadge(pit, 0);
-        for (const m of taken) { fly(m, store, 260, 0.12).then(() => { running++; tickScore(scoreEl, running); click(0.6, 0.1); buzz(12); }); await wait(60); }
+        for (const m of taken) { drop(m, store, 0.3).then(() => { running++; tickScore(scoreEl, running); click(0.6, 0.1); buzz(12); }); await wait(70); }
         await wait(120);
       }
       await wait(300);
@@ -235,9 +262,9 @@ if (resumed && state.turn === ai) { (async () => { busy = true; await wait(400);
 
 window.__ayo = { get state() { return state; }, get selected() { return selected; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
-let frames = 0;
+let frames = 0, last = performance.now();
 function loop(now) {
-  runTweens(now); placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
+  runTweens(now); sim.step((now - last) / 1000, now); last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
   if (frames === 3) { window.__done = true; if (params.get('still')) return; }
   requestAnimationFrame(loop);
 }

@@ -10,7 +10,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 1. **Lock first.** One run at a time, via the `build-lock` branch (see the scheduled task's prompt). Never force-push.
 2. **One item per run** (or one coherent slice of a large item). Finish it: code, tests, docs, push, CI green.
 3. **The engine is the law.** `engine/ayo.js` is shared by browser and server; every move the UI shows comes from `applyMove`'s events. Never duplicate rules in UI code. `npm test` must pass before every push.
-4. **Real, not drawn.** The look is the 3D board in `web/index.html` (approved by Meka 28 Oct): carved hardwood, Job's-tear seeds, warm lamp light. Keep that look; improve it, never flatten it. Three.js from cdnjs (pinned version), physics via Rapier (compat build) when it lands.
+4. **Real, not drawn.** The look is the 3D board in `web/board.js` (approved by Meka 28 Oct): carved hardwood, Job's-tear seeds, warm lamp light. Keep that look; improve it, never flatten it. Three.js from cdnjs (pinned version); seed physics is our own `web/physics.js`.
 5. **Mock-first for new screens.** Any new screen that is not the board (home, game over, settings, store) gets a mockup on Meka's Design canvas and a `[!]` "Needs Meka" line before it is built. The board itself is approved.
 6. **Animations everywhere they make sense** (Meka's standing preference): every seed moves, every capture is a scoop, every score change ticks. Respect `prefers-reduced-motion`. Haptics on phone via `navigator.vibrate`.
 7. **Phone first.** Samsung Galaxy Fold (folded ~390px and open ~800px) and a Mac browser. 60fps target; lighter textures on slow connections. Test in the container with Playwright + SwiftShader (`python3 tools/render.py out.png --smoke` plays a real move and fails on any page error; run it before every push that touches web/) and commit a render to `docs/` when the look changes.
@@ -44,9 +44,9 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [x] Game over state on the board (final position, who won by how many, rematch); game resumes after a reload
 
 ### Fri 30 Oct — seeds that behave like seeds
-- [ ] Rapier physics (compat build from cdnjs): seeds are rigid bodies with the carved bowl as a trimesh collider; dropped seeds bounce, roll and settle; full pits pile up; seeds never clip through wood
-- [ ] Rest states cached so a settled board costs no physics time; physics only during a move
-- [ ] Sound: seed-on-wood click (pitch varies with pit fullness), cluster rattle on pick-up, capture scoop, soft win chord; haptic tap per seed on phone
+- [x] Seed physics (purpose-built in web/physics.js rather than Rapier: smaller, no wasm download, full control): dropped seeds fall, bounce off the carved bowl, roll down its slope, get shoved aside by seeds already there, settle; never below the wood; snap to a slot after 1.1 s whatever happens
+- [x] Physics only runs for seeds in flight; a settled board costs nothing
+- [x] Sound, synthesised on the device (no audio files): seed-on-wood knock with a noise burst, pitch rising with pit fullness, bounce ticks, cluster rattle on pick-up, capture scoop sweep, win chime; haptic tap per seed on phone
 - [ ] Fold open layout (two-column: board left, opponent card right) and Mac window layout; pinch to zoom, drag to tilt, never lose the board
 
 ### Sat 31 Oct — screens around the board
