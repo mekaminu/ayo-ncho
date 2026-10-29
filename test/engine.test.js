@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { newGame, applyMove, legalMoves, replay, totalSeeds, TOTAL_SEEDS, sideOf } from "../engine/ayo.js";
+import { newGame, applyMove, legalMoves, replay, totalSeeds, TOTAL_SEEDS, sideOf, RULES } from "../engine/ayo.js";
 import { chooseMove } from "../engine/ai.js";
 
 function rng(seed) { let s = seed; return () => { s = (s * 9301 + 49297) % 233280; return s / 233280; }; }
@@ -133,4 +133,21 @@ test("ncho: a repeating position within one turn ends the turn, and seeds are co
   g.pits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; g.stores = [18, 18];
   const { state } = applyMove(g, 0);
   assert.equal(totalSeeds(state), TOTAL_SEEDS);
+});
+
+test("custom rules: Ayo captures with relay sowing on, and Nchò captures as a single lap", () => {
+  let g = newGame("ayo", { relay: true });
+  g.pits = [2, 0, 1, 0, 0, 0, 4, 4, 4, 4, 4, 4]; g.stores = [10, 11];
+  const { events } = applyMove(g, 0);
+  assert.ok(events.some((e) => e.type === "pickup" && e.relay), "relay works under Ayo captures");
+  let h = newGame("ncho", { relay: false });
+  h.pits = [2, 0, 1, 0, 0, 0, 4, 4, 4, 4, 4, 4]; h.stores = [10, 11];
+  const r = applyMove(h, 0);
+  assert.ok(!r.events.some((e) => e.type === "pickup" && e.relay), "no relay when switched off");
+  assert.deepEqual(r.state.pits.slice(0, 3), [0, 1, 2]);
+});
+
+test("rule bundles are what the games expect", () => {
+  assert.deepEqual(RULES.ncho, { capture: 4, relay: true, last8: true });
+  assert.deepEqual(RULES.ayo, { capture: 23, relay: false, last8: false });
 });

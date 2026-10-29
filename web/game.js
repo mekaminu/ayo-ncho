@@ -1,6 +1,6 @@
 // The game: engine state → 3D seeds, animated move by move. Every move the picture shows comes from engine events.
 import * as THREE from 'three';
-import { newGame, applyMove, legalMoves, replay, WIN_SEEDS } from '/engine/ayo.js';
+import { newGame, applyMove, legalMoves, replay, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
 import { buildBoard, buildTable, buildLights, seedMaterial, seedGeometry, SEED_R, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
@@ -143,12 +143,24 @@ function setBadge(i, n) { badges[i].textContent = n; badges[i].classList.toggle(
 function tickScore(el, n) { el.textContent = n; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
 // ---------- game state ----------
-const variant = prefs.get('variant', 'ncho');
-const level = prefs.get('level', 'medium');
-let state = newGame(variant); let busy = false; let selected = null;
+// Settings live in prefs; a game carries the rules it started with so changing settings never corrupts a game in progress.
+const settings = {
+  get game() { return prefs.get('game.variant', 'ncho'); },
+  rules() { // explicit switches override the game's bundle
+    const base = RULES[this.game] || RULES.ncho;
+    const cap = prefs.get('rules.capture', ''); const relay = prefs.get('rules.relay', ''); const last8 = prefs.get('rules.last8', '');
+    return { capture: cap ? +cap : base.capture, relay: relay ? relay === '1' : base.relay, last8: last8 ? last8 === '1' : base.last8 };
+  },
+  get level() { return prefs.get('level', 'medium'); },
+  get speed() { return prefs.get('speed', 'normal'); },
+};
+const PACES = { slow: 230, normal: 150, fast: 90 };
+let PACE = PACES[settings.speed] || 150;
 const you = 0, ai = 1;
-const names = { easy: 'Adaeze · Easy', medium: 'Nnamdi · Medium', hard: 'Mama Ngozi · Hard' };
-$('#oppName').textContent = names[level] || names.medium;
+const names = { easy: 'Adaeze', medium: 'Nnamdi', hard: 'Mama Ngozi' };
+const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
+let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
+let stats = { biggest: 0, captures: 0, started: Date.now() };
 
 const worker = new Worker('./ai-worker.js', { type: 'module' });
 function aiMove(s) { return new Promise((res) => { worker.onmessage = (e) => res(e.data); worker.postMessage({ state: s, level }); }); }
@@ -156,6 +168,7 @@ function aiMove(s) { return new Promise((res) => { worker.onmessage = (e) => res
 function refreshStatic() {
   state.pits.forEach((n, i) => setBadge(i, n));
   $('#myScore').textContent = state.stores[0]; $('#oppScore').textContent = state.stores[1];
+  $('#oppName').textContent = levelLabel(level);
   showTurn();
 }
 function showTurn() {
@@ -172,24 +185,22 @@ function select(i) {
 function deselect() { selected = null; board.ring.visible = false; board.glow.visible = false; showTurn(); }
 
 // Play a move's events on the board, one seed at a time.
-const PACE = 150; // ms between seeds leaving the hand
-async function animate(events, prevStores) {
+async function animate(events, prevStores, pace = PACE) {
   const shown = prevStores.slice(); const pending = [];
   for (const e of events) {
     if (e.type === 'pickup') {
       await Promise.all(pending); pending.length = 0;
-      if (e.relay) await wait(140);
+      if (e.relay) await wait(pace);
       const picked = homes[e.pit].splice(0); const [cx, cz] = pitCenters[e.pit];
       await Promise.all(picked.map((m, k) => tween(240, (t) => { m.position.y = surfaceY(m.position.x, m.position.z) + 0.02 + t * 0.14; m.position.x = THREE.MathUtils.lerp(m.position.x, cx + (k % 3 - 1) * 0.018, t * 0.8); m.position.z = THREE.MathUtils.lerp(m.position.z, cz + (Math.floor(k / 3) - 1) * 0.016, t * 0.8); }, easeOut)));
       rattle(picked.length); setBadge(e.pit, 0); animate.cluster = picked;
     } else if (e.type === 'drop') {
       const m = animate.cluster.shift(); const count = homes[e.pit].length + 1;
-      // the cluster drifts along with the sowing hand
       const [cx, cz] = pitCenters[e.pit];
       animate.cluster.forEach((s, k) => tween(140, (t) => { s.position.x = THREE.MathUtils.lerp(s.position.x, cx + (k % 3 - 1) * 0.018, t); s.position.z = THREE.MathUtils.lerp(s.position.z, cz + (Math.floor(k / 3) - 1) * 0.016 - 0.03, t); }));
       // a hand sows at a steady pace: the next seed leaves while the last one is still settling
       pending.push(drop(m, e.pit).then(() => { click(1 + Math.min(count, 8) * 0.04); buzz(8); setBadge(e.pit, count); }));
-      await wait(PACE);
+      await wait(pace);
     } else if (e.type === 'capture') {
       await Promise.all(pending); pending.length = 0;
       await wait(120); scoop();
@@ -207,36 +218,147 @@ async function animate(events, prevStores) {
 
 async function play(pit) {
   const { state: next, events } = applyMove(state, pit);
-  const prevStores = state.stores; state = next; busy = true; deselect(); $('#undo').disabled = true;
+  const prevStores = state.stores; const mover = state.turn; state = next; busy = true; deselect(); $('#undo').disabled = true;
+  if (mover === you) { const got = state.stores[0] - prevStores[0]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; }
+  tipFor(events);
   await animate(events, prevStores);
   busy = false; refreshStatic(); save();
   if (state.over) return gameOver();
   if (state.turn === ai) {
     showTurn(); await wait(350);
     const m = await aiMove(state);
-    if (m === null) return;
+    if (m === null || state.turn !== ai) return;
     select(m); await wait(550); // show which pit the opponent chose
     await play(m);
   }
 }
 
+// ---------- screens ----------
+const body = document.body;
+function showScreen(which) { // 'home' | 'settings' | 'play'
+  $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings';
+  body.classList.toggle('screen', which !== 'play'); body.classList.toggle('playing', which === 'play');
+  if (which === 'home') { paintHome(); idle = true; } else idle = false;
+}
+let idle = true; // the home screen slowly turns the board
+function paintHome() {
+  const g = settings.game;
+  document.querySelectorAll('[data-game]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.game === g));
+  document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.level === level));
+  $('#playSub').textContent = 'vs ' + levelLabel(level);
+  const saved = savedGame();
+  $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
+}
+function paintSettings() {
+  const r = settings.rules();
+  const set = (name, v) => document.querySelectorAll(`[data-set="${name}"] .segbtn, [data-set="${name}"] .swatch`).forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === String(v)));
+  set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', 'jobs'); set('speed', settings.speed);
+  const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
+  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1');
+  document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
+}
+function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; body.appendChild(t); setTimeout(() => t.remove(), 1800); }
+
+// settings wiring: rules changes start a new game; everything else applies at once
+document.querySelectorAll('#settings [data-set]').forEach((el) => {
+  const name = el.dataset.set;
+  if (el.classList.contains('sw')) {
+    el.addEventListener('click', () => {
+      const on = el.getAttribute('aria-checked') !== 'true'; el.setAttribute('aria-checked', String(on));
+      if (name === 'last8') { prefs.set('rules.last8', on ? '1' : '0'); rulesChanged(); }
+      else prefs.set(name, on ? '1' : '0');
+      if (name === 'sound') { paintSound(); click(1, 0.08); }
+    });
+  } else {
+    el.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => {
+      const v = b.dataset.v;
+      if (name === 'game') { prefs.set('game.variant', v); prefs.set('rules.capture', ''); prefs.set('rules.relay', ''); prefs.set('rules.last8', ''); rulesChanged(); }
+      else if (name === 'capture') { prefs.set('rules.capture', v); rulesChanged(); }
+      else if (name === 'relay') { prefs.set('rules.relay', v); rulesChanged(); }
+      else if (name === 'finish') { prefs.set('finish', v); toast('New wood on the next game'); }
+      else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
+      paintSettings(); click(1.2, 0.05);
+    }));
+  }
+});
+document.querySelectorAll('.choose[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); paintSettings(); refreshStatic(); click(1.2, 0.05); }));
+document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('click', () => { prefs.set('game.variant', b.dataset.game); prefs.set('rules.capture', ''); prefs.set('rules.relay', ''); prefs.set('rules.last8', ''); paintHome(); click(1.2, 0.05); }));
+document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); paintHome(); click(1.2, 0.05); }));
+function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
+$('#playBtn').addEventListener('click', () => { newRound(); showScreen('play'); click(1.3, 0.08); });
+$('#continueBtn').addEventListener('click', () => { if (resume()) { layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
+$('#homeBtn').addEventListener('click', () => { if (!busy) { save(); showScreen('home'); } });
+$('#goHome').addEventListener('click', () => { $('#gameover').hidden = true; showScreen('home'); });
+$('#homeSettings').addEventListener('click', () => { paintSettings(); showScreen('settings'); });
+$('#settingsBtn').addEventListener('click', () => { if (!busy) { paintSettings(); showScreen('settings'); } });
+$('#settingsBack').addEventListener('click', () => { const r = settings.rules(); const same = state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(r) && state.moves.length; showScreen(same ? 'play' : 'home'); });
+$('#settingsRules').addEventListener('click', () => { $('#rules').hidden = false; });
+
+// game over card, as approved
 function gameOver() {
   const [a, b] = state.stores; const win = state.winner === you; const draw = state.winner === 'draw';
-  $('#goTitle').textContent = draw ? 'A draw' : win ? 'You win' : 'Nnamdi wins';
-  $('#goSub').textContent = draw ? `${a} seeds each` : `${Math.max(a, b)} to ${Math.min(a, b)}`;
-  $('#gameover').hidden = false; if (win) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
+  $('#goEyebrow').textContent = `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves`;
+  $('#goTitle').textContent = draw ? 'A draw' : win ? 'You win' : `${names[level]} wins`;
+  $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = levelLabel(level);
+  $('#goMe').classList.toggle('win', a >= b); $('#goOpp').classList.toggle('win', b > a);
+  $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
+  const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  $('#gameover').hidden = false; prefs.set('game', 'null');
+  if (win) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
 }
+$('#replayBtn').addEventListener('click', async () => {
+  if (busy) return; const moves = state.moves.slice(); const variant = state.variant, rules = state.rules;
+  $('#gameover').hidden = true; busy = true;
+  let s = newGame(variant, rules); layoutFromState(s); refreshStaticFrom(s);
+  for (const m of moves) { const r = applyMove(s, m); if (r.state.turn === ai) { select(m); await wait(250); } deselect(); await animate(r.events, s.stores, 70); s = r.state; refreshStaticFrom(s); }
+  busy = false; $('#gameover').hidden = false;
+});
+function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); $('#myScore').textContent = s.stores[0]; $('#oppScore').textContent = s.stores[1]; }
+$('#shareBtn').addEventListener('click', async () => {
+  const [a, b] = state.stores; const text = `Ayo & Nchò — ${state.winner === you ? 'I beat' : 'I lost to'} ${names[level]} ${a}–${b} in ${state.moves.length} moves.`;
+  try {
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/png')); const file = blob && new File([blob], 'ayo-ncho.png', { type: 'image/png' });
+    if (navigator.share && file && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ text, files: [file] });
+    if (navigator.share) return await navigator.share({ text });
+    await navigator.clipboard.writeText(text); toast('Result copied');
+  } catch {}
+});
 
-function save() { prefs.set('game', JSON.stringify({ moves: state.moves, variant })); }
+function save() { prefs.set('game', JSON.stringify({ moves: state.moves, variant: state.variant, rules: state.rules, level, stats })); }
+function savedGame() { try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length) { const s = replay(g.moves, g.variant, g.rules); return s.over ? null : s; } } catch {} return null; }
 function resume() {
-  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.variant === variant && g.moves.length && !params.get('still')) { state = replay(g.moves, variant); return state.over ? (state = newGame(variant), false) : true; } } catch {}
+  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; return !state.over; } } catch {}
   return false;
 }
-function newRound() { state = newGame(variant); layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); }
+function newRound() { state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); }
+function kickAi() { if (state.turn === ai && !state.over) (async () => { busy = true; await wait(400); busy = false; const m = await aiMove(state); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 function undo() {
   if (busy || state.moves.length < 2) return;
   const moves = state.moves.slice(0, state.turn === you ? -2 : -1);
-  state = replay(moves, variant); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
+  state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
+}
+function paintRules() { $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
+
+// ---------- first-game tutorial: three tips, then never again ----------
+const TIPS = [
+  'Your six pits are the column nearest you, on the right. Tap one with seeds, then tap again to sow.',
+  'The seeds go one per pit anticlockwise: up your side, then down theirs. The count beside each pit keeps score for you.',
+  null, // filled in per rules below
+];
+let tipStep = +prefs.get('tutorial', '0');
+function showTip(text) {
+  if (!text || params.get('still') || params.get('capture')) return;
+  let t = $('#tip'); if (!t) { t = document.createElement('div'); t.id = 'tip'; t.innerHTML = '<p></p><button class="btn ghost" style="padding:8px 12px;font-size:13px">Got it</button>'; body.appendChild(t); t.querySelector('button').addEventListener('click', () => { t.remove(); }); }
+  t.querySelector('p').textContent = text;
+}
+function tipFor(events) {
+  if (tipStep >= 3) return;
+  if (tipStep === 0) { showTip(TIPS[1]); tipStep = 1; }
+  else if (tipStep === 1 && events.some((e) => e.type === 'capture' || e.relay)) {
+    const r = state.rules; showTip(r.capture === 4 ? 'A pit that reaches 4 is captured by whoever owns that side — and your last seed landing in a pit with seeds picks it up and keeps going.' : 'Your last seed made a pit 2 or 3 on their side, so you captured it, plus any 2s and 3s right behind it.'); tipStep = 2;
+  }
+  else if (tipStep === 2) { tipStep = 3; const t = $('#tip'); if (t) t.remove(); }
+  prefs.set('tutorial', String(tipStep));
 }
 
 // ---------- input ----------
@@ -258,7 +380,7 @@ const lift = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch =
 canvas.addEventListener('pointercancel', (e) => { lift(e); down = null; });
 canvas.addEventListener('pointerup', (e) => {
   const wasPinch = !!pinch || fingers.size > 1; lift(e);
-  const wasDrag = dragged; down = null; if (wasPinch || wasDrag || busy || state.over || state.turn !== you) return;
+  const wasDrag = dragged; down = null; if (wasPinch || wasDrag || busy || state.over || state.turn !== you || body.classList.contains('screen')) return;
   ptr.set((e.clientX / canvas.clientWidth) * 2 - 1, -(e.clientY / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(board.targets)[0]; if (!hit) return deselect();
   const pit = hit.object.userData.pit; const legal = legalMoves(state);
@@ -269,32 +391,29 @@ canvas.addEventListener('wheel', (e) => { dist += e.deltaY * 0.001; clampDist();
 function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; tween(260, (t) => { board.ring.position.x = x + Math.sin(t * Math.PI * 4) * 0.006 * (1 - t); }).then(() => { if (selected === null) board.ring.visible = false; else { board.ring.position.x = pitCenters[selected][0]; board.ring.position.z = pitCenters[selected][1]; } }); click(0.5, 0.05); }
 
 $('#undo').addEventListener('click', undo);
-$('#newGame').addEventListener('click', newRound);
-$('#rematch').addEventListener('click', newRound);
+$('#rematch').addEventListener('click', () => { newRound(); showScreen('play'); });
 $('#rulesBtn').addEventListener('click', () => { $('#rules').hidden = !$('#rules').hidden; });
-$('#rulesNcho').hidden = variant !== 'ncho'; $('#rulesAyo').hidden = variant !== 'ayo';
-$('#gameName').textContent = variant === 'ncho' ? 'Nchò' : 'Ayo';
-document.querySelectorAll('[data-variant]').forEach((b) => {
-  b.setAttribute('aria-pressed', b.dataset.variant === variant);
-  b.addEventListener('click', () => { if (b.dataset.variant === variant) return; prefs.set('variant', b.dataset.variant); prefs.set('game', 'null'); location.reload(); });
-});
 $('#rulesClose').addEventListener('click', () => { $('#rules').hidden = true; });
 const soundBtn = $('#soundBtn'); const paintSound = () => soundBtn.setAttribute('aria-pressed', soundOn());
 soundBtn.addEventListener('click', () => { prefs.set('sound', soundOn() ? '0' : '1'); paintSound(); click(1, 0.08); }); paintSound();
 
 // ---------- start ----------
-const resumed = resume(); layoutFromState(state); refreshStatic();
+paintRules(); layoutFromState(state); refreshStatic();
 if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected
-  state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; layoutFromState(state); refreshStatic(); select(3);
+  state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; layoutFromState(state); refreshStatic(); select(3); showScreen('play');
+} else if (params.get('capture') && !params.get('stay')) { // the smoke test starts straight into a game
+  newRound(); showScreen('play'); if (tipStep === 0) { showTip(TIPS[0]); }
+} else {
+  showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
-if (resumed && state.turn === ai) { (async () => { busy = true; await wait(400); busy = false; const m = await aiMove(state); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 
 window.__ayo = { get state() { return state; }, get selected() { return selected; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 let frames = 0, last = performance.now();
 function loop(now) {
-  runTweens(now); sim.step((now - last) / 1000, now); last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
-  if (frames === 3) { window.__done = true; if (params.get('still')) return; }
+  runTweens(now); sim.step((now - last) / 1000, now); if (idle && !reduceMotion) theta += (now - last) * 0.00004; last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
+  if (frames === 3) { window.__done = true; if (params.get("still")) return; }
+  if (window.__freeze) return;
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);

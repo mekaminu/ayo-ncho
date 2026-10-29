@@ -24,9 +24,15 @@ export const WIN_SEEDS = 25;
 export const QUIET_LIMIT = 60; // moves without a capture before the game is called
 
 export const VARIANTS = ["ncho", "ayo"];
-export function newGame(variant = "ncho") {
+// Each game is a bundle of rule switches; a custom game can mix them (Settings → Rules).
+export const RULES = {
+  ncho: { capture: 4, relay: true, last8: true },   // capture on 4 (to the side's owner; last seed on their side to the sower), relay sowing, last 8 to the next capturer
+  ayo:  { capture: 23, relay: false, last8: false }, // capture on 2 or 3 by the last seed, sweeping back; grand slam; single lap
+};
+export function newGame(variant = "ncho", overrides = {}) {
   return {
     variant,
+    rules: { ...(RULES[variant] || RULES.ncho), ...overrides },
     pits: Array(PITS).fill(4),
     stores: [0, 0],
     turn: 0,            // player to move
@@ -96,35 +102,51 @@ export function applyMove(state, pit) {
   if (!legalMoves(state).includes(pit)) throw new Error("must feed the opponent");
 
   const me = state.turn;
+  const rules = state.rules || RULES[state.variant] || RULES.ncho;
   const events = [{ type: "pickup", pit, n: state.pits[pit] }];
   const stores = state.stores.slice();
-  let pits, captured = [];
-  if (state.variant === "ncho") {
-    pits = state.pits.slice();
-    const boardBefore = pits.reduce((a, b) => a + b, 0);
-    let n = pits[pit]; pits[pit] = 0; let i = pit; let origin = pit;
-    const seen = new Map(); let drops = 0;
-    while (n > 0) {
-      i = (i + 1) % PITS;
-      if (i === origin) continue; // a lap skips the pit the hand was lifted from
-      pits[i] += 1; n -= 1; drops += 1;
-      events.push({ type: "drop", pit: i });
-      if (pits[i] === 4) {
-        const by = (n === 0 && owner(i) !== me) ? me : owner(i);
-        stores[by] += 4; pits[i] = 0; captured.push(i);
-        events.push({ type: "capture", pits: [i], by, n: 4 });
-        continue;
+  const pits = state.pits.slice();
+  let captured = [];
+  const boardBefore = pits.reduce((a, b) => a + b, 0);
+  let n = pits[pit]; pits[pit] = 0; let i = pit; let origin = pit;
+  const seen = new Map(); let drops = 0;
+  while (n > 0) {
+    i = (i + 1) % PITS;
+    if (i === origin) continue; // a lap skips the pit the hand was lifted from
+    pits[i] += 1; n -= 1; drops += 1;
+    events.push({ type: "drop", pit: i });
+    if (rules.capture === 4 && pits[i] === 4) {
+      const by = (n === 0 && owner(i) !== me) ? me : owner(i);
+      stores[by] += 4; pits[i] = 0; captured.push(i);
+      events.push({ type: "capture", pits: [i], by, n: 4 });
+      continue;
+    }
+    if (n === 0) {
+      if (rules.capture === 23) {
+        // Ayo: the last seed making an opponent pit 2 or 3 captures it and every pit behind it that is also 2 or 3.
+        let taken = ayoCaptures(pits, i, me);
+        const oppTotal = sideOf(opponent(me)).reduce((a, k) => a + pits[k], 0);
+        const takeTotal = taken.reduce((a, k) => a + pits[k], 0);
+        if (taken.length && takeTotal === oppTotal) taken = []; // grand slam captures nothing
+        if (taken.length) {
+          let got = 0; for (const k of taken) { got += pits[k]; pits[k] = 0; }
+          stores[me] += got; captured = captured.concat(taken);
+          events.push({ type: "capture", pits: taken.slice(), by: me, n: got });
+          break;
+        }
       }
       // Relay sowing: the last seed landing in an occupied pit picks that pit up and carries on.
-      if (n === 0 && pits[i] > 1) {
+      if (rules.relay && pits[i] > 1) {
         const key = pits.join(",") + "|" + i; const times = (seen.get(key) || 0) + 1; seen.set(key, times);
         if (times >= 3 || drops > 400) break; // the same position three times in one turn: the turn ends here
         n = pits[i]; pits[i] = 0; origin = i;
         events.push({ type: "pickup", pit: i, n, relay: true });
       }
     }
-    // Last 8: whoever makes the capture that leaves 4 on the board takes those too.
-    // Total bankruptcy: fewer than 4 seeds left can never fill a pit, so they go to whoever captured last and the game ends.
+  }
+  // Last 8 / total bankruptcy (Nchò): whoever captured last takes what is left when 8 or fewer were on the board,
+  // or when fewer than 4 remain and no pit can ever fill again.
+  if (rules.last8) {
     const left = pits.reduce((a, b) => a + b, 0);
     if (left > 0 && ((captured.length && boardBefore <= 8) || left < 4)) {
       const lastCap = events.filter((e) => e.type === "capture").pop();
@@ -132,31 +154,6 @@ export function applyMove(state, pit) {
       for (let k = 0; k < PITS; k++) if (pits[k]) { taken.push(k); }
       stores[by] += left; for (const k of taken) pits[k] = 0;
       events.push({ type: "capture", pits: taken, by, n: left });
-    }
-  } else {
-    ({ pits } = sow(state.pits, pit));
-    const { last } = sow(state.pits, pit);
-    {
-      let n = state.pits[pit];
-      let i = pit;
-      while (n > 0) {
-        i = (i + 1) % PITS;
-        if (i === pit) continue;
-        events.push({ type: "drop", pit: i });
-        n -= 1;
-      }
-    }
-    captured = ayoCaptures(pits, last, me);
-    // Grand slam rule: if this would take every seed the opponent has, capture nothing.
-    const oppSide = sideOf(opponent(me));
-    const oppTotal = oppSide.reduce((n, i) => n + pits[i], 0);
-    const takeTotal = captured.reduce((n, i) => n + pits[i], 0);
-    if (captured.length && takeTotal === oppTotal) captured = [];
-    if (captured.length) {
-      let n = 0;
-      for (const i of captured) { n += pits[i]; pits[i] = 0; }
-      stores[me] += n;
-      events.push({ type: "capture", pits: captured.slice(), by: me, n });
     }
   }
 
@@ -198,8 +195,8 @@ function finish(state, events) {
 }
 
 // Replay a move list from the start (used for undo, replay and server verification).
-export function replay(moves, variant = "ayo") {
-  let s = newGame(variant);
+export function replay(moves, variant = "ncho", overrides = {}) {
+  let s = newGame(variant, overrides);
   for (const m of moves) s = applyMove(s, m).state;
   return s;
 }

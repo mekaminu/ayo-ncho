@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#0d0906"/>
+  <rect x="146" y="56" width="220" height="400" rx="110" fill="#7a3b1c"/>
+  <rect x="146" y="56" width="220" height="400" rx="110" fill="none" stroke="#4c2413" stroke-width="10"/>
+  <g fill="#2a170d">
+    <circle cx="206" cy="136" r="34"/><circle cx="306" cy="136" r="34"/>
+    <circle cx="206" cy="216" r="34"/><circle cx="306" cy="216" r="34"/>
+    <circle cx="206" cy="296" r="34"/><circle cx="306" cy="296" r="34"/>
+    <circle cx="206" cy="376" r="34"/><circle cx="306" cy="376" r="34"/>
+  </g>
+  <g fill="#d9d3bf">
+    <ellipse cx="196" cy="128" rx="11" ry="9"/><ellipse cx="216" cy="142" rx="11" ry="9"/>
+    <ellipse cx="300" cy="210" rx="11" ry="9"/><ellipse cx="316" cy="224" rx="11" ry="9"/><ellipse cx="296" cy="226" rx="11" ry="9"/>
+    <ellipse cx="206" cy="300" rx="11" ry="9"/>
+    <ellipse cx="300" cy="370" rx="11" ry="9"/><ellipse cx="314" cy="384" rx="11" ry="9"/>
+    <ellipse cx="200" cy="370" rx="11" ry="9"/><ellipse cx="214" cy="384" rx="11" ry="9"/><ellipse cx="198" cy="388" rx="11" ry="9"/>
+  </g>
+</svg>

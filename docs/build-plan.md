@@ -49,7 +49,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [x] Sowing animation driven by engine events: seeds lift as a cluster, then drop one per pit anticlockwise at a hand's pace (~140 ms per seed); count badge per pit ticks as seeds land
 - [x] Capture animation: captured seeds scoop out of the opponent's pits and travel into your trough; store count climbs seed by seed
 - [x] Opponent's move plays at the same pace, its pit glowing first; "thinking…" while the search runs in a Web Worker so the frame never stalls
-- [~] HUD: both scores, whose turn, undo (via engine replay), rules card, sound toggle — done; remains: polish pass once seen on the Fold
+- [x] HUD: both scores, whose turn, undo, rules card, sound toggle, home and settings buttons
 - [x] Game over state on the board (final position, who won by how many, rematch); game resumes after a reload
 
 ### Fri 30 Oct — seeds that behave like seeds
@@ -60,11 +60,11 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 
 ### Sat 31 Oct — screens around the board
 - [x] Mockups on Meka's Design canvas: Home, Game over, Settings — approved 29 Oct 03:32
-- [ ] Home, as approved: the board render behind, Nchò/Ayo switch, big Play with the chosen opponent, Continue with the live score, With friends (coming), opponent pills
-- [ ] First-game tutorial: three prompts in the first game, then never again
-- [ ] Settings, as approved: Rules (game, capture on 4 vs 2&3, relay vs single lap, last-8 switch — the engine gets these as options on the state, with tests), Board (wood swatches, seed set, pit counts), Feel (sound, haptics, sowing speed), Opponent; changing rules starts a new game
-- [ ] Game over, as approved: one card with both scores, biggest turn / captures / time, Play again, Replay (move by move on the board), Share (a picture of the final board via the Web Share API where available)
-- [ ] Installable (manifest + service worker): offline play vs computer with no signal
+- [x] Home, as approved: the LIVE board slowly turning behind it, Nchò/Ayo switch, big Play with the chosen opponent, Continue with the live score, With friends (coming), opponent pills (docs/render-2026-10-29-home.png)
+- [x] First-game tutorial: three prompts in the first game, then never again
+- [x] Settings, as approved: Rules (game, capture on 4 vs 2&3, relay vs single lap, last-8 switch — engine rule switches with tests), Board (wood swatches, seed set, pit counts), Feel (sound, haptics, sowing speed), Opponent; changing rules starts a new game
+- [x] Game over, as approved: one card with both scores, biggest turn / captures / time, Play again, Replay (the whole game replayed fast on the board), Share (the board picture via Web Share where available, else the result text copied)
+- [x] Installable (manifest, icons, service worker caching the shell, engine and three.js): offline play vs computer with no signal
 
 ### Sun 1 Nov — opponents with character, polish, deploy
 - [ ] Three named opponents with a face and a line or two (an elder who takes his time, a quick cousin, a market champion); reactions when captured from
