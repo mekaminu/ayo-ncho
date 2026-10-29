@@ -12,7 +12,7 @@ import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solved
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
-import { sowPath, pickedHint } from './path.js';
+import { sowPath, pickedHint, playedWords } from './path.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -267,7 +267,7 @@ function paintRoomStatus() { // what the room card says, from the connection and
 function stopOnline() { // leave before anyone joined (Back on the Rooms screen, or a knock the host refused): the board is yours again, no reload
   if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
   $('#knockCard').hidden = true; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
-  if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
+  hideExplain(); if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
 }
 function joinByCode(code) { // Got a code? Join their room: your own room closes and you knock on theirs
   if (net) { net.leave(); net = null; prefs.set('room', 'null'); }
@@ -356,11 +356,11 @@ function sendMove(pit) { if (busy || !net || !net.move(pit)) return; busy = true
 async function showMove({ seat, pit, events, state: pub }) {
   const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; deselect(); $('#undo').disabled = true;
   if (seat === them) { select(pit); await wait(550); deselect(); }
-  else { const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
+  else { hideExplain(); const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
   tipFor(events);
   await animate(events, prev);
   busy = false; refreshStatic();
-  if (state.over) gameOver(); else if (before.over) $('#gameover').hidden = true;
+  if (state.over) gameOver(); else { if (before.over) $('#gameover').hidden = true; if (seat === them) explain(before, pit, events); } // a friend's move, explained too
 }
 function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
 function startOnline(code, { stay = false } = {}) {
@@ -384,7 +384,7 @@ function startOnline(code, { stay = false } = {}) {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
     if (!had && friend) { if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); }
-    if (started) { stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
+    if (started) { hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
   on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
@@ -476,26 +476,63 @@ let path = null, pathToken = 0, pathGlow = false;
 function showPath(i) {
   clearPath(); if (!pathOn() || state.turn !== you || owner(i) !== you) return;
   path = sowPath(state, i); if (!path) return;
-  const token = ++pathToken, M = board.marks, p = path;
-  (async () => {
-    for (let k = 0; k < p.order.length; k++) {
-      if (token !== pathToken) return;
-      const pit = p.order[k], m = M.steps[pit], d = M.dots[pit], strong = p.visits[pit] > 1, y0 = d.position.y;
-      m.visible = true; d.visible = true; // the dot drops onto the pit's edge; the faint ring fades in with it (both stronger where a relay passes twice)
-      tween(220, (t) => { if (token !== pathToken) return; m.material.opacity = (strong ? 0.6 : 0.3) * t; d.material.opacity = 0.95 * Math.min(1, t * 1.6); d.position.y = y0 + (1 - t) * 0.03; const sc = (strong ? 1.35 : 1) * (1.5 - 0.5 * t); d.scale.set(sc, sc, 1); }, easeOut);
-      if (k < 12) click(1.9, 0.012); // the hand counting the pits, quietly
-      await wait(k < 12 ? 55 : 25);
-    }
+  landMarks(path, ++pathToken);
+}
+// land a path's marks on the board, in sowing order: a brass dot and ring on each pit reached, copper rings on the captures, the light where
+// the turn ends. `faint` (their move, explained) lands them quietly at half strength, without the counting ticks; `gap` is the beat between pits.
+async function landMarks(p, token, { faint = false, gap = 55 } = {}) {
+  const M = board.marks, k0 = faint ? 0.5 : 1;
+  for (let k = 0; k < p.order.length; k++) {
     if (token !== pathToken) return;
-    for (const pit of p.captures) { const c = M.caps[pit]; c.visible = true; tween(260, (t) => { if (token !== pathToken) return; c.material.opacity = 0.85 * t; const sc = 1.12 - 0.12 * t; c.scale.set(sc, sc, 1); }, easeOut); }
-    if (p.end !== null) { const e = M.end, [x, z] = pitCenters[p.end]; e.position.x = x; e.position.z = z; e.visible = true; tween(320, (t) => { if (token !== pathToken) return; e.material.opacity = 0.4 * t; }).then(() => { if (token === pathToken) pathGlow = true; }); }
-    if (p.captures.length) click(1.25, 0.035);
-  })();
+    const pit = p.order[k], m = M.steps[pit], d = M.dots[pit], strong = p.visits[pit] > 1, y0 = d.position.y;
+    m.visible = true; d.visible = true; // the dot drops onto the pit's edge; the faint ring fades in with it (both stronger where a relay passes twice)
+    tween(220, (t) => { if (token !== pathToken) return; m.material.opacity = k0 * (strong ? 0.6 : 0.3) * t; d.material.opacity = k0 * 0.95 * Math.min(1, t * 1.6); d.position.y = y0 + (1 - t) * 0.03; const sc = (strong ? 1.35 : 1) * (1.5 - 0.5 * t); d.scale.set(sc, sc, 1); }, easeOut);
+    if (k < 12 && !faint) click(1.9, 0.012); // the hand counting the pits, quietly
+    await wait(k < 12 ? gap : Math.min(gap, 25));
+  }
+  if (token !== pathToken) return;
+  for (const pit of p.captures) { const c = M.caps[pit]; c.visible = true; tween(260, (t) => { if (token !== pathToken) return; c.material.opacity = k0 * 0.85 * t; const sc = 1.12 - 0.12 * t; c.scale.set(sc, sc, 1); }, easeOut); }
+  if (p.end !== null) { const e = M.end, [x, z] = pitCenters[p.end]; e.position.x = x; e.position.z = z; e.visible = true; tween(320, (t) => { if (token !== pathToken) return; e.material.opacity = k0 * 0.4 * t; }).then(() => { if (token === pathToken && !faint) pathGlow = true; }); }
+  if (p.captures.length && !faint) click(1.25, 0.035);
 }
 function clearPath() {
   pathToken++; path = null; pathGlow = false; const M = board.marks;
   for (const m of [...M.steps, ...M.dots, ...M.caps, M.end]) { m.visible = false; m.material.opacity = 0; m.scale.set(1, 1, 1); }
 }
+// fade every mark that is showing, over `ms`, unless something lands new ones first
+function fadeMarks(token, ms = 700) {
+  pathGlow = false; const M = board.marks, all = [...M.steps, ...M.dots, ...M.caps, M.end].filter((m) => m.visible).map((m) => [m, m.material.opacity]);
+  return tween(ms, (t) => { if (token !== pathToken) return; for (const [m, o] of all) m.material.opacity = o * (1 - t); }).then(() => { if (token === pathToken) clearPath(); });
+}
+
+// ---------- their move, explained: after the opponent's turn, the marks of the move they just played stay faint for a moment with the words
+// under the board ("Nnamdi · picked up again twice · took 4"); tap the words and just that turn replays slowly — the marks first, then the
+// seeds at the slow pace — so a fast relay turn can be read after the fact. Off with the same switch as the path (Settings → Feel).
+let theirs = null, replaying = false, theirsFade = null; const lastBtn = $('#lastMove');
+function explain(before, pit, events) {
+  hideExplain(); if (!pathOn() || state.over || !body.classList.contains('playing')) return;
+  const p = sowPath(before, pit); if (!p) return;
+  theirs = { before, pit, events, path: p, name: online ? (friend ? friend.name : 'They') : names[level] };
+  $('#lastName').textContent = theirs.name; $('#lastWords').textContent = playedWords(p, { you });
+  lastBtn.setAttribute('aria-label', `${theirs.name}'s move: ${playedWords(p, { you })}. Watch it again, slowly`); lastBtn.hidden = false;
+  if (selected !== null) return; // a pit already picked: its own path is showing
+  const token = ++pathToken; // the ghost of their path: faint, quick, then it fades on its own; the words stay until your move
+  landMarks(p, token, { faint: true, gap: 30 }).then(() => { if (token !== pathToken) return; theirsFade = setTimeout(() => { if (token === pathToken) fadeMarks(token, 900); }, reduceMotion ? 1200 : 3200); });
+}
+function hideExplain() { theirs = null; lastBtn.hidden = true; clearTimeout(theirsFade); }
+async function replayLast() { // tap the words: the position before their move comes back, their pit lights, the marks land, the seeds follow slowly
+  if (!theirs || busy || replaying || body.classList.contains('screen')) return;
+  const L = theirs; replaying = true; busy = true; deselect(); $('#undo').disabled = true; $('#hintBtn').disabled = true; lastBtn.classList.add('live');
+  $('#hint').textContent = `${L.name}'s move again, slowly`; $('#turn').textContent = 'watching';
+  layoutFromState(L.before); refreshStaticFrom(L.before);
+  await wait(350); const [x, z] = pitCenters[L.pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; board.glow.position.set(x, BT + 0.08, z); board.glow.visible = true; click(1.4, 0.05);
+  const token = ++pathToken; await landMarks(L.path, token, { gap: 90 }); await wait(reduceMotion ? 100 : 700);
+  board.ring.visible = false; board.glow.visible = false;
+  await animate(L.events, L.before.stores, Math.max(PACES.slow, PACE * 1.6)); // the slow pace, whatever the sowing speed is set to
+  await wait(300); fadeMarks(token, 600);
+  layoutFromState(state); busy = false; replaying = false; lastBtn.classList.remove('live'); refreshStatic(); click(1.2, 0.04);
+}
+lastBtn.addEventListener('click', replayLast);
 
 // Play a move's events on the board, one seed at a time.
 async function animate(events, prevStores, pace = PACE) {
@@ -531,8 +568,9 @@ async function animate(events, prevStores, pace = PACE) {
 
 async function play(pit) {
   const { state: next, events } = applyMove(state, pit);
-  const prevStores = state.stores; const mover = state.turn; state = next; busy = true; deselect(); $('#undo').disabled = true;
+  const prevStores = state.stores; const mover = state.turn; const before = state; state = next; busy = true; deselect(); $('#undo').disabled = true;
   if (mover === you) {
+    hideExplain(); // their last move is old news once you have played
     const got = state.stores[0] - prevStores[0]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length;
     const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak));
     if (r.unlocked) setTimeout(() => { toast(`${r.unlocked.name} unlocked — pick them in Settings`); buzz([20, 40, 20]); click(1.8, 0.1); setTimeout(() => click(2.4, 0.1), 140); }, 1200);
@@ -543,6 +581,7 @@ async function play(pit) {
   await animate(events, prevStores);
   busy = false; refreshStatic(); save();
   if (state.over) return gameOver();
+  if (mover === them) explain(before, pit, events); // their move, explained: the ghost of its path and the words, tap to watch it again
   if (state.turn === them) {
     showTurn(); await wait(350); if (mood === 'calm') react('think');
     const m = await aiMove(state);
@@ -634,6 +673,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle
     if (Math.abs(to - from) > 0.01) tween(650, (t) => { theta = from + (to - from) * t; }, easeInOut);
   }
   if (which !== 'play' && !shoutMenu.hidden) toggleShoutMenu(false);
+  if (which !== 'play') { hideExplain(); if (selected === null) clearPath(); } // their last move stays on the board only while you are at it
   if (which === 'play') blinkLoop(); else { clearTimeout(blinkTimer); if (mood !== 'calm' && mood !== 'think') react('calm'); }
 }
 let idle = true; // the home screen slowly turns the board
@@ -710,7 +750,7 @@ document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('clic
 document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); paintHome(); click(1.2, 0.05); }));
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
 $('#playBtn').addEventListener('click', () => { newRound(); showScreen('play'); click(1.3, 0.08); });
-$('#continueBtn').addEventListener('click', () => { if (resume()) { layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
+$('#continueBtn').addEventListener('click', () => { if (resume()) { hideExplain(); layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
 $('#homeBtn').addEventListener('click', () => { if (online) return leaveRoom(); if (!busy) { save(); showScreen('home'); } });
 $('#goHome').addEventListener('click', () => { if (online) return leaveRoom(); $('#gameover').hidden = true; showScreen('home'); });
 $('#homeSettings').addEventListener('click', () => { paintSettings(); showScreen('settings'); });
@@ -749,7 +789,7 @@ function paintRecord(a, b) {
 }
 $('#replayBtn').addEventListener('click', async () => {
   if (busy) return; const moves = state.moves.slice(); const variant = state.variant, rules = state.rules;
-  $('#gameover').hidden = true; busy = true;
+  $('#gameover').hidden = true; busy = true; hideExplain();
   let s = newGame(variant, rules); layoutFromState(s); refreshStaticFrom(s);
   for (const m of moves) { const r = applyMove(s, m); if (r.state.turn === them) { select(m); await wait(250); } deselect(); await animate(r.events, s.stores, 70); s = r.state; refreshStaticFrom(s); }
   busy = false; $('#gameover').hidden = false;
@@ -810,12 +850,12 @@ function resume() {
   try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; return !state.over; } } catch {}
   return false;
 }
-function newRound() { state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); setTimeout(() => say('start'), 600); }
+function newRound() { hideExplain(); state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); setTimeout(() => say('start'), 600); }
 function kickAi() { if (state.turn === them && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 function undo() {
   if (busy || online || state.moves.length < 2) return;
   const moves = state.moves.slice(0, state.turn === you ? -2 : -1);
-  state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06); say('undo');
+  hideExplain(); state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06); say('undo');
 }
 function paintRules() { $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
 
@@ -919,7 +959,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, replayLast, get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

@@ -1,7 +1,7 @@
 // Where the seeds will go: the preview is read from the engine's own events, so it can never disagree with the move.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { sowPath, pathWords, pickedHint, pitName } from "../web/path.js";
+import { sowPath, pathWords, pickedHint, pitName, playedWords } from "../web/path.js";
 import { newGame, applyMove, legalMoves, replay } from "../engine/ayo.js";
 
 test("the opening move under Ayo: four seeds, one per pit, ending on your own side; under Nchò the same pit relays on", () => {
@@ -84,4 +84,26 @@ test("a real relay turn: the preview counts every pick-up and the capture the mo
   assert.ok(found.p.order.length <= 12 && found.p.visits[found.p.end] >= 1);
   assert.ok(pathWords(found.p).startsWith("picks up again"));
   assert.deepEqual(replay([]).pits, newGame().pits, "nothing here touched the engine's state");
+});
+
+test("their move, explained: the words for a turn already played, from your seat, short enough for a phone", () => {
+  // the opponent (seat 1) plays; the words are read from seat 0
+  const you = 0;
+  assert.equal(playedWords({ end: 8, relays: [3, 9], captures: [8], got: 4, lost: 4, over: false, winner: null }, { you }), "picked up again twice · took 4 · gave 4");
+  assert.equal(playedWords({ end: 2, relays: [4], captures: [], got: 0, lost: 0, over: false }, { you }), "picked up again once");
+  assert.equal(playedWords({ end: 2, relays: [4, 7, 1], captures: [2], got: 0, lost: 4, over: false }, { you }), "picked up again ×3 · gave 4");
+  assert.equal(playedWords({ end: 2, relays: [], captures: [], got: 0, lost: 0, over: false }, { you }), "ended in your pit 3", "a plain turn says where it ended");
+  assert.equal(playedWords({ end: 9, relays: [], captures: [], got: 0, lost: 0, over: false }, { you: 1 }), "ended in your pit 4", "from the far seat the same pit is yours");
+  assert.equal(playedWords({ end: null, relays: [], captures: [], got: 0, lost: 0, over: false }, { you }), "sowed nothing");
+  assert.equal(playedWords({ end: 1, relays: [], captures: [1], got: 8, lost: 0, over: true, winner: 1 }, { you }), "took 8 · ended in your pit 2 · they win");
+  assert.equal(playedWords({ end: 1, relays: [], captures: [], got: 0, lost: 0, over: true, winner: "draw" }, { you }), "ended in your pit 2 · the game ends level");
+  assert.equal(playedWords(null), "");
+  // a real opponent's move under Nchò: the words agree with the path of the move actually played
+  let s = newGame("ncho"); s = applyMove(s, 2).state; // you open; now it is their move
+  const m = legalMoves(s)[0]; const p = sowPath(s, m); const w = playedWords(p, { you });
+  assert.ok(w.length > 0 && w.length < 60, w);
+  if (p.relays.length) assert.ok(w.startsWith("picked up again"), w);
+  if (p.got) assert.ok(w.includes(`took ${p.got}`), w);
+  if (p.lost) assert.ok(w.includes(`gave ${p.lost}`), w);
+  if (!p.relays.length && !p.got && !p.lost) assert.equal(w, `ended in ${pitName(p.end, you)}`);
 });

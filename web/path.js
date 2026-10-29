@@ -46,6 +46,19 @@ export function pathWords(path, { you = 0 } = {}) {
   return parts.join(' · ');
 }
 
+// Their move, explained: the words for a turn already played, from your seat — "picked up again twice · took 4 · gave 4";
+// a plain turn says where it ended ("ended in your pit 2"); a turn that ended the game says so. Short enough for a phone.
+export function playedWords(path, { you = 0 } = {}) {
+  if (!path) return '';
+  const parts = [];
+  const r = path.relays.length; if (r) parts.push(r === 1 ? 'picked up again once' : r === 2 ? 'picked up again twice' : `picked up again ×${r}`);
+  if (path.got) parts.push(`took ${path.got}`);
+  if (path.lost) parts.push(`gave ${path.lost}`);
+  if (!parts.length || path.over) parts.push(path.end === null ? 'sowed nothing' : `ended in ${pitName(path.end, you)}`);
+  if (path.over) parts.push(path.winner === 'draw' ? 'the game ends level' : path.winner === you ? 'you win' : 'they win');
+  return parts.join(' · ');
+}
+
 // The whole hint while a pit is picked: the path, then how to sow it (a finger, or the keys).
 export function pickedHint(path, { you = 0, keys = false, key = null, seeds = 0 } = {}) {
   const words = pathWords(path, { you });
