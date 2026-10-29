@@ -83,9 +83,9 @@ export function buildTable(scene) {
   const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: t, roughness: 0.95 })); m.receiveShadow = true; m.position.y = -0.0005; scene.add(m);
 }
 
-export function buildLights(scene) {
+export function buildLights(scene, shadowSize = 2048) {
   scene.add(new THREE.HemisphereLight(0xffe2c0, 0x1a0e07, 0.55));
-  const key = new THREE.DirectionalLight(0xffd4a4, 2.6); key.position.set(-0.9, 1.6, 0.6); key.castShadow = true; key.shadow.mapSize.set(2048, 2048);
+  const key = new THREE.DirectionalLight(0xffd4a4, 2.6); key.position.set(-0.9, 1.6, 0.6); key.castShadow = true; key.shadow.mapSize.set(shadowSize, shadowSize);
   key.shadow.camera.left = -0.8; key.shadow.camera.right = 0.8; key.shadow.camera.top = 0.9; key.shadow.camera.bottom = -0.9; key.shadow.camera.near = 0.2; key.shadow.camera.far = 5; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.004; scene.add(key);
   const rim = new THREE.DirectionalLight(0xffb070, 0.7); rim.position.set(0.8, 0.9, -1.2); scene.add(rim);
   const fill = new THREE.PointLight(0xffe8d0, 0.25, 4); fill.position.set(0.9, 1.4, 1.3); scene.add(fill);

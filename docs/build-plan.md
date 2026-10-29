@@ -67,10 +67,10 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [x] Installable (manifest, icons, service worker caching the shell, engine and three.js): offline play vs computer with no signal
 
 ### Sun 1 Nov — opponents with character, polish, deploy
-- [ ] Three named opponents with a face and a line or two (an elder who takes his time, a quick cousin, a market champion); reactions when captured from
-- [ ] Performance pass: 60fps on the Fold, battery-friendly idle, textures cached, lighter textures on slow connections
+- [x] Three opponents with a vector face, a bio and lines (Adaeze the playful child, Nnamdi the cheeky cousin, Mama Ngozi the dry market champion): they speak at game start, when they capture, when they lose a pit of 4+, when you undo, and when the game ends; faces on the HUD, Home pills and Settings
+- [~] Performance pass: pixel ratio capped at 1.5 on phones, 1024 shadow map on phones and high-dpr screens, render loop paused when the tab is hidden; remains: measure on the real Fold, lighter textures on slow connections
 - [ ] Deployed on Render from mekaminu/ayo-ncho; health check; Meka's test link on the tracker
-- [ ] Hint: the Hard opponent's best move, lit on the board
+- [x] Hint: Mama Ngozi's best move lit on the board for 1.5 s, one hint per turn
 
 ### Mon 2 Nov — Meka's test and the fixes from it
 - [ ] Every fix Meka reports from the Fold and the Mac

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { newGame, applyMove, legalMoves, replay, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
+import { CHARACTERS, line } from './characters.js';
 import { buildBoard, buildTable, buildLights, seedMaterial, seedGeometry, SEED_R, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -12,13 +13,14 @@ const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?
 // ---------- renderer / scene ----------
 const canvas = $('#c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: !!(params.get('still') || params.get('capture')) });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+const phone = Math.min(innerWidth, innerHeight) < 500;
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 20);
 const finish = params.get('finish') || prefs.get('finish', 'mahogany');
-const board = buildBoard(scene, finish); buildTable(scene); buildLights(scene);
+const board = buildBoard(scene, finish); buildTable(scene); buildLights(scene, phone || (window.devicePixelRatio || 1) > 2 ? 1024 : 2048);
 const seedMat = seedMaterial();
 const sim = new SeedSim();
 
@@ -163,9 +165,24 @@ let state = newGame(settings.game, settings.rules()); let busy = false; let sele
 let stats = { biggest: 0, captures: 0, started: Date.now() };
 
 const worker = new Worker('./ai-worker.js', { type: 'module' });
-function aiMove(s) { return new Promise((res) => { worker.onmessage = (e) => res(e.data); worker.postMessage({ state: s, level }); }); }
+function aiMove(s, lvl = level) { return new Promise((res) => { worker.onmessage = (e) => res(e.data); worker.postMessage({ state: s, level: lvl }); }); }
+let hintedAt = -1;
+async function hint() {
+  if (busy || state.over || state.turn !== you || hintedAt === state.moves.length) return;
+  hintedAt = state.moves.length; $('#hintBtn').disabled = true;
+  const m = await aiMove(state, 'hard'); if (m === null || state.turn !== you) return;
+  const [x, z] = pitCenters[m]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; board.glow.position.set(x, BT + 0.08, z); board.glow.visible = true; click(1.6, 0.05);
+  $('#hint').textContent = `${CHARACTERS.hard.name} would play that one`;
+  await wait(1500); if (selected === null) { board.ring.visible = false; board.glow.visible = false; } showTurn();
+}
 
+function paintFaces() {
+  $('#oppFace').innerHTML = CHARACTERS[level].face;
+  document.querySelectorAll('.pill[data-level]').forEach((b) => { b.querySelector('.face').innerHTML = CHARACTERS[b.dataset.level].face; });
+  document.querySelectorAll('[data-face]').forEach((f) => { f.innerHTML = CHARACTERS[f.dataset.face].face; });
+}
 function refreshStatic() {
+  paintFaces();
   state.pits.forEach((n, i) => setBadge(i, n));
   $('#myScore').textContent = state.stores[0]; $('#oppScore').textContent = state.stores[1];
   $('#oppName').textContent = levelLabel(level);
@@ -177,6 +194,7 @@ function showTurn() {
   $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…';
   $('#hint').textContent = state.over ? '' : mine ? (selected === null ? 'tap a pit on your side to sow' : 'tap again to sow, or pick another') : '';
   $('#undo').disabled = busy || state.moves.length < 2;
+  $('#hintBtn').disabled = !mine || busy || hintedAt === state.moves.length;
 }
 function select(i) {
   selected = i; const [x, z] = pitCenters[i]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true;
@@ -221,6 +239,8 @@ async function play(pit) {
   const prevStores = state.stores; const mover = state.turn; state = next; busy = true; deselect(); $('#undo').disabled = true;
   if (mover === you) { const got = state.stores[0] - prevStores[0]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; }
   tipFor(events);
+  const aiGot = state.stores[1] - prevStores[1], meGot = state.stores[0] - prevStores[0];
+  if (mover === ai && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400);
   await animate(events, prevStores);
   busy = false; refreshStatic(); save();
   if (state.over) return gameOver();
@@ -256,6 +276,11 @@ function paintSettings() {
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1');
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
+}
+let bubbleTimer = null;
+function say(moment) {
+  const text = line(level, moment); if (!text || params.get('still')) return;
+  const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, 2600);
 }
 function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; body.appendChild(t); setTimeout(() => t.remove(), 1800); }
 
@@ -303,7 +328,7 @@ function gameOver() {
   $('#goMe').classList.toggle('win', a >= b); $('#goOpp').classList.toggle('win', b > a);
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-  $('#gameover').hidden = false; prefs.set('game', 'null');
+  $('#gameover').hidden = false; prefs.set('game', 'null'); say(win ? 'lose' : 'win');
   if (win) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
 }
 $('#replayBtn').addEventListener('click', async () => {
@@ -330,12 +355,12 @@ function resume() {
   try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; return !state.over; } } catch {}
   return false;
 }
-function newRound() { state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); }
+function newRound() { state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); setTimeout(() => say('start'), 600); }
 function kickAi() { if (state.turn === ai && !state.over) (async () => { busy = true; await wait(400); busy = false; const m = await aiMove(state); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 function undo() {
   if (busy || state.moves.length < 2) return;
   const moves = state.moves.slice(0, state.turn === you ? -2 : -1);
-  state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
+  state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06); say('undo');
 }
 function paintRules() { $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
 
@@ -391,6 +416,7 @@ canvas.addEventListener('wheel', (e) => { dist += e.deltaY * 0.001; clampDist();
 function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; tween(260, (t) => { board.ring.position.x = x + Math.sin(t * Math.PI * 4) * 0.006 * (1 - t); }).then(() => { if (selected === null) board.ring.visible = false; else { board.ring.position.x = pitCenters[selected][0]; board.ring.position.z = pitCenters[selected][1]; } }); click(0.5, 0.05); }
 
 $('#undo').addEventListener('click', undo);
+$('#hintBtn').addEventListener('click', hint);
 $('#rematch').addEventListener('click', () => { newRound(); showScreen('play'); });
 $('#rulesBtn').addEventListener('click', () => { $('#rules').hidden = !$('#rules').hidden; });
 $('#rulesClose').addEventListener('click', () => { $('#rules').hidden = true; });
@@ -413,7 +439,11 @@ let frames = 0, last = performance.now();
 function loop(now) {
   runTweens(now); sim.step((now - last) / 1000, now); if (idle && !reduceMotion) theta += (now - last) * 0.00004; last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
   if (frames === 3) { window.__done = true; if (params.get("still")) return; }
-  if (window.__freeze) return;
-  requestAnimationFrame(loop);
+  if (window.__freeze || document.hidden) return;
+  let hiddenAt = null;
+document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = performance.now(); else { last = performance.now(); if (hiddenAt !== null) requestAnimationFrame(loop); hiddenAt = null; } });
+requestAnimationFrame(loop);
 }
+let hiddenAt = null;
+document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = performance.now(); else { last = performance.now(); if (hiddenAt !== null) requestAnimationFrame(loop); hiddenAt = null; } });
 requestAnimationFrame(loop);
