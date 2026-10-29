@@ -16,7 +16,11 @@
 #                  and check the Home card says solved (<out>-home.png); --wide for the Mac layout
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv
+#        --record: your record against each opponent — a phone with games already played against all three and a saved game one move from a
+#                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
+#                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
+#                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -136,10 +140,41 @@ with sync_playwright() as p:
     pg.route("https://fonts.googleapis.com/**", lambda r: r.abort())
     if os.path.exists(three):
         pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=three, content_type="text/javascript"))
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    if record:  # a phone that has played all three before, with a saved game one move from beating Mama Ngozi for the third time running
+        end = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "endgame.js"), "7", "ncho"]).decode())
+        saved = {"moves": end["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "hard", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 7 * 60 * 1000}}  # a game that began a few minutes ago
+        before = {"easy": {"w": 4, "l": 2, "d": 0, "best": [31, 17], "run": 1}, "medium": {"w": 1, "l": 3, "d": 1, "best": [25, 23], "run": -2}, "hard": {"w": 2, "l": 1, "d": 0, "best": [26, 22], "run": 2}, "last": 1}
+        pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.record', %s); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.tutorial', '3');" % (json.dumps(json.dumps(saved)), json.dumps(json.dumps(before))))
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
+    if record:
+        pills = pg.evaluate("[...document.querySelectorAll('.pill[data-level]')].map(b=>[b.dataset.level, b.querySelector('small.rec').textContent])")
+        assert pills == [["easy", "you lead 4–2"], ["medium", "you trail 1–3"], ["hard", "you lead 2–1"]], pills
+        assert not pg.evaluate("document.querySelector('#continueBtn').disabled") and "moves in" in pg.evaluate("document.querySelector('#continueSub').textContent"), "the saved game should be there to continue"
+        print("record: Home pills", pills)
+        out2 = out[:-4] + "-home.png" if out.endswith(".png") else out + "-home.png"
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out2, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+        st = pg.evaluate("window.__ayo.state"); assert len(st["moves"]) == len(end["moves"]) and st["turn"] == 0 and not st["over"], "the saved game did not come back as it was"
+        assert pg.evaluate("window.__ayo.level") == "hard" and pg.evaluate("document.querySelector('#oppName').textContent") == "Mama Ngozi · Hard"
+        tap(pg, end["pit"])  # the winning move: the game ends and the card comes up with the record
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.over", timeout=240000)
+        pg.wait_for_selector("#gameover:not([hidden])", timeout=10000)
+        assert pg.evaluate("window.__ayo.state.stores") == end["scores"], "the game did not end as the engine said it would"
+        line = pg.evaluate("document.querySelector('#goRecLine').textContent"); say = pg.evaluate("document.querySelector('#goRecSay').textContent")
+        assert line == "you lead 3–1 · new best win %d–%d" % tuple(end["scores"]), line
+        assert say == "“Three in a row? Mama Ngozi is watching.”" and not pg.evaluate("document.querySelector('#goRecSay').hidden"), say
+        assert pg.evaluate("document.querySelector('#goRecord').classList.contains('word') && document.querySelector('#goRecFace svg') !== null")
+        assert pg.evaluate("document.querySelector('#bubble').textContent") == "Three in a row? Mama Ngozi is watching." and pg.evaluate("window.__ayo.mood") == "sulk", "she should say it, and sulk"
+        kept = json.loads(pg.evaluate("localStorage.getItem('ayo.record')"))
+        assert kept["hard"] == {"w": 3, "l": 1, "d": 0, "best": end["scores"], "run": 3} and kept["easy"] == before["easy"] and kept["last"] == saved["stats"]["started"], kept
+        print("record: card says", line, say)
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(500); pg.screenshot(path=out, timeout=120000, animations="disabled")
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
     if puzzle:  # today's puzzle on the board: the ask at the top, one move, the result card
         pz = pg.evaluate("window.__ayo.puzzle"); print("puzzle:", json.dumps({k: pz[k] for k in ("key", "target", "answer")}))
         assert pz["on"] and not pz["played"], "the puzzle screen should be up and waiting"

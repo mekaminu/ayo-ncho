@@ -2,7 +2,8 @@
 import * as THREE from 'three';
 import { newGame, applyMove, legalMoves, replay, owner, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
-import { CHARACTERS, line, faceFor, MOOD_FOR } from './characters.js';
+import { CHARACTERS, line, faceFor, MOOD_FOR, runLine as runWord, RUN_MOOD } from './characters.js';
+import { parse as parseRecord, record as recordGame, standing, cardLine as recordLine } from './record.js';
 import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
@@ -205,6 +206,9 @@ const names = { easy: 'Adaeze', medium: 'Nnamdi', hard: 'Mama Ngozi' };
 const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
 let stats = { biggest: 0, captures: 0, started: Date.now() };
+// your record against each opponent, kept on this phone (web/record.js): wins–losses and your best win, on their Home pill and the Game over card
+let records = parseRecord(prefs.get('record', null));
+function paintRecordPills() { document.querySelectorAll('.pill[data-level] small.rec').forEach((s) => { s.textContent = standing(records[s.closest('.pill').dataset.level]); }); }
 
 // ---------- a friend online: the board joins a room (?room=CODE from the invite link) and animates the moves the server sends ----------
 // The server runs the same engine and is the referee; this board only asks for a move and shows what comes back. A move
@@ -606,7 +610,7 @@ function paintHome() {
   const g = settings.game;
   document.querySelectorAll('[data-game]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.game === g));
   document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.level === level));
-  $('#playSub').textContent = 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak); paintPuzzleCard();
+  $('#playSub').textContent = 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak); paintPuzzleCard(); paintRecordPills();
   const saved = savedGame();
   $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
 }
@@ -636,9 +640,12 @@ function blinkLoop() { // a blink every few seconds, only on a calm face, never 
 let bubbleTimer = null;
 function say(moment) {
   if (online) return; // a friend speaks for themselves
-  react(MOOD_FOR[moment] || 'calm');
-  const text = line(level, moment); if (!text || params.get('still')) return;
-  const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, 2600);
+  sayText(line(level, moment), MOOD_FOR[moment] || 'calm');
+}
+function sayText(text, mood = 'calm', ms = 2600) { // the opponent says these words, with the face to match
+  if (online) return; react(mood);
+  if (!text || params.get('still')) return;
+  const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, ms);
 }
 function toast(text) { const t = document.createElement('div'); t.className = 'toast'; t.textContent = text; body.appendChild(t); setTimeout(() => t.remove(), 1800); }
 
@@ -690,8 +697,24 @@ function gameOver() {
   $('#goMe').classList.toggle('win', a >= b); $('#goOpp').classList.toggle('win', b > a);
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-  $('#gameover').hidden = false; if (!online) prefs.set('game', 'null'); say(win ? 'lose' : 'win');
+  const word = paintRecord(a, b);
+  $('#gameover').hidden = false; if (!online) prefs.set('game', 'null');
+  if (word) sayText(word.text, word.mood); else say(win ? 'lose' : 'win'); // a run or a first win is worth their word more than the usual line
   if (win) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
+}
+// your record against this opponent, counted once per game (the game's start time is its id) and shown on the card with their face;
+// when the result is worth a word (your first win against them, a run of 3, 5, 10…) they say it, on the card and in the bubble
+function paintRecord(a, b) {
+  const box = $('#goRecord'); if (online || puzzle.on) { box.hidden = true; return null; }
+  const r = recordGame(records, level, a, b, stats.started); records = r.data; if (r.counted) prefs.set('record', JSON.stringify(records));
+  const text = recordLine(r.entry, r.counted && r.newBest); if (!text) { box.hidden = true; return null; }
+  $('#goRecLine').innerHTML = text.split(' · ').map((p) => p.startsWith('new best') ? `<em>${p}</em>` : p).join(' · '); // our own numbers and words, nothing typed
+  const word = r.counted ? (r.moment === 'firstWin' ? line(level, 'firstWin') : r.moment === 'run' ? runWord(level, r.entry.run) : '') : '';
+  const mood = !word ? 'calm' : r.moment === 'firstWin' ? MOOD_FOR.firstWin : r.entry.run > 0 ? RUN_MOOD.yours : RUN_MOOD.theirs;
+  $('#goRecSay').textContent = word ? `“${word}”` : ''; $('#goRecSay').hidden = !word; box.classList.toggle('word', !!word);
+  $('#goRecFace').innerHTML = faceFor(level, mood); box.hidden = false;
+  if (word) setTimeout(() => { click(1.6, 0.06); buzz(10); }, 450); // the line lands a beat after the card
+  return word ? { text: word, mood } : null;
 }
 $('#replayBtn').addEventListener('click', async () => {
   if (busy) return; const moves = state.moves.slice(); const variant = state.variant, rules = state.rules;
@@ -865,7 +888,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

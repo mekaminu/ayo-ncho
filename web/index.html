@@ -85,6 +85,10 @@ button{font-family:inherit}
 .pills{display:flex;justify-content:center;gap:6px;padding-top:4px;flex-wrap:wrap}
 .pill{padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--muted);font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
 .pill[aria-pressed="true"]{border-color:var(--brass);background:rgba(230,183,111,.18);color:var(--brass)}
+/* your record against them rides under the name on the pill ("you lead 4–2"); the pill stays one line until there is one */
+.pill .pt{display:flex;flex-direction:column;align-items:flex-start;line-height:1.15;text-align:left}
+.pill small.rec{font-size:10px;font-weight:500;opacity:.75;letter-spacing:.01em}
+.pill small.rec:empty{display:none}
 .streak{margin:0;text-align:center;font-size:11px;color:var(--muted);letter-spacing:.02em}
 /* the daily puzzle card on Home: one line tall, above the game picker */
 .dailyCard{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:rgba(230,183,111,.12);border:1px solid rgba(230,183,111,.4);color:var(--fg);cursor:pointer;text-align:left;width:100%;box-sizing:border-box}
@@ -194,6 +198,15 @@ button{font-family:inherit}
 .mini{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:8px}
 .mini div{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:12px;background:var(--soft)}
 .mini span{font-size:11px;color:var(--muted)}.mini b{font-size:15px;font-weight:600}
+/* your record against this opponent: a line with their face; their word under it when the result is worth one */
+.record{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;background:var(--soft);border:1px solid var(--line);animation:recIn .4s cubic-bezier(.3,1.4,.5,1) .2s backwards}
+@keyframes recIn{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.record .face.s{width:28px;height:28px;margin:0;border:1px solid rgba(230,183,111,.4)}
+.record .col{gap:3px;min-width:0}
+.record b{font-size:13px;font-weight:600}.record b em{font-style:normal;color:var(--brass)}
+.record i{font-style:italic;font-size:12px;color:var(--muted);line-height:1.35}
+.record.word{border-color:rgba(230,183,111,.4);background:rgba(230,183,111,.1)}
+@media (prefers-reduced-motion:reduce){.record{animation:none}}
 
 /* opponent faces and speech */
 .who{display:flex;align-items:center;gap:10px;min-width:0}
@@ -300,9 +313,9 @@ button{font-family:inherit}
       <button id="friendsBtn"><b>With friends</b><small>a room code · invite on WhatsApp</small></button>
     </div>
     <div class="pills" role="group" aria-label="Opponent">
-      <button class="pill" data-level="easy" aria-pressed="false"><span class="face s"></span>Easy · Adaeze</button>
-      <button class="pill" data-level="medium" aria-pressed="true"><span class="face s"></span>Medium · Nnamdi</button>
-      <button class="pill" data-level="hard" aria-pressed="false"><span class="face s"></span>Hard · Mama Ngozi</button>
+      <button class="pill" data-level="easy" aria-pressed="false"><span class="face s"></span><span class="pt">Easy · Adaeze<small class="rec"></small></span></button>
+      <button class="pill" data-level="medium" aria-pressed="true"><span class="face s"></span><span class="pt">Medium · Nnamdi<small class="rec"></small></span></button>
+      <button class="pill" data-level="hard" aria-pressed="false"><span class="face s"></span><span class="pt">Hard · Mama Ngozi<small class="rec"></small></span></button>
     </div>
     <p class="streak" id="streakLine" aria-live="polite"></p>
   </div>
@@ -396,6 +409,8 @@ button{font-family:inherit}
   <div class="col"><span class="eyebrow" id="goEyebrow">Nchò · 14 moves</span><h2 id="goTitle">You win</h2></div>
   <div class="stats"><div class="stat" id="goMe"><span>Meka</span><b id="goMyScore">0</b></div><div class="stat" id="goOpp"><span id="goOppName">Nnamdi</span><b id="goOppScore">0</b></div></div>
   <div class="mini"><div><span>Biggest turn</span><b id="goBig">0 seeds</b></div><div><span>Captures</span><b id="goCaps">0</b></div><div><span>Time</span><b id="goTime">0:00</b></div></div>
+  <!-- your record against this opponent, kept on this phone; their word when you are on a run or have beaten them for the first time -->
+  <div class="record" id="goRecord" hidden><span class="face s" id="goRecFace"></span><span class="col"><b id="goRecLine">you lead 4–2 · best win 30–18</b><i id="goRecSay" hidden>“Three in a row? Mama Ngozi is watching.”</i></span></div>
   <div class="col" style="gap:8px">
     <button class="btn" id="rematch">Play again</button>
     <div class="two" style="gap:8px"><button class="btn ghost" id="replayBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>Replay</button><button class="btn ghost" id="clipBtn" style="flex:1;padding-left:10px;padding-right:10px" title="Record your best turn as a 10-second clip to share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>Clip</button><button class="btn ghost" id="shareBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button></div>

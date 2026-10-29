@@ -60,7 +60,7 @@ export function faceFor(level, mood = 'calm') {
 }
 
 // Which face goes with each moment the opponent speaks at.
-export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk' };
+export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised' };
 
 export const CHARACTERS = {
   easy: {
@@ -72,7 +72,11 @@ export const CHARACTERS = {
       undo: ['Heh, no take-backs… fine.', 'I saw that.'],
       win: ['I won! Can we play again?', 'Told you I was winning.'],
       lose: ['Again! One more!', 'You only won because I let you.'],
+      firstWin: ['You beat me?! OK. Again, again!'],
     },
+    // your record against them: what they say when you are on a run (yours: you keep winning; theirs: they do)
+    runs: { yours: { 3: 'Three in a row? I\'m telling Mama.', 5: 'Five! Are you magic?', more: (n) => `${n} in a row. I give up. No I don't.` },
+            theirs: { 3: 'Three for me! Hehe.', 5: 'Five! I\'m the champion of everything.', more: (n) => `${n}! Are you letting me win?` } },
   },
   medium: {
     name: 'Nnamdi', level: 'Medium', bio: 'Your quick cousin. Talks more than he plans, plans more than you think.',
@@ -83,7 +87,10 @@ export const CHARACTERS = {
       undo: ['Undo? In Lagos we call that a loan.', 'I\'ll allow it. Once.'],
       win: ['Cousin, I warned you.', 'GG. Buy me suya.'],
       lose: ['Best of three. Obviously.', 'My phone was lagging.'],
+      firstWin: ['Fine. That one counts. Barely.'],
     },
+    runs: { yours: { 3: 'Three straight? Who have you been practising with?', 5: 'Five in a row. OK, I\'m actually trying now.', more: (n) => `${n} in a row. Cousin, leave something for me.` },
+            theirs: { 3: 'Three–zero. Suya is on you.', 5: 'Five. I\'m not even looking at the board.', more: (n) => `${n} and counting. Buy a bigger board.` } },
   },
   hard: {
     name: 'Mama Ngozi', level: 'Hard', bio: 'Thirty years at the market, ten thousand games on the same board.',
@@ -94,7 +101,10 @@ export const CHARACTERS = {
       undo: ['Undo all you like, child.', 'The board remembers.'],
       win: ['Come back when you have practised.', 'The board does not lie.'],
       lose: ['Well played. I mean it.', 'Hm. I taught you too well.'],
+      firstWin: ['So. You finally beat me. Once.'],
     },
+    runs: { yours: { 3: 'Three in a row? Mama Ngozi is watching.', 5: 'Five. Now the market will talk.', more: (n) => `${n} in a row. The board is yours. For now.` },
+            theirs: { 3: 'Three. Come back when the seeds listen to you.', 5: 'Five. Sit well; we are not finished.', more: (n) => `${n}. I am not counting. You are.` } },
   },
 };
 for (const k in CHARACTERS) CHARACTERS[k].face = faceFor(k, 'calm');
@@ -103,3 +113,14 @@ export function line(level, moment) {
   const c = CHARACTERS[level] || CHARACTERS.medium; const arr = c.lines[moment] || [];
   return arr[Math.floor(Math.random() * arr.length)] || '';
 }
+
+// What the opponent says about a run: `run` is yours against them (+3 three wins in a row, −3 three losses).
+// Only runs worth a word get one (3, 5, then every fifth); anything else is ''.
+export function runLine(level, run) {
+  const c = CHARACTERS[level] || CHARACTERS.medium; const n = Math.abs(run); if (!n) return '';
+  const side = run > 0 ? c.runs.yours : c.runs.theirs;
+  if (side[n]) return side[n];
+  return n >= 10 && n % 5 === 0 ? side.more(n) : '';
+}
+// The face that goes with a run line: a sulk when you are the one winning, a grin when they are.
+export const RUN_MOOD = { yours: 'sulk', theirs: 'happy' };
