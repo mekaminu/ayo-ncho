@@ -22,7 +22,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 ## Ideas (Meka said yes to ideas, mock-first still applies)
 
 - [~] Daily puzzle: engine done (engine/puzzle.js: date-seeded, same for everyone, 60 days tested solvable, targets 4–20; share text with a seed row). Remains: the Home card and the puzzle screen — mockups added to the Design canvas 29 Oct ("Home — with the daily puzzle card", "Daily puzzle — played and solved"), [!] awaiting Meka's yes
-- [ ] Replay clip: a 10-second recording of a brilliant relay turn to share
+- [x] Replay clip (29 Oct): the game remembers your best turn (web/clip.js, tested: seeds won ×2 + relays ×3 − seeds handed over; ties go to the busier turn); Game over → Clip replays it on the board from the position before the move, pit lit first, camera drifting slowly, at a seed pace sized so the turn fits ~10 s (monster turns of 6+ relays run longer rather than being cut), while MediaRecorder records the canvas (mp4 or webm, whichever the browser has); then Web Share with the video and a caption (WhatsApp on the phone), or a download on the Mac; browsers that cannot record still play the turn and share the words. `tools/render.py --smoke --clip` records one in headless Chromium and checks a video came out. Picture: docs/render-2026-10-29-clip.png
 - [x] Calm streak (29 Oct): web/streak.js counts distinct days with a move, never resets; a quiet line on Home ("6 days played · 1 more day for river stones"); 7 days played unlocks the River stones seed set (grey pebbles, docs/render-2026-10-29-stones.png), announced with a toast on the move that crosses it and chosen in Settings → Board → Seeds (swaps in place, no new game). Cowries stay for the store later
 - [ ] Opponent reactions: a line and a face when they lose a big pit, when they win, when you undo
 
@@ -31,6 +31,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [!] Daily puzzle card on Home and the puzzle screen: mockups on the Design canvas (https://claude.ai/artifact/H75vS5iCT5X2Fmft4oYMXP, second row) — awaiting Meka's yes
 - [x] Make the repo public so the scheduled cloud runs can push — done 29 Oct; runs push from 12:07
 - [!] Render: create the Web Service from mekaminu/ayo-ncho (Free plan, no environment variables) and send the address, so the deploy item can be closed and the tracker gets the test link
+- [!] Clip button on the Game over card (docs/render-2026-10-29-clip.png): the clip records the board only, not the scores or names. Say if you want a name/score strip drawn into the video, or a sound track (the knocks) — both are possible
 - [!] On the Fold: open Settings → Feel → Lighter board and say whether the full board runs smoothly (then Auto is right) or the lighter one looks good enough to keep (docs/render-2026-10-29-lite.png)
 
 - [x] Family rules confirmed 29 Oct: Nchò (relay sowing, capture on 4, last 8, bankruptcy, loop stop — see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka sent a rules write-up at 03:12: relay sowing taken as yes unless he says otherwise.

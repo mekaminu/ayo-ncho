@@ -5,6 +5,7 @@ import { SeedSim } from './physics.js';
 import { CHARACTERS, line } from './characters.js';
 import { decideQuality, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
+import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -373,6 +374,45 @@ $('#shareBtn').addEventListener('click', async () => {
   } catch {}
 });
 
+// ---------- the replay clip: your best turn of the game, recorded from the board as a ~10-second video to share ----------
+let clipping = false, cinematic = false;
+const CLIP_TYPES = ['video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+async function recordClip(deliver = true) {
+  if (busy || clipping || !state.moves.length) return null;
+  const turn = bestTurn(state.moves, state.variant, state.rules, you); if (!turn) return null;
+  clipping = true; busy = true; const wasOver = !$('#gameover').hidden; $('#gameover').hidden = true; deselect();
+  // record the board itself (not the overlay) wherever the browser can; elsewhere the turn still plays and the words are shared
+  const type = window.MediaRecorder && canvas.captureStream ? CLIP_TYPES.find((t) => MediaRecorder.isTypeSupported(t)) : null;
+  let rec = null; const chunks = [];
+  if (type) { try { rec = new MediaRecorder(canvas.captureStream(30), { mimeType: type, videoBitsPerSecond: 2500000 }); rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); }; } catch { rec = null; } }
+  $('#rec').hidden = !rec; const t0 = performance.now();
+  // the board as it stood before the turn, the chosen pit lit, then the turn at a pace that fits the clip
+  layoutFromState(turn.before); refreshStaticFrom(turn.before); cinematic = true;
+  if (rec) rec.start(250);
+  await wait(300); select(turn.pit); await wait(600); board.ring.visible = false; board.glow.visible = false;
+  await animate(turn.events, turn.before.stores, clipPace(turn, PACE));
+  await wait(900); cinematic = false;
+  const blob = rec ? await new Promise((res) => { rec.onstop = () => res(new Blob(chunks, { type: rec.mimeType || type })); rec.stop(); }) : null;
+  const ms = Math.round(performance.now() - t0); $('#rec').hidden = true;
+  layoutFromState(state); refreshStatic(); busy = false; clipping = false; selected = null; if (wasOver) $('#gameover').hidden = false;
+  const caption = clipCaption(turn, names[level], state.variant);
+  if (deliver) await deliverClip(blob, caption);
+  return { size: blob ? blob.size : 0, type: blob ? blob.type : null, ms, turn: { index: turn.index, seeds: turn.seeds, relays: turn.relays, drops: turn.drops } };
+}
+async function deliverClip(blob, caption) {
+  try {
+    if (blob && blob.size) {
+      const file = new File([blob], `ayo-ncho-best-turn.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`, { type: blob.type });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ text: caption, files: [file] });
+      const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = file.name; body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 10000);
+      return toast('Clip saved to your downloads');
+    }
+    if (navigator.share) return await navigator.share({ text: caption });
+    await navigator.clipboard.writeText(caption); toast('This browser cannot record video — the words are copied');
+  } catch {}
+}
+$('#clipBtn').addEventListener('click', () => { recordClip(); click(1.3, 0.08); });
+
 function save() { prefs.set('game', JSON.stringify({ moves: state.moves, variant: state.variant, rules: state.rules, level, stats })); }
 function savedGame() { try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length) { const s = replay(g.moves, g.variant, g.rules); return s.over ? null : s; } } catch {} return null; }
 function resume() {
@@ -457,12 +497,12 @@ if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
 function loop(now) {
-  runTweens(now); sim.step((now - last) / 1000, now); if (idle && !reduceMotion) theta += (now - last) * 0.00004; last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
+  runTweens(now); sim.step((now - last) / 1000, now); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
   if (frames === 3) { window.__done = true; if (params.get('still')) { running = false; return; } }
   if (window.__freeze || document.hidden) { running = false; return; }
   requestAnimationFrame(loop);

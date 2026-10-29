@@ -118,6 +118,9 @@ button{font-family:inherit}
 .face.m{width:40px;height:40px}
 .pill{display:inline-flex;align-items:center}
 #bubble{position:fixed;left:max(18px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 64px);max-width:min(70vw,280px);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:14px 14px 14px 4px;padding:9px 12px;font-size:13px;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:pop .25s ease-out;pointer-events:none;z-index:2}
+#rec{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 64px);display:flex;align-items:center;gap:8px;background:rgba(13,9,6,.75);border:1px solid var(--line);border-radius:999px;padding:6px 12px 6px 10px;font-size:12px;color:var(--fg);pointer-events:none;z-index:3;animation:pop .25s ease-out}
+#rec i{width:9px;height:9px;border-radius:50%;background:#e2493b;animation:blink 1s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.25}}
 .wide #bubble{left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 100px)}
 /* tutorial */
 #tip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);width:min(86vw,320px);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:pop .3s ease-out;z-index:3}
@@ -146,6 +149,7 @@ button{font-family:inherit}
 <div id="badges" aria-hidden="true"></div>
 <div class="hud top"><div class="who"><span class="face" id="oppFace"></span><div class="col"><span class="name" id="oppName">Nnamdi · Medium</span><span class="sub" id="oppSub">waiting</span></div></div><div class="col r"><span class="score" id="oppScore">0</span><span class="lab">captured</span></div></div>
 <div id="hint" role="status"></div>
+<div id="rec" hidden role="status"><i></i>Recording your best turn…</div>
 <div id="bubble" hidden role="status"></div>
 <div class="hud bottom"><div class="col"><span class="score" id="myScore">0</span><span class="lab">captured</span></div><div class="col r"><span class="name">Meka</span><span class="sub" id="turn">your move</span></div></div>
 <div class="bar">
@@ -228,7 +232,7 @@ button{font-family:inherit}
   <div class="mini"><div><span>Biggest turn</span><b id="goBig">0 seeds</b></div><div><span>Captures</span><b id="goCaps">0</b></div><div><span>Time</span><b id="goTime">0:00</b></div></div>
   <div class="col" style="gap:8px">
     <button class="btn" id="rematch">Play again</button>
-    <div class="two" style="gap:8px"><button class="btn ghost" id="replayBtn" style="flex:1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>Replay</button><button class="btn ghost" id="shareBtn" style="flex:1"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button></div>
+    <div class="two" style="gap:8px"><button class="btn ghost" id="replayBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>Replay</button><button class="btn ghost" id="clipBtn" style="flex:1;padding-left:10px;padding-right:10px" title="Record your best turn as a 10-second clip to share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>Clip</button><button class="btn ghost" id="shareBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button></div>
     <button class="btn quiet" id="goHome">Back to home</button>
   </div>
 </div>

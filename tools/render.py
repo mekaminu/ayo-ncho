@@ -1,10 +1,11 @@
 # Render the game with headless Chromium (software WebGL) and optionally play a move.
 # Usage: python3 tools/render.py out.png            -> still frame (mid-game position, pit 4 lit)
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
+#        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
 import sys, base64, http.server, threading, functools, os, json, time
 from playwright.sync_api import sync_playwright
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -32,6 +33,13 @@ with sync_playwright() as p:
         after = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         assert before != after, "board did not change"
         print("smoke: before", before, "after", after, "scores", pg.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]"))
+        if clip:  # record the best turn so far as a short video, the way the Game over card's Clip button does
+            pg.set_default_timeout(300000)
+            r = pg.evaluate("window.__ayo.clip()")
+            print("clip:", json.dumps(r))
+            assert r and r["size"] > 0 and r["type"], "no video came out of the clip"
+            assert r["ms"] <= 60000, "clip never finished in reasonable time: %s ms" % r["ms"]  # software rendering is slow; a real phone plays it in ~10 s (clipLength)
+            assert pg.evaluate("document.querySelector('#rec').hidden && document.querySelector('#turn').textContent==='your move'"), "board not restored after the clip"
     pg.wait_for_timeout(300)
     if home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     else:
