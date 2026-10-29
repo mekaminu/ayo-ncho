@@ -196,12 +196,46 @@ const online = !!roomParam;
 let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
 const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : levelLabel(level);
 const myName = () => prefs.get('name', '') || $('#meName').textContent || 'Player';
+function paintMyName() { const n = prefs.get('name', ''); if (n) { $('#meName').textContent = n; $('#goMe span').textContent = n; } }
+// the name card: asked once (before a room is opened or knocked on), then remembered on this phone
+function askName(verb) {
+  return new Promise((res) => {
+    const card = $('#nameCard'), field = $('#nameField'); field.value = prefs.get('name', ''); $('#nameGo').textContent = verb;
+    $('#nameSub').textContent = verb === 'Knock' ? 'Your friend sees this name when you knock on their board.' : 'Your friend sees this name when they knock on your board.';
+    card.hidden = false; setTimeout(() => field.focus(), 50);
+    card.onsubmit = (e) => { e.preventDefault(); const n = field.value.replace(/\s+/g, ' ').trim().slice(0, 24); if (!n) return field.focus(); prefs.set('name', n); paintMyName(); card.hidden = true; click(1.3, 0.08); res(n); };
+    $('#nameHome').onclick = () => { card.hidden = true; leaveRoom(); };
+  });
+}
+// the door (host's side): the first person knocking is shown; Let in seats them, Not now sends them away; the next knock follows
+let doorId = null;
+function paintDoor() {
+  const knocks = (net && net.room && net.room.knocks) || []; const card = $('#knockCard');
+  if (!knocks.length || friend) { doorId = null; card.hidden = true; return; }
+  const k = knocks[0]; if (doorId === k.id && !card.hidden) return;
+  doorId = k.id; $('#knockTitle').textContent = `${k.name} wants to play`; $('#knockFace').innerHTML = initialFace(k.name);
+  $('#knockSub').textContent = knocks.length > 1 ? `Let them in and they take the far seat. ${knocks.length - 1} more ${knocks.length > 2 ? 'are' : 'is'} waiting behind them.` : 'Let them in and they take the far seat. Nobody else can join once they do.';
+  $('#knockYes').disabled = false; $('#knockNo').disabled = false; card.hidden = false;
+}
+function answerDoor(yes) { if (!net || !doorId) return; if (net.let(doorId, yes)) { $('#knockYes').disabled = true; $('#knockNo').disabled = true; click(yes ? 1.5 : 0.7, 0.08); } }
+$('#knockYes').addEventListener('click', () => answerDoor(true));
+$('#knockNo').addEventListener('click', () => answerDoor(false));
+function knockSound() { [1.1, 1.1, 1.4].forEach((p, i) => setTimeout(() => click(p, 0.12), i * 130)); buzz([30, 60, 30, 60, 60]); }
 function initialFace(name) { // a friend has no drawn character yet: their initial on a brass ring
   const ch = (String(name || '?').trim()[0] || '?').toUpperCase();
   return `<svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true"><circle cx="22" cy="22" r="22" fill="#3a2718"/><circle cx="22" cy="22" r="19" fill="none" stroke="#e6b76f" stroke-opacity=".55"/><text x="22" y="29" text-anchor="middle" font-size="20" font-weight="700" fill="#e6b76f" font-family="inherit">${ch}</text></svg>`;
 }
 function showTurnOnline() {
-  if (!net || net.seat === null) { $('#undo').disabled = true; $('#hintBtn').disabled = true; return; } // not seated yet: the joining message stays
+  $('#undo').disabled = true; $('#hintBtn').disabled = true;
+  if (!net || net.seat === null) { // not seated yet: the joining message stays, or the door's
+    if (net && net.knock) {
+      const k = net.knock; const link = net.status !== 'open';
+      $('#oppName').textContent = k.host; $('#oppFace').innerHTML = initialFace(k.host);
+      $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : 'no connection') : k.hostOnline ? 'deciding whether to let you in' : 'away — they will see you knocked when they are back';
+      $('#turn').textContent = 'at the door'; $('#hint').textContent = `Knocked — waiting for ${k.host} to let you in`; $('#shoutBtn').disabled = true;
+    }
+    return;
+  }
   const waiting = !friend; const mine = !waiting && state.turn === you && !state.over && !busy; const link = net.status !== 'open';
   $('#turn').textContent = state.over ? 'game over' : waiting ? 'waiting' : mine ? 'your move' : '…';
   $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : net.status === 'connecting' ? 'connecting…' : 'no connection')
@@ -234,7 +268,7 @@ function syncRoom(room) { // the room as the server shows it: the friend's seat 
   const s = stateFrom(room.state);
   const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
   state = s; if (!same) layoutFromState(state);
-  refreshStatic(); paintRules();
+  refreshStatic(); paintRules(); paintDoor();
 }
 let moveQueue = Promise.resolve();
 function sendMove(pit) { if (busy || !net || !net.move(pit)) return; busy = true; deselect(); }
@@ -251,13 +285,14 @@ function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location
 function startOnline() {
   net = new Online((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   let held = null; try { held = JSON.parse(prefs.get('room', 'null')); } catch {}
-  let triedJoin = false, seated = false;
+  let triedJoin = false, seated = false, knocking = false;
   net.on('joined', ({ seat, code, token, room }) => {
     const back = seated; seated = true; you = seat; them = 1 - seat; baseTheta = seat === 1 ? Math.PI : 0; if (!back) theta = baseTheta;
     prefs.set('room', JSON.stringify({ code, token }));
     if (roomParam.toUpperCase() !== code) history.replaceState(null, '', inviteLink(code)); // ?room=new becomes the real invite link, ready to share
     syncRoom(room); $('#gameover').hidden = !state.over; if (state.over) gameOver();
-    if (back) toast('Back at the board'); else if (!friend) toast(`Room ${code} — share this page's link`);
+    if (knocking) { knocking = false; toast(`${friend ? friend.name : 'Your friend'} let you in — ${state.turn === you ? 'your move' : 'they start'}`); click(1.5, 0.1); setTimeout(() => click(2, 0.1), 120); buzz(20); }
+    else if (back) toast('Back at the board'); else if (!friend) toast(`Room ${code} — share this page's link`);
   });
   net.on('room', ({ room, started, resync }) => {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
@@ -269,20 +304,33 @@ function startOnline() {
   net.on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
   net.on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
   net.on('shout', ({ seat, id }) => showShout(seat, id));
+  // the door: this phone knocked and waits for the host; or (as host) someone is knocking on ours
+  net.on('knocked', ({ host }) => { const again = knocking; knocking = true; showTurn(); if (!again) { toast(`Knocked — ${host} decides`); click(1.1, 0.08); } });
+  net.on('knock', () => { knockSound(); });
   net.on('error', (e) => {
     busy = false;
-    if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomParam, myName()); } // our old seat is gone: take the free one
-    if (['notfound', 'taken', 'swept', 'offline', 'nows', 'full'].includes(e.code)) { $('#oppName').textContent = e.msg; $('#oppSub').textContent = 'tap Home to go back'; $('#turn').textContent = ''; $('#hint').textContent = ''; return; }
+    if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomParam, myName()); } // our old seat is gone: knock for the free one
+    if (e.code === 'noknock' || e.code === 'host') { toast(e.msg); paintDoor(); return; } // the host answered a knock that was already gone
+    if (['notfound', 'taken', 'swept', 'offline', 'nows', 'full', 'notlet', 'busy'].includes(e.code)) {
+      const host = net.knock && net.knock.host; $('#knockCard').hidden = true;
+      $('#oppName').textContent = e.code === 'notlet' && host ? `${host} did not let you in this time` : e.msg; $('#oppSub').textContent = 'tap Home to go back'; $('#turn').textContent = ''; $('#hint').textContent = ''; $('#shoutBtn').disabled = true;
+      if (e.code === 'notlet') { click(0.6, 0.08); buzz(40); } return;
+    }
     $('#hint').textContent = e.msg; showTurn(); click(0.5, 0.05);
   });
-  net.on('status', () => { if (seated) showTurn(); });
+  net.on('status', () => { if (seated || net.knock) showTurn(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) net.wake(); });
   addEventListener('online', () => net.wake());
-  body.classList.add('online'); showScreen('play'); $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = '';
+  body.classList.add('online'); showScreen('play'); $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = ''; $('#shoutBtn').disabled = true;
   $('#oppFace').innerHTML = initialFace('?');
-  if (roomParam === 'new') net.create({ variant: settings.game, rules: settings.rules(), name: myName() });
-  else if (held && held.code === roomParam.toUpperCase()) net.rejoin(held.code, held.token);
-  else net.join(roomParam, myName());
+  const rejoining = held && roomParam !== 'new' && held.code === roomParam.toUpperCase();
+  const go = () => {
+    if (roomParam === 'new') net.create({ variant: settings.game, rules: settings.rules(), name: myName() });
+    else if (rejoining) net.rejoin(held.code, held.token);
+    else { net.join(roomParam, myName()); $('#oppName').textContent = 'Knocking…'; }
+  };
+  if (!rejoining && !prefs.get('name', '')) askName(roomParam === 'new' ? 'Open the room' : 'Knock').then(go); // the name is asked once; the Rooms screen will ask it in its own way later
+  else go();
 }
 
 const worker = new Worker('./ai-worker.js', { type: 'module' });
@@ -298,7 +346,7 @@ async function hint() {
 }
 
 function paintFaces() {
-  $('#oppFace').innerHTML = online ? initialFace(oppLabel()) : faceFor(level, mood);
+  $('#oppFace').innerHTML = online ? initialFace(friend ? friend.name : '?') : faceFor(level, mood);
   document.querySelectorAll('.pill[data-level]').forEach((b) => { b.querySelector('.face').innerHTML = CHARACTERS[b.dataset.level].face; });
   document.querySelectorAll('[data-face]').forEach((f) => { f.innerHTML = CHARACTERS[f.dataset.face].face; });
 }
@@ -614,7 +662,7 @@ const soundBtn = $('#soundBtn'); const paintSound = () => soundBtn.setAttribute(
 soundBtn.addEventListener('click', () => { prefs.set('sound', soundOn() ? '0' : '1'); paintSound(); click(1, 0.08); }); paintSound();
 
 // ---------- start ----------
-paintRules(); layoutFromState(state); refreshStatic();
+paintRules(); paintMyName(); layoutFromState(state); refreshStatic();
 if (online) startOnline();
 else if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected
   state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; layoutFromState(state); refreshStatic(); select(3); showScreen('play');
@@ -624,7 +672,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

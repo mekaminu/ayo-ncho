@@ -41,11 +41,20 @@ test("host creates, friend joins by code, moves go to both, an out-of-turn move 
   assert.equal(look.ok, true); assert.equal(look.seatFree, true); assert.equal(look.players[0].name, "Meka");
   assert.equal(JSON.stringify(look).includes(ja.token), false);
 
+  // the friend knocks (join does not seat anyone): the host hears it, sees the door list, and lets them in
   b.send({ t: "join", code: ja.code, name: "Tete" });
+  const kb = await b.next("knocked");
+  assert.equal(kb.code, ja.code); assert.equal(kb.host, "Meka"); assert.equal(kb.hostOnline, true); assert.ok(kb.id);
+  assert.deepEqual(await a.next("knock"), { t: "knock", id: kb.id, name: "Tete" });
+  const atDoor = await a.next("room"); assert.deepEqual(atDoor.room.knocks, [{ id: kb.id, name: "Tete" }]); assert.equal(atDoor.room.players[1], null);
+  b.send({ t: "move", pit: 6 }); assert.equal((await b.next("error")).code, "unseated"); // knocking is not playing
+  b.send({ t: "let", id: kb.id, in: true }); assert.equal((await b.next("error")).code, "unseated"); // and a knocker cannot let themselves in
+  a.send({ t: "let", id: kb.id, in: true });
   const jb = await b.next("joined");
-  assert.equal(jb.seat, 1);
+  assert.equal(jb.seat, 1); assert.ok(jb.token); assert.deepEqual(jb.room.knocks, []);
   const presence = await a.next("room");
   assert.equal(presence.room.players[1].name, "Tete");
+  b.send({ t: "let", id: "x", in: false }); assert.equal((await b.next("error")).code, "host"); // only the host answers the door
 
   b.send({ t: "move", pit: 6 });
   const err = await b.next("error");

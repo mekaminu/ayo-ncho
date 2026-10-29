@@ -27,10 +27,16 @@ test("host creates, friend joins by code, moves reach both boards, a wrong-turn 
   assert.equal(ja.seat, 0); assert.match(ja.code, /^[A-HJ-NP-Z]{4}$/); assert.equal(host.room.players[1], null);
   assert.deepEqual(statuses, ["connecting", "open"]);
 
-  const friendJoined = once(friend, "joined"), hostSees = once(host, "room");
+  // the friend opens the link: they knock with their name, the host hears it and sees them at the door, then lets them in
+  const knocked = once(friend, "knocked"), heard = once(host, "knock"), door = once(host, "room");
   friend.join(ja.code.toLowerCase(), "Tete");
+  const k = await knocked; assert.equal(k.host, "Meka"); assert.equal(k.hostOnline, true); assert.equal(k.code, ja.code); assert.equal(friend.knock.id, k.id); assert.equal(friend.seat, null);
+  assert.deepEqual(await heard, { id: k.id, name: "Tete" }); assert.deepEqual((await door).room.knocks, [{ id: k.id, name: "Tete" }]);
+  assert.equal(host.room.players[1], null, "knocking is not joining");
+  const friendJoined = once(friend, "joined"), hostSees = once(host, "room");
+  assert.equal(host.let(k.id, true), true);
   const jb = await friendJoined; const presence = await hostSees;
-  assert.equal(jb.seat, 1); assert.equal(presence.room.players[1].name, "Tete"); assert.equal(presence.room.players[0].name, "Meka");
+  assert.equal(jb.seat, 1); assert.equal(friend.knock, null); assert.equal(presence.room.players[1].name, "Tete"); assert.equal(presence.room.players[0].name, "Meka"); assert.deepEqual(presence.room.knocks, []);
 
   // the friend taps first: refused in plain words, nothing moves
   const refused = once(friend, "error"); friend.move(6);
@@ -65,6 +71,29 @@ test("host creates, friend joins by code, moves reach both boards, a wrong-turn 
   const closed = once(host, "status"); host.leave(); assert.equal(await closed, "closed"); assert.equal(host.ws, null);
   await new Promise((r) => setTimeout(r, 50)); assert.equal(host.status, "closed");
   friend.leave();
+});
+
+test("the door: not let in is said plainly; a knocker who leaves vanishes from the door; the knock is sent again after a dropped line", async () => {
+  const host = new Online(url); const hj = once(host, "joined"); host.create({ name: "Meka" }); const { code } = await hj;
+  // Ada knocks and is turned away
+  const ada = new Online(url); const ak = once(ada, "knocked"), seen = once(host, "room"); ada.join(code, "Ada"); const k = await ak; await seen;
+  const away = once(ada, "error"), cleared = once(host, "room"); host.let(k.id, false);
+  const e = await away; assert.equal(e.code, "notlet"); assert.equal(e.msg, ERROR_TEXT.notlet); assert.equal(e.re, "join"); assert.equal(ada.knock, null); assert.equal(ada.intent, null);
+  await cleared; assert.deepEqual(host.room.knocks, []);
+  // Bola knocks, then closes the page: the host's door list empties; answering that knock is refused in plain words
+  const bola = new Online(url); const bk = once(bola, "knocked"), seen2 = once(host, "room"); bola.join(code, "Bola"); const kb = await bk; await seen2;
+  assert.equal(host.room.knocks[0].name, "Bola");
+  const gone = once(host, "room"); bola.leave(); await gone; assert.deepEqual(host.room.knocks, []);
+  const stale = once(host, "error"); host.let(kb.id, true); assert.equal((await stale).code, "noknock");
+  // Chidi knocks; the line drops under them; the client knocks again by itself and the host sees one knock, not two
+  const chidi = new Online(url); const ck = once(chidi, "knocked"), seen3 = once(host, "room"); chidi.join(code, "Chidi"); const k1 = await ck; await seen3;
+  const emptied = once(host, "room"), reknock = once(chidi, "knocked", 8000); chidi.ws.close(); await emptied;
+  const k2 = await reknock; assert.notEqual(k2.id, k1.id); assert.equal(chidi.status, "open");
+  await new Promise((r) => setTimeout(r, 30)); assert.deepEqual(host.room.knocks.map((x) => x.name), ["Chidi"]);
+  const seatedC = once(chidi, "joined"); host.let(k2.id, true); assert.equal((await seatedC).seat, 1);
+  // the room is full now: the next knock is refused as taken, before the host is bothered
+  const late = new Online(url); const le = once(late, "error"); late.join(code, "Dayo"); assert.equal((await le).code, "taken");
+  for (const n of [host, ada, bola, chidi, late]) n.leave();
 });
 
 test("a code nobody opened is refused and the client does not keep trying", async () => {

@@ -3,13 +3,15 @@
 //
 //   const net = new Online(wsUrl);
 //   net.on('joined', ({ seat, room }) => …)   // seated (also after a reconnect: the room carries the whole game)
+//   net.on('knocked', ({ host, hostOnline }) => …) // you are at the door: the host has been told your name and decides
+//   net.on('knock',  ({ id, name }) => …)      // (host) someone is at the door; room.knocks in the next 'room' lists everyone waiting
 //   net.on('move',   ({ seat, pit, events, state }) => …) // events and state rebuilt here with the engine from the small message the server sends
-//   net.on('room',   ({ room, started, resync }) => …) // presence, a rematch asked for, a new game started; resync: the whole room after this board fell behind
+//   net.on('room',   ({ room, started, resync }) => …) // presence, a knock, a rematch asked for, a new game started; resync: the whole room after this board fell behind
 //   net.on('resync', ({ why }) => …)           // this board could not rebuild a move and has asked for the room (a 'room' with resync follows)
 //   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
-//   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened …
+//   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
-//   net.create({ variant, rules, name }) / net.join(code, name) / net.rejoin(code, token) / net.move(pit) / net.shout(id) / net.rematch() / net.leave()
+//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.leave()
 
 import { applyMove } from '../engine/ayo.js';
 
@@ -47,12 +49,15 @@ export const ERROR_TEXT = {
   turn: 'Not your move', illegal: 'That pit cannot be played', over: 'The game is over', token: 'That seat is not yours', swept: 'The room has closed',
   full: 'Too many rooms open right now — try again in a minute', seated: 'Already at a board', unseated: 'Join a room first', variant: 'Unknown game',
   hush: 'Easy — one shout at a time', bad: 'Something went wrong',
+  notlet: 'Not let in this time', knocking: 'Already at the door', busy: 'Too many people at the door — try again in a minute',
+  host: 'Only the host decides who comes in', noknock: 'They have gone from the door',
 };
 
 export class Online {
   constructor(url, { WebSocketImpl = typeof WebSocket !== 'undefined' ? WebSocket : null, setTimeoutFn = (fn, ms) => setTimeout(fn, ms), clearTimeoutFn = (t) => clearTimeout(t) } = {}) {
     this.url = url; this.WS = WebSocketImpl; this.setTimeout = setTimeoutFn; this.clearTimeout = clearTimeoutFn;
     this.ws = null; this.status = 'closed'; this.seat = null; this.code = null; this.token = null; this.room = null;
+    this.knock = null; // {code, id, host, hostOnline} while this board waits at the door
     this.intent = null; // what to send once the socket opens: {t:'create'…} | {t:'join'…} | {t:'rejoin'…}
     this.attempts = 0; this.timer = null; this.left = false;
     this.handlers = {};
@@ -66,10 +71,11 @@ export class Online {
   join(code, name) { this.ask({ t: 'join', code: String(code || '').toUpperCase(), name }); }
   rejoin(code, token) { this.ask({ t: 'rejoin', code: String(code || '').toUpperCase(), token }); }
   ask(intent) { this.intent = intent; if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(intent)); else this.connect(); }
+  let(id, yes = true) { return this.send({ t: 'let', id, in: !!yes }); } // the host answers the door
   move(pit) { return this.send({ t: 'move', pit }); }
   rematch() { return this.send({ t: 'rematch' }); }
   shout(id) { return this.send({ t: 'shout', id }); }
-  leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
+  leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; this.knock = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
 
   send(msg) {
     if (!this.ws || this.ws.readyState !== 1) { this.emit('error', { code: 'offline', msg: 'No connection right now — reconnecting', re: msg.t }); return false; }
@@ -91,21 +97,25 @@ export class Online {
   }
   scheduleReconnect() {
     if (this.left) return;
-    // only a seat we already hold is worth coming back for; a create/join that never got through is reported once
-    if (!this.token) { this.setStatus('closed'); this.emit('error', { code: 'offline', msg: 'Could not reach the server — check your signal and try again', re: this.intent && this.intent.t }); return; }
-    this.intent = { t: 'rejoin', code: this.code, token: this.token };
+    // only a seat we already hold, or a door we were already knocking at, is worth coming back for; a create/join that never got through is reported once
+    if (!this.token && !this.knock) { this.setStatus('closed'); this.emit('error', { code: 'offline', msg: 'Could not reach the server — check your signal and try again', re: this.intent && this.intent.t }); return; }
+    if (this.token) this.intent = { t: 'rejoin', code: this.code, token: this.token }; else this.knock = { ...this.knock, id: null }; // at the door: the same join knocks again when the line is back
     const delay = BACKOFF_MS[Math.min(this.attempts, BACKOFF_MS.length - 1)]; this.attempts += 1;
     this.setStatus('reconnecting');
     this.timer = this.setTimeout(() => { this.timer = null; this.connect(); }, delay);
   }
   // the page came back to the front (or the phone found signal): try now rather than waiting out the backoff
-  wake() { if (this.status === 'reconnecting' && this.token) { this.clearTimeout(this.timer); this.timer = null; this.connect(); } }
+  wake() { if (this.status === 'reconnecting' && (this.token || this.knock)) { this.clearTimeout(this.timer); this.timer = null; this.connect(); } }
 
   handle(m) {
     switch (m.t) {
       case 'joined':
-        this.seat = m.seat; this.code = m.code; this.token = m.token; this.room = m.room; this.intent = { t: 'rejoin', code: m.code, token: m.token };
+        this.seat = m.seat; this.code = m.code; this.token = m.token; this.room = m.room; this.knock = null; this.intent = { t: 'rejoin', code: m.code, token: m.token };
         return this.emit('joined', { seat: m.seat, code: m.code, token: m.token, room: m.room });
+      case 'knocked':
+        this.code = m.code; this.knock = { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline };
+        return this.emit('knocked', { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline });
+      case 'knock': return this.emit('knock', { id: m.id, name: m.name });
       case 'room': this.room = m.room; return this.emit('room', { room: m.room, started: !!m.started, resync: !!m.resync });
       case 'move': {
         let events = m.events, state = m.state; // an older server still sends the whole thing
@@ -120,6 +130,7 @@ export class Online {
       case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
       case 'error':
         if (m.code === 'swept' || (m.code === 'notfound' && m.re === 'rejoin') || m.code === 'token') { this.token = null; this.intent = null; } // nothing left to come back to
+        if (m.re === 'join' && m.code !== 'knocking') { this.knock = null; this.intent = null; } // turned away, or the door is gone: no knocking again by ourselves
         return this.emit('error', { code: m.code, msg: ERROR_TEXT[m.code] || m.msg || 'Something went wrong', re: m.re });
       case 'pong': return;
       default: return;

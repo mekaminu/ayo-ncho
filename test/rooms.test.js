@@ -31,6 +31,35 @@ test("host opens a room, the friend joins by code, a third person is turned away
   assert.ok(!JSON.stringify(rooms.snapshot(host.code)).includes(host.token), "tokens never leave in a snapshot");
 });
 
+test("the door: a knock is not a seat; only the host lets people in; the first let in takes the seat and the rest are turned away", () => {
+  const c = clock(); const rooms = new Rooms({ random: seeded(5), now: c.now });
+  const host = rooms.create({ name: "Meka" });
+  const ada = rooms.knock(host.code.toLowerCase(), { name: "  Ada   Obi " });
+  assert.equal(ada.name, "Ada Obi"); assert.equal(ada.host, "Meka"); assert.equal(ada.hostOnline, true); assert.ok(ada.id);
+  assert.equal(rooms.snapshot(host.code).players[1], null, "knocking does not take the seat");
+  assert.deepEqual(rooms.snapshot(host.code).knocks, [{ id: ada.id, name: "Ada Obi" }]);
+  const bola = rooms.knock(host.code, { name: "Bola" });
+  assert.equal(rooms.snapshot(host.code).knocks.length, 2);
+  // a knocker cannot let anyone in, and nobody but the host can
+  assert.throws(() => rooms.admit(host.code, "nope", ada.id), (e) => e.code === "token");
+  // not now: Ada is dropped from the door and told so by the caller
+  assert.deepEqual(rooms.refuse(host.code, host.token, ada.id), { id: ada.id, name: "Ada Obi" });
+  assert.throws(() => rooms.refuse(host.code, host.token, ada.id), (e) => e.code === "noknock");
+  // Chidi knocks too; the host lets Bola in: Bola takes seat 1 and Chidi is turned away with the full room
+  const chidi = rooms.knock(host.code, { name: "Chidi" });
+  const r = rooms.admit(host.code, host.token, bola.id);
+  assert.equal(r.seat, 1); assert.ok(r.token); assert.deepEqual(r.knock, { id: bola.id, name: "Bola" }); assert.deepEqual(r.turnedAway, [{ id: chidi.id, name: "Chidi" }]);
+  assert.deepEqual(rooms.snapshot(host.code).players.map((p) => p.name), ["Meka", "Bola"]); assert.deepEqual(rooms.snapshot(host.code).knocks, []);
+  assert.throws(() => rooms.knock(host.code, { name: "Dayo" }), (e) => e.code === "taken");
+  // the friend, once let in, never knocks again: the token rejoins; the host answering the door as the friend is refused
+  assert.equal(rooms.rejoin(host.code, r.token).seat, 1);
+  assert.throws(() => rooms.admit(host.code, r.token, "x"), (e) => e.code === "host");
+  // a knock keeps the room alive: an unjoined room with someone at the door is not swept as abandoned
+  const h2 = rooms.create({ name: "Ngozi" }); c.tick(SEAT_HOLD_MS - 1000); rooms.knock(h2.code, { name: "Emeka" }); c.tick(SEAT_HOLD_MS - 1000);
+  assert.deepEqual(rooms.sweep(), []); c.tick(2000); assert.deepEqual(rooms.sweep(), [h2.code]);
+  assert.equal(rooms.withdraw(h2.code, "gone"), false);
+});
+
 test("two rooms never share a code; names are trimmed and bounded", () => {
   const rooms = new Rooms({ random: seeded(3) });
   const codes = new Set();

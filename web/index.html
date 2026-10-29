@@ -136,6 +136,17 @@ button{font-family:inherit}
 .wide #shoutMenu{left:auto;right:max(84px,calc(env(safe-area-inset-right,0px) + 84px));bottom:50%;transform:translateY(50%);width:min(32vw,320px);justify-content:flex-end}
 .wide #myBubble{right:auto;left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 118px);border-radius:14px 14px 14px 4px}
 @media (prefers-reduced-motion:reduce){#shoutMenu,#myBubble{animation:none}}
+/* with friends: the name card and the door */
+.field{width:100%;box-sizing:border-box;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:500 16px Inter,system-ui,sans-serif;color:var(--fg);outline:none;-webkit-user-select:text;user-select:text}
+.field:focus{border-color:var(--brass)}
+.door .who{align-items:center;gap:12px;margin-top:6px}
+.door .face.m{width:48px;height:48px;border:2px solid var(--brass);box-shadow:0 0 0 4px rgba(230,183,111,.18);animation:knockRing 1.6s ease-out infinite}
+@keyframes knockRing{0%{box-shadow:0 0 0 0 rgba(230,183,111,.45)}70%{box-shadow:0 0 0 12px rgba(230,183,111,0)}100%{box-shadow:0 0 0 12px rgba(230,183,111,0)}}
+.door h2{font-size:24px}
+.door .two .btn{flex:1;flex-direction:row;gap:8px;text-align:center;border-radius:999px;padding:13px 10px;font:600 15px Inter,system-ui,sans-serif}
+.door .two #knockYes{background:var(--brass);color:#1a0f07;border:0}
+.door .two #knockNo{background:none;color:var(--brass);border:1px solid rgba(230,183,111,.5)}
+@media (prefers-reduced-motion:reduce){.door .face.m{animation:none}}
 /* tutorial */
 #tip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);width:min(86vw,320px);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:pop .3s ease-out;z-index:3}
 #tip p{margin:0;font-size:13px;line-height:1.45;flex:1}
@@ -253,6 +264,21 @@ button{font-family:inherit}
     <div class="two" style="gap:8px"><button class="btn ghost" id="replayBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>Replay</button><button class="btn ghost" id="clipBtn" style="flex:1;padding-left:10px;padding-right:10px" title="Record your best turn as a 10-second clip to share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>Clip</button><button class="btn ghost" id="shareBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button></div>
     <button class="btn quiet" id="goHome">Back to home</button>
   </div>
+</div>
+
+<!-- With friends: your name at the board (asked once, before you open a room or knock on one) -->
+<form class="card" id="nameCard" hidden aria-labelledby="nameTitle">
+  <div class="col"><span class="eyebrow">With friends</span><h2 id="nameTitle">What do we call you?</h2></div>
+  <p id="nameSub">Your friend sees this name when you knock on their board.</p>
+  <input class="field" id="nameField" type="text" maxlength="24" autocomplete="nickname" placeholder="Your name" aria-label="Your name" required>
+  <div class="col" style="gap:8px"><button class="btn" id="nameGo" type="submit">Knock</button><button class="btn quiet" id="nameHome" type="button">Back to home</button></div>
+</form>
+
+<!-- The door: someone opened your invite link; you decide whether they take the far seat -->
+<div class="card door" id="knockCard" hidden role="dialog" aria-labelledby="knockTitle">
+  <div class="col"><span class="eyebrow">At the door</span><div class="who"><span class="face m" id="knockFace"></span><h2 id="knockTitle">Tete wants to play</h2></div></div>
+  <p id="knockSub">Let them in and they take the far seat. Nobody else can join once they do.</p>
+  <div class="two" style="gap:8px"><button class="btn ghost" id="knockNo" type="button" style="flex:1">Not now</button><button class="btn" id="knockYes" type="button" style="flex:1">Let in</button></div>
 </div>
 
 <!-- Rules -->

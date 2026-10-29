@@ -4,6 +4,11 @@
 // A room has a four-letter code (no letters that read like each other), two seats (0 = the host, south;
 // 1 = the friend, north) and one game. Each seat holds a secret token: a phone that loses signal sends the
 // token back and gets its seat and the whole game again. Rooms nobody has touched for a while are swept.
+//
+// The door: whoever opens the invite link does not take the seat straight away. They KNOCK with their name
+// (knock), the host sees who is asking and lets them in (admit) or not (refuse). A member who already holds a
+// token never knocks again: rejoin() is theirs. Knocks that are not answered are held until the knocker goes
+// away (withdraw) or the room is swept.
 import { randomUUID } from "node:crypto";
 import { newGame, applyMove, legalMoves, replay, RULES } from "../engine/ayo.js";
 import { isShout, mayShout } from "../web/shouts.js";
@@ -46,6 +51,7 @@ export class Rooms {
     const room = {
       code, variant, rules: { ...RULES[variant], ...rules },
       seats: [{ token: randomUUID(), name: cleanName(name, "Host"), online: true, wantsRematch: false }, null],
+      knocks: [], // people at the door, oldest first: {id, name, at}
       game: newGame(variant, rules), games: 0,
       createdAt: t, touchedAt: t,
     };
@@ -54,12 +60,48 @@ export class Rooms {
   }
 
   // The friend joins by code and takes seat 1. A full room, or a code nobody opened, is refused.
+  // (admit() is how the host's yes gets here; tests and trusted callers may seat a friend directly.)
   join(code, { name } = {}) {
     const room = this.get(code);
     if (room.seats[1]) fail("taken", "that room already has two players");
     room.seats[1] = { token: randomUUID(), name: cleanName(name, "Friend"), online: true, wantsRematch: false };
     room.touchedAt = this.now();
     return { code: room.code, token: room.seats[1].token, seat: 1, room: this.snapshot(code) };
+  }
+
+  // Someone opened the invite link: they knock with their name and wait for the host's yes. Returns what the
+  // knocker may know: their knock id, the host's name and whether the host is at the board right now.
+  knock(code, { name } = {}) {
+    const room = this.get(code);
+    if (room.seats[1]) fail("taken", "that room already has two players");
+    if (room.knocks.length >= 20) fail("busy", "too many people at the door");
+    const k = { id: randomUUID(), name: cleanName(name, "Friend"), at: this.now() };
+    room.knocks.push(k); room.touchedAt = k.at;
+    return { code: room.code, id: k.id, name: k.name, host: room.seats[0].name, hostOnline: room.seats[0].online };
+  }
+  // The knocker went away before being answered.
+  withdraw(code, id) {
+    const room = this.rooms.get(normaliseCode(code)); if (!room) return false;
+    const i = room.knocks.findIndex((k) => k.id === id); if (i < 0) return false;
+    room.knocks.splice(i, 1); return true;
+  }
+  // The host lets a knocker in: they take seat 1 and everyone else at the door is turned away (the room is full).
+  admit(code, token, id) {
+    const room = this.get(code);
+    if (this.seatOf(room, token) !== 0) fail("host", "only the host decides who comes in");
+    const i = room.knocks.findIndex((k) => k.id === id); if (i < 0) fail("noknock", "nobody is knocking with that name");
+    const [k] = room.knocks.splice(i, 1);
+    const seated = this.join(code, { name: k.name });
+    const turnedAway = room.knocks.splice(0); // the seat is gone: the others at the door are told so
+    return { ...seated, knock: { id: k.id, name: k.name }, turnedAway: turnedAway.map((x) => ({ id: x.id, name: x.name })) };
+  }
+  // The host says not now: the knock is dropped and the knocker is told.
+  refuse(code, token, id) {
+    const room = this.get(code);
+    if (this.seatOf(room, token) !== 0) fail("host", "only the host decides who comes in");
+    const i = room.knocks.findIndex((k) => k.id === id); if (i < 0) fail("noknock", "nobody is knocking with that name");
+    const [k] = room.knocks.splice(i, 1); room.touchedAt = this.now();
+    return { id: k.id, name: k.name };
   }
 
   // A phone that lost signal comes back with its token and gets its seat and the whole game.
@@ -128,6 +170,7 @@ export class Rooms {
     return {
       code: room.code, variant: room.variant, rules: { ...room.rules }, games: room.games,
       players: room.seats.map((s, i) => s ? { seat: i, name: s.name, online: s.online, wantsRematch: s.wantsRematch } : null),
+      knocks: room.knocks.map((k) => ({ id: k.id, name: k.name })), // who is at the door (the host's board shows them; never shown to the knockers)
       state: publicState(room.game),
     };
   }

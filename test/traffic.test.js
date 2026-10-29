@@ -69,7 +69,8 @@ const once = (net, type, ms = 5000) => new Promise((res, rej) => { const t = set
 test("over the wire: a client whose game went stale asks for the room and is caught up, and keeps rebuilding after", async () => {
   const host = new Online(url), friend = new Online(url);
   const hostJoined = once(host, "joined"); host.create({ variant: "ncho", name: "Meka" }); const ja = await hostJoined;
-  const friendJoined = once(friend, "joined"), seen = once(host, "room"); friend.join(ja.code, "Tete"); await friendJoined; await seen;
+  const knocked = once(friend, "knocked"), atDoor = once(host, "room"); friend.join(ja.code, "Tete"); const k = await knocked; await atDoor;
+  const friendJoined = once(friend, "joined"), seen = once(host, "room"); host.let(k.id, true); await friendJoined; await seen;
 
   // the friend's phone somehow holds a different game (say an old tab): the next move cannot be rebuilt, so it asks for the room instead
   friend.room.state = publicFrom(replay([0], "ncho"));

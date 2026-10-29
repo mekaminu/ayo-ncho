@@ -5,9 +5,10 @@
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
 #        add --nophysics to play with the seed physics off (seeds fly straight to their pit, as on the weakest phones) and check the setting took
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online: start the real server (node server/index.js), open a room from one phone (?room=new), join it from a second (?room=CODE),
-#                  play a move from each end and check both boards followed, then shout both ways; the picture is the friend's view (the far seat,
-#                  pits nearest them) with the host's shout up by the host's face
+#        --online: start the real server (node server/index.js), open a room from one phone (?room=new, name card filled in), knock on it from a
+#                  second (?room=CODE: name card, then the knock), check the host's board shows who is at the door and let them in, play a move
+#                  from each end and check both boards followed, then shout both ways; the picture is the host's view with the door card
+#                  ("Tete wants to play"), and <out>-friend.png the friend's view (the far seat, pits nearest them) with the host's shout by his face
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv
@@ -42,13 +43,31 @@ if online:
         # two phones = two browser contexts, so neither sees the other's saved seat
         host = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1).new_page(); watch(host, errors, "host: ")
         host.goto("http://127.0.0.1:8767/?room=new&capture=1", wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
+        # the name is asked once, before the room is opened
+        host.wait_for_selector("#nameCard:not([hidden])", timeout=10000); assert host.evaluate("document.querySelector('#nameGo').textContent") == "Open the room"
+        host.fill("#nameField", "Meka"); host.click("#nameGo")
         host.wait_for_function("window.__ayo.room && window.__ayo.room.code", timeout=20000)
         code = host.evaluate("window.__ayo.room.code"); print("room:", code, "host seat", host.evaluate("window.__ayo.room.seat"))
         assert host.evaluate("location.search") == "?room=" + code, "the address did not become the invite link"
+        assert host.evaluate("document.querySelector('#meName').textContent") == "Meka"
+        # the friend opens the link: their name, then a knock; the host's board shows who is at the door and the friend waits
         friend = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1).new_page(); watch(friend, errors, "friend: ")
         friend.goto("http://127.0.0.1:8767/?room=%s&capture=1" % code.lower(), wait_until="load"); friend.wait_for_function("window.__done===true", timeout=180000)
+        friend.wait_for_selector("#nameCard:not([hidden])", timeout=10000); assert friend.evaluate("document.querySelector('#nameGo').textContent") == "Knock"
+        friend.fill("#nameField", "Tete"); friend.click("#nameGo")
+        friend.wait_for_function("window.__ayo.room && window.__ayo.room.knock && window.__ayo.room.knock.id", timeout=20000)
+        assert friend.evaluate("window.__ayo.room.seat") is None, "a knock must not seat the friend"
+        assert friend.evaluate("document.querySelector('#oppName').textContent") == "Meka" and friend.evaluate("document.querySelector('#turn').textContent") == "at the door"
+        host.wait_for_selector("#knockCard:not([hidden])", timeout=20000)
+        assert host.evaluate("document.querySelector('#knockTitle').textContent") == "Tete wants to play", host.evaluate("document.querySelector('#knockTitle').textContent")
+        assert host.evaluate("window.__ayo.room.friend") is None and host.evaluate("window.__ayo.room.knocks.length") == 1
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(200); host.screenshot(path=out, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        print("door: host sees", host.evaluate("document.querySelector('#knockTitle').textContent"), "/ friend sees", friend.evaluate("document.querySelector('#hint').textContent"))
+        host.click("#knockYes")  # let them in: the friend takes the far seat
         for pg in (host, friend): pg.wait_for_function("window.__ayo.room && window.__ayo.room.friend && window.__ayo.room.friend.name", timeout=20000)
-        assert friend.evaluate("window.__ayo.room.seat") == 1
+        assert host.evaluate("document.querySelector('#knockCard').hidden"), "the door card should close once they are in"
+        assert friend.evaluate("window.__ayo.room.seat") == 1 and friend.evaluate("window.__ayo.room.knock") is None
+        assert host.evaluate("document.querySelector('#oppName').textContent") == "Tete" and friend.evaluate("document.querySelector('#oppName').textContent") == "Meka"
         assert host.evaluate("document.querySelector('#turn').textContent") == "your move", "the host should move first"
         assert friend.evaluate("document.querySelector('#turn').textContent") != "your move", "the friend must wait"
         before = friend.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
@@ -78,10 +97,11 @@ if online:
         assert friend.evaluate("window.__ayo.shout('chai')") is True, "the friend can shout back"
         host.wait_for_function("document.querySelector('#bubble').textContent==='Chai!'", timeout=10000)
         print("online: shouts went both ways")
-        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out, timeout=120000, animations="disabled")
+        out2 = out[:-4] + "-friend.png" if out.endswith(".png") else out + "-friend.png"
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out2, timeout=120000, animations="disabled")
         b.close(); node.terminate()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
-    srv.shutdown(); print("wrote", out); sys.exit(0)
+    srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
     pg = b.new_page(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2 if not (wide or home) else 1)
