@@ -6,7 +6,7 @@ import { CHARACTERS, line, faceFor, MOOD_FOR } from './characters.js';
 import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
-import { Online, stateFrom, inviteLink } from './online.js';
+import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
@@ -192,7 +192,7 @@ let stats = { biggest: 0, captures: 0, started: Date.now() };
 // travels as a few dozen bytes (seat, pit, move count, scores): online.js rebuilds the seeds' path with the same engine, so a
 // weak signal carries a whole game in less data than one photo; if a board ever disagrees it fetches the whole room.
 const roomParam = params.get('still') ? null : params.get('room');
-const online = !!roomParam;
+let online = false, roomWanted = null; // online while a room is open, knocked on or joined (from the Rooms screen, or ?room=CODE from an invite link); roomWanted: 'NEW' or the code asked for
 let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
 const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : levelLabel(level);
 const myName = () => prefs.get('name', '') || $('#meName').textContent || 'Player';
@@ -201,12 +201,67 @@ function paintMyName() { const n = prefs.get('name', ''); if (n) { $('#meName').
 function askName(verb) {
   return new Promise((res) => {
     const card = $('#nameCard'), field = $('#nameField'); field.value = prefs.get('name', ''); $('#nameGo').textContent = verb;
-    $('#nameSub').textContent = verb === 'Knock' ? 'Your friend sees this name when you knock on their board.' : 'Your friend sees this name when they knock on your board.';
     card.hidden = false; setTimeout(() => field.focus(), 50);
-    card.onsubmit = (e) => { e.preventDefault(); const n = field.value.replace(/\s+/g, ' ').trim().slice(0, 24); if (!n) return field.focus(); prefs.set('name', n); paintMyName(); card.hidden = true; click(1.3, 0.08); res(n); };
-    $('#nameHome').onclick = () => { card.hidden = true; leaveRoom(); };
+    $('#nameSub').textContent = verb === 'Knock' ? 'Your friend sees this name when you knock on their board.' : verb === "That's me" ? 'Your friends see this name at the board. Asked once, kept on this phone.' : 'Your friend sees this name when they knock on your board.';
+    card.onsubmit = (e) => { e.preventDefault(); const n = field.value.replace(/\s+/g, ' ').trim().slice(0, 24); if (!n) return field.focus(); prefs.set('name', n); paintMyName(); paintRoomsName(); card.hidden = true; click(1.3, 0.08); res(n); };
+    $('#nameHome').onclick = () => { card.hidden = true; if (net) leaveRoom(); else showScreen('home'); };
   });
 }
+// ---------- the Rooms screen, as approved: your room and its big code, Invite on WhatsApp, copy the link, join a friend's room by code ----------
+const rooms = { state: 'idle' }; // 'idle' | 'opening' | 'open' | 'door' | 'error'
+const roomsShowing = () => !$('#rooms').hidden;
+function paintRoomsName() { $('#roomsName').textContent = `playing as ${prefs.get('name', '') || '…'}`; }
+function openRooms() { // Home → With friends: the screen comes up and a room is opened straight away (your name is asked first, once)
+  $('#roomsGame').textContent = `${settings.game === 'ncho' ? 'Nchò' : 'Ayo'} · same rules as the board`; paintRoomsName();
+  $('#joinNote').textContent = 'Lose signal mid-game and the room keeps your seat: come back and carry on.'; $('#joinNote').className = 'note'; $('#codeField').value = ''; $('#joinBtn').disabled = true;
+  if (!net) { paintCode(null); setRoomStatus('opening'); }
+  showScreen('rooms');
+  if (!prefs.get('name', '')) askName("That's me").then(openRoom); else openRoom();
+}
+function openRoom() { if (net || !roomsShowing()) return; paintCode(null); setRoomStatus('opening'); startOnline('new', { stay: true }); }
+function paintCode(code) { // the four tiles: dots while the room opens, then the letters land one after another
+  const tiles = $('#roomCode'); tiles.classList.toggle('empty', !code); tiles.classList.remove('fresh');
+  [...tiles.children].forEach((t, i) => { t.textContent = code ? code[i] : '·'; });
+  tiles.setAttribute('aria-label', code ? 'Room code ' + code.split('').join(' ') : 'Room code');
+  if (code) { void tiles.offsetWidth; tiles.classList.add('fresh'); }
+}
+const STATUS_TEXT = { idle: 'tap to open a room', opening: 'opening a room…', open: 'waiting for a friend', door: 'someone is at the door', error: 'no connection · tap to try again' };
+function setRoomStatus(s, text) {
+  rooms.state = s; const el = $('#roomStatus'); el.dataset.state = s; el.querySelector('span').textContent = text || STATUS_TEXT[s];
+  const ready = (s === 'open' || s === 'door') && net && net.code;
+  $('#waBtn').classList.toggle('off', !ready); $('#copyBtn').disabled = !ready; $('#shareLinkBtn').disabled = !ready;
+  if (ready) $('#waBtn').href = whatsappLink(net.code, inviteLink(net.code)); else $('#waBtn').removeAttribute('href');
+}
+function paintRoomStatus() { // what the room card says, from the connection and the door
+  if (!roomsShowing()) return;
+  if (!net) return setRoomStatus(rooms.state === 'error' ? 'error' : 'idle');
+  if (net.seat === null) return setRoomStatus('opening');
+  if (net.status !== 'open') return setRoomStatus('opening', net.status === 'reconnecting' ? 'reconnecting…' : 'connecting…');
+  const knocks = (net.room && net.room.knocks) || [];
+  setRoomStatus(knocks.length ? 'door' : 'open', knocks.length ? `${knocks[0].name} is at the door` : undefined);
+}
+function stopOnline() { // leave before anyone joined (Back on the Rooms screen, or a knock the host refused): the board is yours again, no reload
+  if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
+  $('#knockCard').hidden = true; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
+  if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
+}
+function joinByCode(code) { // Got a code? Join their room: your own room closes and you knock on theirs
+  if (net) { net.leave(); net = null; prefs.set('room', 'null'); }
+  $('#joinNote').textContent = `Knocking on room ${code}…`; $('#joinNote').className = 'note busy'; $('#joinBtn').disabled = true; paintCode(null);
+  startOnline(code, { stay: true }); paintRoomStatus(); click(1.2, 0.06);
+}
+$('#friendsBtn').addEventListener('click', () => { openRooms(); click(1.3, 0.08); });
+$('#roomsBack').addEventListener('click', () => { if (friend) return leaveRoom(); stopOnline(); showScreen('home'); click(1, 0.05); });
+$('#roomStatus').addEventListener('click', () => { if (rooms.state === 'error' || rooms.state === 'idle') { if (net) { net.leave(); net = null; } openRoom(); } });
+$('#codeField').addEventListener('input', (e) => { const c = cleanCode(e.target.value); if (e.target.value !== c) e.target.value = c; $('#joinBtn').disabled = c.length !== 4; if ($('#joinNote').classList.contains('bad')) { $('#joinNote').textContent = ''; $('#joinNote').className = 'note'; } });
+$('#joinCard').addEventListener('submit', (e) => { e.preventDefault(); const code = cleanCode($('#codeField').value); if (code.length === 4 && !(net && net.seat === null && roomWanted === code)) joinByCode(code); });
+$('#copyBtn').addEventListener('click', async () => { if (!net || !net.code) return; const link = inviteLink(net.code); try { await navigator.clipboard.writeText(link); toast('Link copied'); click(1.3, 0.06); } catch { toast(link); } });
+$('#shareLinkBtn').addEventListener('click', async () => {
+  if (!net || !net.code) return; const link = inviteLink(net.code);
+  try { if (navigator.share) await navigator.share({ title: 'Ayo & Nchò', text: inviteText(net.code), url: link }); else { await navigator.clipboard.writeText(link); toast('Link copied'); } } catch {}
+});
+$('#waBtn').addEventListener('click', () => click(1.3, 0.06));
+$('#roomsName').addEventListener('click', () => askName("That's me").then(() => { if (net && !friend && net.seat !== null) { net.leave(); net = null; prefs.set('room', 'null'); openRoom(); toast('A new room, with your new name'); } }));
 // the door (host's side): the first person knocking is shown; Let in seats them, Not now sends them away; the next knock follows
 let doorId = null;
 function paintDoor() {
@@ -268,7 +323,7 @@ function syncRoom(room) { // the room as the server shows it: the friend's seat 
   const s = stateFrom(room.state);
   const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
   state = s; if (!same) layoutFromState(state);
-  refreshStatic(); paintRules(); paintDoor();
+  refreshStatic(); paintRules(); paintDoor(); paintRoomStatus();
 }
 let moveQueue = Promise.resolve();
 function sendMove(pit) { if (busy || !net || !net.move(pit)) return; busy = true; deselect(); }
@@ -282,35 +337,46 @@ async function showMove({ seat, pit, events, state: pub }) {
   if (state.over) gameOver(); else if (before.over) $('#gameover').hidden = true;
 }
 function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
-function startOnline() {
+function startOnline(code, { stay = false } = {}) {
+  // code: 'new' opens a room, a four-letter code knocks on one. stay: asked from the Rooms screen, which stays up (the door card over it)
+  // until a friend is in; otherwise (an invite link) the board shows at once with "Joining the room…"
+  roomWanted = String(code).toUpperCase(); online = true;
   net = new Online((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  const self = net; const on = (t, fn) => self.on(t, (d) => { if (net === self) fn(d); }); // a room left behind (Back, a new name) says nothing more
   let held = null; try { held = JSON.parse(prefs.get('room', 'null')); } catch {}
   let triedJoin = false, seated = false, knocking = false;
-  net.on('joined', ({ seat, code, token, room }) => {
+  on('joined', ({ seat, code, token, room }) => {
     const back = seated; seated = true; you = seat; them = 1 - seat; baseTheta = seat === 1 ? Math.PI : 0; if (!back) theta = baseTheta;
     prefs.set('room', JSON.stringify({ code, token }));
-    if (roomParam.toUpperCase() !== code) history.replaceState(null, '', inviteLink(code)); // ?room=new becomes the real invite link, ready to share
+    if (location.search !== '?room=' + code) history.replaceState(null, '', inviteLink(code)); // the address becomes the invite link (a reload comes back to this seat)
     syncRoom(room); $('#gameover').hidden = !state.over; if (state.over) gameOver();
+    if (roomsShowing()) { if (friend) showScreen('play'); else { paintCode(code); paintRoomStatus(); if (!back) { click(1.4, 0.08); setTimeout(() => click(1.8, 0.08), 120); } } } // the tiles fill in on the Rooms screen
     if (knocking) { knocking = false; toast(`${friend ? friend.name : 'Your friend'} let you in — ${state.turn === you ? 'your move' : 'they start'}`); click(1.5, 0.1); setTimeout(() => click(2, 0.1), 120); buzz(20); }
-    else if (back) toast('Back at the board'); else if (!friend) toast(`Room ${code} — share this page's link`);
+    else if (back) toast('Back at the board'); else if (!friend && !roomsShowing()) toast(`Room ${code} — share this page's link`);
   });
-  net.on('room', ({ room, started, resync }) => {
+  on('room', ({ room, started, resync }) => {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
-    if (!had && friend) { toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); }
+    if (!had && friend) { if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); }
     if (started) { stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
-  net.on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
-  net.on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
-  net.on('shout', ({ seat, id }) => showShout(seat, id));
+  on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
+  on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
+  on('shout', ({ seat, id }) => showShout(seat, id));
   // the door: this phone knocked and waits for the host; or (as host) someone is knocking on ours
-  net.on('knocked', ({ host }) => { const again = knocking; knocking = true; showTurn(); if (!again) { toast(`Knocked — ${host} decides`); click(1.1, 0.08); } });
-  net.on('knock', () => { knockSound(); });
-  net.on('error', (e) => {
+  on('knocked', ({ host }) => { const again = knocking; knocking = true; if (roomsShowing()) { showScreen('play'); $('#oppFace').innerHTML = initialFace(host); } showTurn(); if (!again) { toast(`Knocked — ${host} decides`); click(1.1, 0.08); } });
+  on('knock', () => { knockSound(); });
+  on('error', (e) => {
     busy = false;
-    if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomParam, myName()); } // our old seat is gone: knock for the free one
+    if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomWanted, myName()); } // our old seat is gone: knock for the free one
     if (e.code === 'noknock' || e.code === 'host') { toast(e.msg); paintDoor(); return; } // the host answered a knock that was already gone
+    if (roomsShowing() && net.seat === null && !net.knock) { // from the Rooms screen, before any seat: said on the screen, which stays up
+      const opening = roomWanted === 'NEW'; stopOnline(); click(0.6, 0.06);
+      if (opening) setRoomStatus('error', e.code === 'full' ? 'too many rooms open · tap to try again' : 'no connection · tap to try again');
+      else { $('#joinNote').textContent = e.msg; $('#joinNote').className = 'note bad'; $('#joinBtn').disabled = cleanCode($('#codeField').value).length !== 4; setRoomStatus('idle'); }
+      return;
+    }
     if (['notfound', 'taken', 'swept', 'offline', 'nows', 'full', 'notlet', 'busy'].includes(e.code)) {
       const host = net.knock && net.knock.host; $('#knockCard').hidden = true;
       $('#oppName').textContent = e.code === 'notlet' && host ? `${host} did not let you in this time` : e.msg; $('#oppSub').textContent = 'tap Home to go back'; $('#turn').textContent = ''; $('#hint').textContent = ''; $('#shoutBtn').disabled = true;
@@ -318,18 +384,19 @@ function startOnline() {
     }
     $('#hint').textContent = e.msg; showTurn(); click(0.5, 0.05);
   });
-  net.on('status', () => { if (seated || net.knock) showTurn(); });
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) net.wake(); });
-  addEventListener('online', () => net.wake());
-  body.classList.add('online'); showScreen('play'); $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = ''; $('#shoutBtn').disabled = true;
+  on('status', () => { if (net !== self) return; if (seated || net.knock) showTurn(); paintRoomStatus(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && net === self) net.wake(); });
+  addEventListener('online', () => { if (net === self) net.wake(); });
+  body.classList.add('online'); if (!stay) showScreen('play');
+  $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = ''; $('#shoutBtn').disabled = true;
   $('#oppFace').innerHTML = initialFace('?');
-  const rejoining = held && roomParam !== 'new' && held.code === roomParam.toUpperCase();
+  const rejoining = held && roomWanted !== 'NEW' && held.code === roomWanted;
   const go = () => {
-    if (roomParam === 'new') net.create({ variant: settings.game, rules: settings.rules(), name: myName() });
+    if (roomWanted === 'NEW') net.create({ variant: settings.game, rules: settings.rules(), name: myName() });
     else if (rejoining) net.rejoin(held.code, held.token);
-    else { net.join(roomParam, myName()); $('#oppName').textContent = 'Knocking…'; }
+    else { net.join(roomWanted, myName()); $('#oppName').textContent = 'Knocking…'; }
   };
-  if (!rejoining && !prefs.get('name', '')) askName(roomParam === 'new' ? 'Open the room' : 'Knock').then(go); // the name is asked once; the Rooms screen will ask it in its own way later
+  if (!rejoining && !prefs.get('name', '')) askName(roomWanted === 'NEW' ? 'Open the room' : 'Knock').then(go); // an invite link opened before a name was ever given: asked here, once
   else go();
 }
 
@@ -429,10 +496,14 @@ async function play(pit) {
 
 // ---------- screens ----------
 const body = document.body;
-function showScreen(which) { // 'home' | 'settings' | 'play'
-  $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings';
+function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms'
+  $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms';
   body.classList.toggle('screen', which !== 'play'); body.classList.toggle('playing', which === 'play');
-  if (which === 'home') { paintHome(); idle = true; } else idle = false;
+  const wasIdle = idle; if (which === 'home') { paintHome(); idle = true; } else idle = which === 'rooms'; // the board turns slowly behind Home and the Rooms screen
+  if (which === 'play' && wasIdle) { // …and swings back round to face you as the game starts
+    const from = theta, to = baseTheta + Math.round((theta - baseTheta) / (2 * Math.PI)) * 2 * Math.PI;
+    if (Math.abs(to - from) > 0.01) tween(650, (t) => { theta = from + (to - from) * t; }, easeInOut);
+  }
   if (which !== 'play' && !shoutMenu.hidden) toggleShoutMenu(false);
   if (which === 'play') blinkLoop(); else { clearTimeout(blinkTimer); if (mood !== 'calm' && mood !== 'think') react('calm'); }
 }
@@ -663,7 +734,8 @@ soundBtn.addEventListener('click', () => { prefs.set('sound', soundOn() ? '0' : 
 
 // ---------- start ----------
 paintRules(); paintMyName(); layoutFromState(state); refreshStatic();
-if (online) startOnline();
+if (roomParam === 'new') openRooms(); // the old way in: the Rooms screen now
+else if (roomParam) startOnline(roomParam); // an invite link: straight to the board, knocking
 else if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected
   state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; layoutFromState(state); refreshStatic(); select(3); showScreen('play');
 } else if (params.get('capture') && !params.get('stay')) { // the smoke test starts straight into a game

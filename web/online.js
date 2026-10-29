@@ -43,6 +43,12 @@ export function inviteLink(code, base = typeof location !== 'undefined' ? locati
   return `${base}?room=${encodeURIComponent(String(code || '').toUpperCase())}`;
 }
 
+// A code typed on the Rooms screen: letters only, upper case, four at most (the server says if nobody opened it).
+export function cleanCode(s) { return String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); }
+// The invite, in the host's own voice, for WhatsApp and the share sheet.
+export function inviteText(code) { return `Come and play Ayo & Nchò with me — open the link, say your name and knock, and I'll let you in. Room ${String(code || '').toUpperCase()}.`; }
+export function whatsappLink(code, link) { return 'https://wa.me/?text=' + encodeURIComponent(inviteText(code) + '\n' + link); }
+
 // What the player sees for a refusal, in plain words.
 export const ERROR_TEXT = {
   notfound: 'No room with that code — check the link', taken: 'That room already has two players', waiting: 'Your friend has not joined yet',

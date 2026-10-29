@@ -2,7 +2,7 @@
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "../server/index.js";
-import { Online, stateFrom, inviteLink, ERROR_TEXT } from "../web/online.js";
+import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink, ERROR_TEXT } from "../web/online.js";
 import { legalMoves, replay, applyMove } from "../engine/ayo.js";
 
 const srv = createServer({ sweepEvery: 60_000 });
@@ -17,6 +17,16 @@ test("the invite link and the engine-shaped state", () => {
   const s = stateFrom({ variant: "ncho", rules: { capture: 4, relay: true, last8: true }, pits: Array(12).fill(4), stores: [0, 0], turn: 1, moves: [], over: false, winner: null });
   assert.equal(s.turn, 1); assert.deepEqual(legalMoves(s), [6, 7, 8, 9, 10, 11]);
   assert.ok(ERROR_TEXT.taken.includes("two players"));
+});
+
+test("the Rooms screen: a typed code is tidied, the WhatsApp invite carries the code and the link", () => {
+  assert.equal(cleanCode(" ab-c1d e"), "ABCD"); assert.equal(cleanCode("zz9z"), "ZZZ"); assert.equal(cleanCode(""), ""); assert.equal(cleanCode(null), "");
+  assert.equal(cleanCode("okwe"), "OKWE"); assert.equal(cleanCode("ABCDEFG"), "ABCD");
+  const text = inviteText("edne"); assert.ok(text.includes("Room EDNE") && text.includes("knock"));
+  const wa = whatsappLink("edne", "https://ayo.example/?room=EDNE");
+  assert.ok(wa.startsWith("https://wa.me/?text=")); const msg = decodeURIComponent(wa.slice("https://wa.me/?text=".length));
+  assert.ok(msg.includes("Ayo & Nchò") && msg.includes("Room EDNE") && msg.endsWith("https://ayo.example/?room=EDNE"));
+  assert.ok(!wa.includes("&", "https://wa.me/?text=".length), "the ampersand in the name is encoded, so WhatsApp gets the whole message");
 });
 
 test("host creates, friend joins by code, moves reach both boards, a wrong-turn tap is refused, a drop reconnects", async () => {
