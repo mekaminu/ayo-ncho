@@ -1,11 +1,12 @@
 // The game: engine state → 3D seeds, animated move by move. Every move the picture shows comes from engine events.
 import * as THREE from 'three';
-import { newGame, applyMove, legalMoves, replay, RULES } from '/engine/ayo.js';
+import { newGame, applyMove, legalMoves, replay, owner, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
 import { CHARACTERS, line, faceFor, MOOD_FOR } from './characters.js';
 import { decideQuality, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
+import { Online, stateFrom, inviteLink } from './online.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -40,12 +41,12 @@ function applySeedSet() { // swap every seed's look and shape in place (no new g
 const sim = new SeedSim();
 
 // camera: the board upright in your hands, you at the near end
-let theta = 0, phi = 0.72, dist = 1.55; const target = new THREE.Vector3(0, 0.02, 0.02);
+let baseTheta = 0; /* π when you hold the far seat of an online room: your pits still nearest you */ let theta = 0, phi = 0.72, dist = 1.55; const target = new THREE.Vector3(0, 0.02, 0.02);
 function placeCam() { camera.position.set(target.x + dist * Math.sin(phi) * Math.sin(theta), target.y + dist * Math.cos(phi), target.z + dist * Math.sin(phi) * Math.cos(theta)); camera.lookAt(target); }
 let wide = false;
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-  const nowWide = w > h * 1.1; if (nowWide !== wide) { wide = nowWide; dist = wide ? 1.8 : 1.55; phi = wide ? 0.5 : 0.72; theta = 0; }
+  const nowWide = w > h * 1.1; if (nowWide !== wide) { wide = nowWide; dist = wide ? 1.8 : 1.55; phi = wide ? 0.5 : 0.72; theta = baseTheta; }
   document.documentElement.classList.toggle('wide', wide);
 }
 addEventListener('resize', resize); resize();
@@ -153,7 +154,8 @@ const v3 = new THREE.Vector3();
 function placeBadges() {
   const w = canvas.clientWidth, h = canvas.clientHeight; const show = prefs.get('badges', '1') === '1';
   pitCenters.forEach(([x, z], i) => {
-    v3.set(x + (i < 6 ? PIT_R * 0.7 : -PIT_R * 0.7), BT + 0.01, z + PIT_R * 0.75).project(camera);
+    const flip = you === 1 ? -1 : 1; // from the far seat the board is seen the other way round: badges stay at the outer, nearer corner of each pit
+    v3.set(x + (i < 6 ? PIT_R * 0.7 : -PIT_R * 0.7), BT + 0.01, z + PIT_R * 0.75 * flip).project(camera);
     const b = badges[i]; b.style.transform = `translate(${(v3.x * 0.5 + 0.5) * w}px, ${(-v3.y * 0.5 + 0.5) * h}px)`; b.hidden = !show;
   });
 }
@@ -174,17 +176,90 @@ const settings = {
 };
 const PACES = { slow: 230, normal: 150, fast: 90 };
 let PACE = PACES[settings.speed] || 150;
-const you = 0, ai = 1;
+let you = 0, them = 1; // engine seats: offline you are always 0; in a room you take the seat the server gives you
 const names = { easy: 'Adaeze', medium: 'Nnamdi', hard: 'Mama Ngozi' };
 const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
 let stats = { biggest: 0, captures: 0, started: Date.now() };
 
+// ---------- a friend online: the board joins a room (?room=CODE from the invite link) and animates the moves the server sends ----------
+// The server runs the same engine and is the referee; this board only asks for a move and shows what comes back.
+const roomParam = params.get('still') ? null : params.get('room');
+const online = !!roomParam;
+let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
+const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : levelLabel(level);
+const myName = () => prefs.get('name', '') || $('#meName').textContent || 'Player';
+function initialFace(name) { // a friend has no drawn character yet: their initial on a brass ring
+  const ch = (String(name || '?').trim()[0] || '?').toUpperCase();
+  return `<svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true"><circle cx="22" cy="22" r="22" fill="#3a2718"/><circle cx="22" cy="22" r="19" fill="none" stroke="#e6b76f" stroke-opacity=".55"/><text x="22" y="29" text-anchor="middle" font-size="20" font-weight="700" fill="#e6b76f" font-family="inherit">${ch}</text></svg>`;
+}
+function showTurnOnline() {
+  if (!net || net.seat === null) { $('#undo').disabled = true; $('#hintBtn').disabled = true; return; } // not seated yet: the joining message stays
+  const waiting = !friend; const mine = !waiting && state.turn === you && !state.over && !busy; const link = net.status !== 'open';
+  $('#turn').textContent = state.over ? 'game over' : waiting ? 'waiting' : mine ? 'your move' : '…';
+  $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : net.status === 'connecting' ? 'connecting…' : 'no connection')
+    : waiting ? `room ${net.code || ''}` : !friend.online ? 'away — their seat is held' : state.over ? '' : mine ? 'waiting' : 'their move';
+  $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine ? (selected === null ? 'tap a pit on your side to sow' : 'tap again to sow, or pick another') : '';
+  $('#undo').disabled = true; $('#hintBtn').disabled = true;
+}
+function syncRoom(room) { // the room as the server shows it: the friend's seat and the whole game
+  friend = room.players[them] || null;
+  const s = stateFrom(room.state);
+  const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
+  state = s; if (!same) layoutFromState(state);
+  refreshStatic(); paintRules();
+}
+let moveQueue = Promise.resolve();
+function sendMove(pit) { if (busy || !net || !net.move(pit)) return; busy = true; deselect(); }
+async function showMove({ seat, pit, events, state: pub }) {
+  const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; deselect(); $('#undo').disabled = true;
+  if (seat === them) { select(pit); await wait(550); deselect(); }
+  else { const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
+  tipFor(events);
+  await animate(events, prev);
+  busy = false; refreshStatic();
+  if (state.over) gameOver(); else if (before.over) $('#gameover').hidden = true;
+}
+function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
+function startOnline() {
+  net = new Online((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  let held = null; try { held = JSON.parse(prefs.get('room', 'null')); } catch {}
+  let triedJoin = false, seated = false;
+  net.on('joined', ({ seat, code, token, room }) => {
+    const back = seated; seated = true; you = seat; them = 1 - seat; baseTheta = seat === 1 ? Math.PI : 0; if (!back) theta = baseTheta;
+    prefs.set('room', JSON.stringify({ code, token }));
+    if (roomParam.toUpperCase() !== code) history.replaceState(null, '', inviteLink(code)); // ?room=new becomes the real invite link, ready to share
+    syncRoom(room); $('#gameover').hidden = !state.over; if (state.over) gameOver();
+    if (back) toast('Back at the board'); else if (!friend) toast(`Room ${code} — share this page's link`);
+  });
+  net.on('room', ({ room, started }) => {
+    const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
+    if (!had && friend) { toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); }
+    if (started) { stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
+    else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
+  });
+  net.on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); });
+  net.on('error', (e) => {
+    busy = false;
+    if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomParam, myName()); } // our old seat is gone: take the free one
+    if (['notfound', 'taken', 'swept', 'offline', 'nows', 'full'].includes(e.code)) { $('#oppName').textContent = e.msg; $('#oppSub').textContent = 'tap Home to go back'; $('#turn').textContent = ''; $('#hint').textContent = ''; return; }
+    $('#hint').textContent = e.msg; showTurn(); click(0.5, 0.05);
+  });
+  net.on('status', () => { if (seated) showTurn(); });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) net.wake(); });
+  addEventListener('online', () => net.wake());
+  showScreen('play'); $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = '';
+  $('#oppFace').innerHTML = initialFace('?');
+  if (roomParam === 'new') net.create({ variant: settings.game, rules: settings.rules(), name: myName() });
+  else if (held && held.code === roomParam.toUpperCase()) net.rejoin(held.code, held.token);
+  else net.join(roomParam, myName());
+}
+
 const worker = new Worker('./ai-worker.js', { type: 'module' });
 function aiMove(s, lvl = level) { return new Promise((res) => { worker.onmessage = (e) => res(e.data); worker.postMessage({ state: s, level: lvl }); }); }
 let hintedAt = -1;
 async function hint() {
-  if (busy || state.over || state.turn !== you || hintedAt === state.moves.length) return;
+  if (busy || online || state.over || state.turn !== you || hintedAt === state.moves.length) return;
   hintedAt = state.moves.length; $('#hintBtn').disabled = true;
   const m = await aiMove(state, 'hard'); if (m === null || state.turn !== you) return;
   const [x, z] = pitCenters[m]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; board.glow.position.set(x, BT + 0.08, z); board.glow.visible = true; click(1.6, 0.05);
@@ -193,18 +268,19 @@ async function hint() {
 }
 
 function paintFaces() {
-  $('#oppFace').innerHTML = faceFor(level, mood);
+  $('#oppFace').innerHTML = online ? initialFace(oppLabel()) : faceFor(level, mood);
   document.querySelectorAll('.pill[data-level]').forEach((b) => { b.querySelector('.face').innerHTML = CHARACTERS[b.dataset.level].face; });
   document.querySelectorAll('[data-face]').forEach((f) => { f.innerHTML = CHARACTERS[f.dataset.face].face; });
 }
 function refreshStatic() {
   paintFaces();
   state.pits.forEach((n, i) => setBadge(i, n));
-  $('#myScore').textContent = state.stores[0]; $('#oppScore').textContent = state.stores[1];
-  $('#oppName').textContent = levelLabel(level);
+  $('#myScore').textContent = state.stores[you]; $('#oppScore').textContent = state.stores[them];
+  $('#oppName').textContent = oppLabel();
   showTurn();
 }
 function showTurn() {
+  if (online) return showTurnOnline();
   const mine = state.turn === you && !state.over;
   $('#turn').textContent = state.over ? 'game over' : mine ? 'your move' : '…';
   $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…';
@@ -238,7 +314,7 @@ async function animate(events, prevStores, pace = PACE) {
     } else if (e.type === 'capture') {
       await Promise.all(pending); pending.length = 0;
       await wait(120); scoop();
-      const store = e.by === you ? 'S0' : 'S1'; const scoreEl = e.by === you ? $('#myScore') : $('#oppScore');
+      const store = 'S' + e.by; const scoreEl = e.by === you ? $('#myScore') : $('#oppScore');
       for (const pit of e.pits) {
         const taken = homes[pit].splice(0); setBadge(pit, 0);
         for (const m of taken) { drop(m, store, 0.3).then(() => { shown[e.by]++; tickScore(scoreEl, shown[e.by]); click(0.6, 0.1); buzz(12); }); await wait(70); }
@@ -260,14 +336,14 @@ async function play(pit) {
   }
   tipFor(events);
   const aiGot = state.stores[1] - prevStores[1], meGot = state.stores[0] - prevStores[0];
-  if (mover === ai && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400);
+  if (mover === them && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400);
   await animate(events, prevStores);
   busy = false; refreshStatic(); save();
   if (state.over) return gameOver();
-  if (state.turn === ai) {
+  if (state.turn === them) {
     showTurn(); await wait(350); if (mood === 'calm') react('think');
     const m = await aiMove(state);
-    if (m === null || state.turn !== ai) return;
+    if (m === null || state.turn !== them) return;
     if (mood === 'think') react('calm'); select(m); await wait(550); // show which pit the opponent chose
     await play(m);
   }
@@ -304,16 +380,17 @@ function paintSettings() {
 // ---------- the opponent's face reacts: a mood for a moment, then back to calm; blinks now and then while waiting ----------
 let mood = 'calm', moodTimer = null, blinkTimer = null;
 function react(next, ms = 2600) {
-  if (params.get('still')) return; clearTimeout(moodTimer); mood = next; const f = $('#oppFace'); f.innerHTML = faceFor(level, mood);
+  if (params.get('still') || online) return; clearTimeout(moodTimer); mood = next; const f = $('#oppFace'); f.innerHTML = faceFor(level, mood);
   if (next !== 'calm' && next !== 'blink' && next !== 'think') { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); }
   if (next !== 'calm' && next !== 'think') moodTimer = setTimeout(() => react('calm'), ms);
 }
 function blinkLoop() { // a blink every few seconds, only on a calm face, never under reduced motion
-  clearTimeout(blinkTimer); if (reduceMotion || params.get('still')) return;
+  clearTimeout(blinkTimer); if (reduceMotion || params.get('still') || online) return;
   blinkTimer = setTimeout(() => { if (mood === 'calm' && body.classList.contains('playing')) { $('#oppFace').innerHTML = faceFor(level, 'blink'); setTimeout(() => { if (mood === 'calm') $('#oppFace').innerHTML = faceFor(level, 'calm'); }, 130); } blinkLoop(); }, 2800 + Math.random() * 4200);
 }
 let bubbleTimer = null;
 function say(moment) {
+  if (online) return; // a friend speaks for themselves
   react(MOOD_FOR[moment] || 'calm');
   const text = line(level, moment); if (!text || params.get('still')) return;
   const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, 2600);
@@ -350,35 +427,36 @@ document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
 $('#playBtn').addEventListener('click', () => { newRound(); showScreen('play'); click(1.3, 0.08); });
 $('#continueBtn').addEventListener('click', () => { if (resume()) { layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
-$('#homeBtn').addEventListener('click', () => { if (!busy) { save(); showScreen('home'); } });
-$('#goHome').addEventListener('click', () => { $('#gameover').hidden = true; showScreen('home'); });
+$('#homeBtn').addEventListener('click', () => { if (online) return leaveRoom(); if (!busy) { save(); showScreen('home'); } });
+$('#goHome').addEventListener('click', () => { if (online) return leaveRoom(); $('#gameover').hidden = true; showScreen('home'); });
 $('#homeSettings').addEventListener('click', () => { paintSettings(); showScreen('settings'); });
 $('#settingsBtn').addEventListener('click', () => { if (!busy) { paintSettings(); showScreen('settings'); } });
-$('#settingsBack').addEventListener('click', () => { const r = settings.rules(); const same = state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(r) && state.moves.length; showScreen(same ? 'play' : 'home'); });
+$('#settingsBack').addEventListener('click', () => { if (online) return showScreen('play'); const r = settings.rules(); const same = state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(r) && state.moves.length; showScreen(same ? 'play' : 'home'); });
 $('#settingsRules').addEventListener('click', () => { $('#rules').hidden = false; });
 
 // game over card, as approved
 function gameOver() {
-  const [a, b] = state.stores; const win = state.winner === you; const draw = state.winner === 'draw';
+  const a = state.stores[you], b = state.stores[them]; const win = state.winner === you; const draw = state.winner === 'draw';
   $('#goEyebrow').textContent = `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves`;
-  $('#goTitle').textContent = draw ? 'A draw' : win ? 'You win' : `${names[level]} wins`;
-  $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = levelLabel(level);
+  $('#goTitle').textContent = draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
+  $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = oppLabel();
+  $('#rematch').textContent = online ? (friend && friend.wantsRematch ? `Play again — ${friend.name} is ready` : 'Play again') : 'Play again'; $('#rematch').disabled = false;
   $('#goMe').classList.toggle('win', a >= b); $('#goOpp').classList.toggle('win', b > a);
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-  $('#gameover').hidden = false; prefs.set('game', 'null'); say(win ? 'lose' : 'win');
+  $('#gameover').hidden = false; if (!online) prefs.set('game', 'null'); say(win ? 'lose' : 'win');
   if (win) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
 }
 $('#replayBtn').addEventListener('click', async () => {
   if (busy) return; const moves = state.moves.slice(); const variant = state.variant, rules = state.rules;
   $('#gameover').hidden = true; busy = true;
   let s = newGame(variant, rules); layoutFromState(s); refreshStaticFrom(s);
-  for (const m of moves) { const r = applyMove(s, m); if (r.state.turn === ai) { select(m); await wait(250); } deselect(); await animate(r.events, s.stores, 70); s = r.state; refreshStaticFrom(s); }
+  for (const m of moves) { const r = applyMove(s, m); if (r.state.turn === them) { select(m); await wait(250); } deselect(); await animate(r.events, s.stores, 70); s = r.state; refreshStaticFrom(s); }
   busy = false; $('#gameover').hidden = false;
 });
-function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); $('#myScore').textContent = s.stores[0]; $('#oppScore').textContent = s.stores[1]; }
+function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); $('#myScore').textContent = s.stores[you]; $('#oppScore').textContent = s.stores[them]; }
 $('#shareBtn').addEventListener('click', async () => {
-  const [a, b] = state.stores; const text = `Ayo & Nchò — ${state.winner === you ? 'I beat' : 'I lost to'} ${names[level]} ${a}–${b} in ${state.moves.length} moves.`;
+  const a = state.stores[you], b = state.stores[them]; const text = `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`;
   try {
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/png')); const file = blob && new File([blob], 'ayo-ncho.png', { type: 'image/png' });
     if (navigator.share && file && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ text, files: [file] });
@@ -408,7 +486,7 @@ async function recordClip(deliver = true) {
   const blob = rec ? await new Promise((res) => { rec.onstop = () => res(new Blob(chunks, { type: rec.mimeType || type })); rec.stop(); }) : null;
   const ms = Math.round(performance.now() - t0); $('#rec').hidden = true;
   layoutFromState(state); refreshStatic(); busy = false; clipping = false; selected = null; if (wasOver) $('#gameover').hidden = false;
-  const caption = clipCaption(turn, names[level], state.variant);
+  const caption = clipCaption(turn, online ? oppLabel() : names[level], state.variant);
   if (deliver) await deliverClip(blob, caption);
   return { size: blob ? blob.size : 0, type: blob ? blob.type : null, ms, turn: { index: turn.index, seeds: turn.seeds, relays: turn.relays, drops: turn.drops } };
 }
@@ -426,7 +504,7 @@ async function deliverClip(blob, caption) {
 }
 $('#clipBtn').addEventListener('click', () => { recordClip(); click(1.3, 0.08); });
 
-function save() { prefs.set('game', JSON.stringify({ moves: state.moves, variant: state.variant, rules: state.rules, level, stats })); }
+function save() { if (online) return; prefs.set('game', JSON.stringify({ moves: state.moves, variant: state.variant, rules: state.rules, level, stats })); }
 function savedGame() { try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length) { const s = replay(g.moves, g.variant, g.rules); return s.over ? null : s; } } catch {} return null; }
 function resume() {
   try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; return !state.over; } } catch {}
@@ -435,7 +513,7 @@ function resume() {
 function newRound() { state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); setTimeout(() => say('start'), 600); }
 function kickAi() { if (state.turn === ai && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 function undo() {
-  if (busy || state.moves.length < 2) return;
+  if (busy || online || state.moves.length < 2) return;
   const moves = state.moves.slice(0, state.turn === you ? -2 : -1);
   state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06); say('undo');
 }
@@ -486,15 +564,16 @@ canvas.addEventListener('pointerup', (e) => {
   ptr.set((e.clientX / canvas.clientWidth) * 2 - 1, -(e.clientY / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(board.targets)[0]; if (!hit) return deselect();
   const pit = hit.object.userData.pit; const legal = legalMoves(state);
-  if (!legal.includes(pit)) { if (pit < 6 && state.pits[pit] > 0) $('#hint').textContent = 'you must give the other side seeds'; else shake(pit); return; }
-  if (selected === pit) play(pit); else select(pit);
+  if (online && !friend) return;
+  if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) $('#hint').textContent = 'you must give the other side seeds'; else shake(pit); return; }
+  if (selected === pit) { if (online) sendMove(pit); else play(pit); } else select(pit);
 });
 canvas.addEventListener('wheel', (e) => { dist += e.deltaY * 0.001; clampDist(); }, { passive: true });
 function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; tween(260, (t) => { board.ring.position.x = x + Math.sin(t * Math.PI * 4) * 0.006 * (1 - t); }).then(() => { if (selected === null) board.ring.visible = false; else { board.ring.position.x = pitCenters[selected][0]; board.ring.position.z = pitCenters[selected][1]; } }); click(0.5, 0.05); }
 
 $('#undo').addEventListener('click', undo);
 $('#hintBtn').addEventListener('click', hint);
-$('#rematch').addEventListener('click', () => { newRound(); showScreen('play'); });
+$('#rematch').addEventListener('click', () => { if (online) { if (net.rematch()) { $('#rematch').textContent = `Waiting for ${oppLabel()}…`; $('#rematch').disabled = true; click(1.3, 0.08); } return; } newRound(); showScreen('play'); });
 $('#rulesBtn').addEventListener('click', () => { $('#rules').hidden = !$('#rules').hidden; });
 $('#rulesClose').addEventListener('click', () => { $('#rules').hidden = true; });
 const soundBtn = $('#soundBtn'); const paintSound = () => soundBtn.setAttribute('aria-pressed', soundOn());
@@ -502,7 +581,8 @@ soundBtn.addEventListener('click', () => { prefs.set('sound', soundOn() ? '0' : 
 
 // ---------- start ----------
 paintRules(); layoutFromState(state); refreshStatic();
-if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected
+if (online) startOnline();
+else if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected
   state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; layoutFromState(state); refreshStatic(); select(3); showScreen('play');
 } else if (params.get('capture') && !params.get('stay')) { // the smoke test starts straight into a game
   newRound(); showScreen('play'); if (tipStep === 0) { showTip(TIPS[0]); }
@@ -510,7 +590,7 @@ if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get mood() { return mood; }, quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
