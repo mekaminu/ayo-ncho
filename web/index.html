@@ -114,6 +114,9 @@ button{font-family:inherit}
 .mini.two2{grid-template-columns:repeat(2, minmax(0, 1fr))}
 .pzCard .two .btn{flex:1;flex-direction:row;padding:12px;font-size:14px;text-align:center}
 #pzHome{align-self:center;font-size:13px}
+.pzShow{color:var(--brass);font-size:13px;padding:4px 8px 0;margin-top:-4px}
+.pzShow .face.s{width:22px;height:22px;border:1px solid rgba(230,183,111,.5)}
+.pzBadge.shown{color:var(--fg);background:var(--soft);border-color:var(--line)}
 .puzzle #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 200px)}
 .puzzle .hud,.puzzle .bar{opacity:0;pointer-events:none}
 .puzzle #badges,.puzzle #hint{opacity:1}
@@ -333,10 +336,11 @@ button{font-family:inherit}
   </div>
   <div class="puzzleBottom">
     <div class="roomCard pzCard" id="pzCard" hidden role="status">
-      <div class="pzScore"><div class="col"><span class="eyebrow">You captured</span><span class="pzBig"><span id="pzGot">8</span> <small>/ <span id="pzTarget">8</span></small></span></div><span class="pzBadge" id="pzBadge">Solved</span></div>
+      <div class="pzScore"><div class="col"><span class="eyebrow" id="pzEyebrow">You captured</span><span class="pzBig"><span id="pzGot">8</span> <small>/ <span id="pzTarget">8</span></small></span></div><span class="pzBadge" id="pzBadge">Solved</span></div>
       <div class="pzRow" id="pzRow" aria-label="8 of 8 seeds">●●●●●●●●</div>
       <div class="mini two2"><div><span>Your best today</span><b id="pzBest">8 of 8</b></div><div><span>Days solved</span><b id="pzRun">none yet</b></div></div>
       <div class="two"><button class="btn" id="pzShare" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button><button class="btn ghost" id="pzAgain" type="button">Try again</button></div>
+      <button class="btn quiet pzShow" id="pzShow" type="button" hidden><span class="face s" data-face="hard"></span>Show me the move</button>
     </div>
     <button class="btn quiet" id="pzHome" type="button">Back to home</button>
   </div>

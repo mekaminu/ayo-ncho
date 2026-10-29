@@ -20,11 +20,19 @@ export function entry(data, key, variant) { return data.days[entryKey(key, varia
 export function record(data, key, variant, got, target) {
   const d = { days: { ...data.days }, solved: data.solved.slice() };
   const k = entryKey(key, variant); const was = d.days[k];
-  const e = { got: Math.max(got, was ? was.got : 0), target, tries: (was ? was.tries : 0) + 1, solved: !!(was && was.solved) || got >= target };
+  const e = { got: Math.max(got, was ? was.got : 0), target, tries: (was ? was.tries : 0) + 1, solved: !!(was && was.solved) || got >= target, ...(was && was.shown ? { shown: true } : {}) };
   d.days[k] = e;
   const firstSolve = e.solved && !d.solved.includes(key);
   if (firstSolve) { d.solved.push(key); d.solved.sort(); }
   return { data: d, improved: !was || got > was.got, firstSolve, entry: e };
+}
+
+// Show me: after two misses the board plays the answer for you. Remembered, so the card says so; never counts as solved.
+export const SHOW_AFTER = 2;
+export function canShow(e) { return !!e && !e.solved && !e.shown && e.tries >= SHOW_AFTER; }
+export function markShown(data, key, variant) {
+  const d = { days: { ...data.days }, solved: data.solved.slice() }; const k = entryKey(key, variant); const was = d.days[k];
+  d.days[k] = { ...(was || { got: 0, target: 0, tries: 0, solved: false }), shown: true }; return d;
 }
 
 function shift(key, days) { const [y, m, d] = key.split('-').map(Number); const t = new Date(y, m - 1, d + days); return todayKey(t); }
@@ -40,6 +48,7 @@ export function solvedRun(data, key = todayKey()) {
 export function cardLine(e) {
   if (!e) return 'not yet played';
   if (e.solved) return 'solved ✓';
+  if (e.shown) return 'shown the move';
   return `best ${e.got} of ${e.target}`;
 }
 

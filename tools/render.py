@@ -153,9 +153,23 @@ with sync_playwright() as p:
         got = pg.evaluate("window.__ayo.puzzle.got"); badge = pg.evaluate("document.querySelector('#pzBadge').textContent"); print("puzzle: wrong pit", wrong, "captured", got, "->", badge)
         assert pg.evaluate("document.querySelector('#pzGot').textContent") == str(got)
         assert pg.evaluate("window.__ayo.puzzle.daily.days[window.__ayo.puzzle.key + ':ncho'].tries") == 1
+        assert pg.evaluate("document.querySelector('#pzShow').hidden"), "Show me waits for a second miss"
         pg.click("#pzAgain"); pg.wait_for_function("!window.__ayo.puzzle.played", timeout=5000)
         assert pg.evaluate("document.querySelector('#pzCard').hidden"), "Try again should hide the card"
         assert pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent).reduce((a,b)=>a+b,0)") == 48 - sum(pg.evaluate("window.__ayo.state.stores")), "the position was not put back"
+        if got < pz["target"]:  # a second miss: Mama Ngozi offers to show the move; it plays through, shown but not scored
+            tap(pg, wrong); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+            assert not pg.evaluate("document.querySelector('#pzShow').hidden"), "Show me should be offered after two misses"
+            pg.click("#pzShow"); pg.wait_for_function("window.__ayo.busy", timeout=5000); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000)
+            pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+            assert pg.evaluate("document.querySelector('#pzBadge').textContent") == "Shown" and pg.evaluate("document.querySelector('#pzAgain').textContent") == "Now you"
+            assert pg.evaluate("document.querySelector('#pzShow').hidden"), "shown once"; assert pg.evaluate("document.querySelector('#pzEyebrow').textContent") == "Mama Ngozi's move captures"
+            assert pg.evaluate("document.querySelector('#pzGot').textContent") == str(pz["target"]) and pg.evaluate("document.querySelector('#pzBest').textContent") == "%d of %d" % (got, pz["target"]), "a shown move must not become your score"
+            assert pg.evaluate("window.__ayo.puzzle.daily.days[window.__ayo.puzzle.key + ':ncho'].shown") is True
+            print("puzzle: shown the move; best still", pg.evaluate("document.querySelector('#pzBest').textContent"))
+            out3 = out[:-4] + "-shown.png" if out.endswith(".png") else out + "-shown.png"
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out3, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.click("#pzAgain"); pg.wait_for_function("!window.__ayo.puzzle.played", timeout=5000)
         tap(pg, pz["answer"])  # the answer: the target captured, the card says Solved
         pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000)
         pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)

@@ -7,7 +7,7 @@ import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
-import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel } from './daily.js';
+import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
@@ -525,14 +525,32 @@ async function puzzlePlay(pit) { // one move: the engine's events on the board, 
 }
 function paintPuzzleResult(got, e, firstSolve) {
   const p = puzzle.p; const hit = got >= p.target;
-  $('#pzGot').textContent = got; $('#pzTarget').textContent = p.target; $('#pzBadge').textContent = resultLabel(got, p.target); $('#pzBadge').classList.toggle('miss', !hit);
+  $('#pzEyebrow').textContent = 'You captured'; $('#pzGot').textContent = got; $('#pzTarget').textContent = p.target; $('#pzBadge').textContent = resultLabel(got, p.target); $('#pzBadge').className = hit ? 'pzBadge' : 'pzBadge miss';
   const n = Math.min(Math.max(p.target, got), 16); const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', `${got} of ${p.target} seeds`);
   for (let i = 0; i < n; i++) { const s = document.createElement('span'); s.textContent = i < got ? '●' : '○'; if (i >= got) s.className = 'o'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
   $('#pzBest').textContent = `${e.got} of ${p.target}`; $('#pzRun').textContent = runLine(solvedRun(daily, p.key));
   $('#pzAgain').textContent = hit ? 'Play it again' : 'Try again';
+  $('#pzShow').hidden = !canShow(e); // after two misses Mama Ngozi offers to show the move
   $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
   if (hit) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); buzz([20, 40, 20]); if (firstSolve) { const run = solvedRun(daily, p.key); if (run > 1) setTimeout(() => toast(`${run} days in a row`), 900); } }
   else { click(0.7, 0.08); }
+}
+async function puzzleShow() { // Show me: the position comes back, the answer pit lights, and the move plays through — shown, not scored
+  if (busy || !puzzle.on) return; const p = puzzle.p; const e = dailyEntry(daily, p.key, p.variant); if (!canShow(e)) return;
+  busy = true; puzzle.played = true; $('#pzCard').hidden = true; $('#puzzle').classList.remove('open');
+  state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStaticFrom(state);
+  daily = markShown(daily, p.key, p.variant); prefs.set('daily', JSON.stringify(daily));
+  await wait(350); select(p.answer); $('#hint').textContent = `${CHARACTERS.hard.name}: watch this one…`; await wait(reduceMotion ? 300 : 1100);
+  const r = attempt(p, p.answer); const prevStores = state.stores; state = r.state; board.ring.visible = false; board.glow.visible = false; selected = null;
+  await animate(r.events, prevStores, Math.max(PACE, 190)); // a touch slower than a game, so the relay can be followed
+  busy = false; refreshStatic();
+  const shown = dailyEntry(daily, p.key, p.variant);
+  $('#pzEyebrow').textContent = `${CHARACTERS.hard.name}'s move captures`; $('#pzGot').textContent = r.got; $('#pzTarget').textContent = p.target; $('#pzBadge').textContent = 'Shown'; $('#pzBadge').className = 'pzBadge shown';
+  const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', `the move captures ${r.got}`);
+  for (let i = 0; i < Math.min(r.got, 16); i++) { const s = document.createElement('span'); s.textContent = '●'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
+  $('#pzBest').textContent = `${shown.got} of ${p.target}`; $('#pzRun').textContent = runLine(solvedRun(daily, p.key));
+  $('#pzAgain').textContent = 'Now you'; $('#pzShow').hidden = true; $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
+  toast(`${CHARACTERS.hard.name} showed you — now play it yourself`); click(1.2, 0.06);
 }
 function puzzleAgain() { if (busy) return; const p = puzzle.p; puzzle.played = false; puzzle.got = 0; state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); click(1.2, 0.05); }
 function closePuzzle() { // Back to home: the board goes back to your game (or a fresh one)
@@ -545,6 +563,7 @@ async function sharePuzzle() {
 }
 $('#puzzleCard').addEventListener('click', () => { openPuzzle(); click(1.3, 0.08); });
 $('#pzAgain').addEventListener('click', puzzleAgain);
+$('#pzShow').addEventListener('click', () => { puzzleShow(); click(1.3, 0.06); });
 $('#pzHome').addEventListener('click', () => { closePuzzle(); click(1, 0.05); });
 $('#pzShare').addEventListener('click', () => { sharePuzzle(); click(1.3, 0.06); });
 

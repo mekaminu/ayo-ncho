@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parse, record, entry, solvedRun, cardLine, resultLabel, runLine, dayLabel } from "../web/daily.js";
+import { parse, record, entry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown, SHOW_AFTER } from "../web/daily.js";
 
 test("a day keeps your best over several goes, and counts the goes", () => {
   let d = parse(null); assert.equal(entry(d, "2026-10-29", "ncho"), null); assert.equal(cardLine(null), "not yet played");
@@ -43,4 +43,17 @@ test("storage survives garbage and old shapes", () => {
   assert.deepEqual(parse("not json"), { days: {}, solved: [] });
   assert.deepEqual(parse('{"days":{"2026-10-29:ncho":{"got":2,"target":8,"tries":1,"solved":false}}}').solved, []);
   assert.equal(parse('{"days":[]}').solved.length, 0);
+});
+
+test("Show me: offered after two misses, never while solved or already shown; the card says so, and a later solve still counts", () => {
+  let d = parse(null); assert.equal(canShow(entry(d, "2026-10-29", "ncho")), false);
+  d = record(d, "2026-10-29", "ncho", 2, 8).data; assert.equal(canShow(entry(d, "2026-10-29", "ncho")), false, "one miss is not enough");
+  d = record(d, "2026-10-29", "ncho", 3, 8).data; assert.equal(canShow(entry(d, "2026-10-29", "ncho")), true);
+  d = markShown(d, "2026-10-29", "ncho"); const e = entry(d, "2026-10-29", "ncho");
+  assert.equal(e.shown, true); assert.equal(e.got, 3, "a shown move is not your score"); assert.equal(e.solved, false); assert.equal(canShow(e), false);
+  assert.equal(cardLine(e), "shown the move"); assert.deepEqual(d.solved, []);
+  d = record(d, "2026-10-29", "ncho", 8, 8).data; assert.equal(entry(d, "2026-10-29", "ncho").solved, true); assert.equal(entry(d, "2026-10-29", "ncho").shown, true);
+  assert.equal(cardLine(entry(d, "2026-10-29", "ncho")), "solved ✓"); assert.deepEqual(d.solved, ["2026-10-29"]);
+  let s = parse(null); for (let i = 0; i < 3; i++) s = record(s, "2026-10-29", "ncho", 8, 8).data; assert.equal(canShow(entry(s, "2026-10-29", "ncho")), false, "solved: nothing to show");
+  assert.equal(SHOW_AFTER, 2);
 });
