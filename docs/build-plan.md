@@ -21,12 +21,15 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 
 ## Ideas (Meka said yes to ideas, mock-first still applies)
 
-- [ ] Daily puzzle: one position a day, "capture 12 in one turn", with a shareable WhatsApp card
+- [~] Daily puzzle: engine done (engine/puzzle.js: date-seeded, same for everyone, 60 days tested solvable, targets 4–20; share text with a seed row). Remains: the Home card and the puzzle screen — mockups added to the Design canvas 29 Oct ("Home — with the daily puzzle card", "Daily puzzle — played and solved"), [!] awaiting Meka's yes
 - [ ] Replay clip: a 10-second recording of a brilliant relay turn to share
 - [ ] Calm streak: days played unlocks a seed set, no punishment for missing a day
 - [ ] Opponent reactions: a line and a face when they lose a big pit, when they win, when you undo
 
 ## Needs Meka
+
+- [!] Daily puzzle card on Home and the puzzle screen: mockups on the Design canvas (https://claude.ai/artifact/H75vS5iCT5X2Fmft4oYMXP, second row) — awaiting Meka's yes
+- [!] Make the repo public so the scheduled cloud runs can push (github.com/mekaminu/ayo-ncho/settings → Danger Zone → Change visibility)
 
 - [x] Family rules confirmed 29 Oct: Nchò (relay sowing, capture on 4, last 8, bankruptcy, loop stop — see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka sent a rules write-up at 03:12: relay sowing taken as yes unless he says otherwise.
 - [!] Settings screen toggles Meka asked for from that write-up: capture on 2&3 vs 4 only, relay vs single lap. Mock them on the Settings mockup; build after his yes.
