@@ -3,190 +3,74 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Akase Board</title>
+<meta name="theme-color" content="#0d0906">
+<title>Ayo &amp; Nchò</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0d0906;--fg:#f1e6d2;--muted:#b19f85;--brass:#e6b76f}
-:root:not([data-theme="light"]){color-scheme:dark}
-:root[data-theme="dark"]{color-scheme:dark}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,sans-serif;overflow:hidden}
+:root{--bg:#0d0906;--fg:#f1e6d2;--muted:#b19f85;--brass:#e6b76f;--card:rgba(24,15,9,.92);color-scheme:dark}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
 canvas{display:block;width:100vw;height:100vh;touch-action:none}
-.hud{position:fixed;left:0;right:0;padding:0 18px;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.hud{position:fixed;left:0;right:0;padding:0 max(18px,env(safe-area-inset-left,0px)) 0 max(18px,env(safe-area-inset-right,0px));display:flex;justify-content:space-between;align-items:center;pointer-events:none}
 .hud.top{top:calc(env(safe-area-inset-top,0px) + 14px)}
-.hud.bottom{bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}
+.hud.bottom{bottom:calc(env(safe-area-inset-bottom,0px) + 70px)}
 .name{font-size:14px;font-weight:600}.sub{font-size:12px;color:var(--muted)}
-.score{font-family:Georgia,"Times New Roman",serif;font-size:28px;font-weight:700;line-height:1}
+.score{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:700;line-height:1;display:inline-block}
+.score.bump{animation:bump .35s ease-out}
+@keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.35);color:var(--brass)}100%{transform:scale(1)}}
 .lab{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .col{display:flex;flex-direction:column}.r{align-items:flex-end}
-.hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 64px);font-size:12px;color:var(--brass);background:rgba(13,9,6,.55);padding:6px 12px;border-radius:999px;pointer-events:none}
+#hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 118px);font-size:12px;color:var(--brass);background:rgba(13,9,6,.6);padding:6px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;min-height:1em}
+#hint:empty{display:none}
+#badges{position:fixed;inset:0;pointer-events:none}
+.badge{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:11px;font-weight:600;color:var(--brass);background:rgba(13,9,6,.72);border-radius:10px;padding:1px 6px;line-height:15px;margin:-8px 0 0 -9px;transition:opacity .2s}
+.badge.zero{opacity:.35}
+.bar{position:fixed;left:0;right:0;bottom:0;padding:8px max(18px,env(safe-area-inset-left,0px)) calc(env(safe-area-inset-bottom,0px) + 16px) max(18px,env(safe-area-inset-right,0px));display:flex;justify-content:center;gap:12px}
+.chip{width:44px;height:44px;border-radius:50%;background:rgba(13,9,6,.55);border:1px solid rgba(243,233,215,.18);color:var(--fg);display:flex;align-items:center;justify-content:center;padding:0;cursor:pointer;transition:transform .15s,border-color .15s}
+.chip:hover{border-color:var(--brass)}.chip:active{transform:scale(.92)}.chip:disabled{opacity:.35;cursor:default}
+.chip[aria-pressed="false"] svg{opacity:.4}
+.chip:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.card{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:18px;padding:22px 24px;width:min(86vw,340px);box-sizing:border-box;display:flex;flex-direction:column;gap:12px;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:pop .3s ease-out}
+@keyframes pop{from{opacity:0;transform:translate(-50%,-46%) scale(.96)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.card[hidden]{display:none}
+.card h2{font-family:Fraunces,Georgia,serif;font-size:28px;margin:0;font-weight:700}
+.card p{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+.card ul{margin:0;padding-left:18px;color:var(--fg);font-size:14px;line-height:1.55;display:grid;gap:6px}
+.btn{background:var(--brass);color:#1a0f07;border:0;border-radius:999px;padding:12px 18px;font:600 15px Inter,system-ui,sans-serif;cursor:pointer}
+.btn.ghost{background:none;color:var(--brass);border:1px solid rgba(230,183,111,.5)}
+.btn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.score.bump,.card{animation:none}}
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
-<div class="hud top"><div class="col"><span class="name">Nnamdi · Level 2</span><span class="sub">thinking…</span></div><div class="col r"><span class="score">5</span><span class="lab">captured</span></div></div>
-<div class="hint">Drag to look around · tap a pit on your side to sow</div>
-<div class="hud bottom"><div class="col"><span class="score">8</span><span class="lab">captured</span></div><div class="col r"><span class="name">Meka · your move</span><span class="sub">pit 4 lit — tap again to sow</span></div></div>
+<canvas id="c" aria-label="Ayo board"></canvas>
+<div id="badges" aria-hidden="true"></div>
+<div class="hud top"><div class="col"><span class="name" id="oppName">Nnamdi · Medium</span><span class="sub" id="oppSub">waiting</span></div><div class="col r"><span class="score" id="oppScore">0</span><span class="lab">captured</span></div></div>
+<div id="hint" role="status"></div>
+<div class="hud bottom"><div class="col"><span class="score" id="myScore">0</span><span class="lab">captured</span></div><div class="col r"><span class="name">Meka</span><span class="sub" id="turn">your move</span></div></div>
+<div class="bar">
+  <button class="chip" id="newGame" aria-label="New game"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="chip" id="undo" aria-label="Undo"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
+  <button class="chip" id="rulesBtn" aria-label="Rules"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg></button>
+  <button class="chip" id="soundBtn" aria-label="Sound" aria-pressed="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></button>
+</div>
+<div class="card" id="gameover" hidden role="dialog" aria-labelledby="goTitle">
+  <h2 id="goTitle">You win</h2>
+  <p id="goSub"></p>
+  <button class="btn" id="rematch">Play again</button>
+</div>
+<div class="card" id="rules" hidden role="dialog" aria-label="How to play">
+  <h2>How to play</h2>
+  <ul>
+    <li>Your six pits are the column on the right. Tap one with seeds to pick them all up.</li>
+    <li>They are sown one per pit anticlockwise: up your side, then down the other side.</li>
+    <li>If your last seed makes an opponent's pit 2 or 3, you capture it, and every pit behind it that is also 2 or 3.</li>
+    <li>If the other side is empty, you must give them seeds when you can.</li>
+    <li>First to 25 seeds wins.</li>
+  </ul>
+  <button class="btn ghost" id="rulesClose">Got it</button>
+</div>
 <script type="importmap">{"imports":{"three":"https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js"}}</script>
-<script type="module">
-import * as THREE from 'three';
-
-// ---------- procedural textures ----------
-function noise2(w,h,oct){ // value noise, returns Float32Array
-  const out=new Float32Array(w*h);
-  for(let o=0;o<oct;o++){
-    const f=2**o, amp=1/f; const gw=Math.max(2,Math.floor(w/ (64/f))), gh=Math.max(2,Math.floor(h/(64/f)));
-    const g=new Float32Array(gw*gh); for(let i=0;i<g.length;i++) g[i]=Math.random();
-    for(let y=0;y<h;y++){ const gy=y/h*gh, y0=Math.floor(gy), y1=(y0+1)%gh, ty=gy-y0, sy=ty*ty*(3-2*ty);
-      for(let x=0;x<w;x++){ const gx=x/w*gw, x0=Math.floor(gx), x1=(x0+1)%gw, tx=gx-x0, sx=tx*tx*(3-2*tx);
-        const a=g[y0*gw+x0], b=g[y0*gw+x1], c=g[y1*gw+x0], d=g[y1*gw+x1];
-        out[y*w+x]+=amp*((a*(1-sx)+b*sx)*(1-sy)+(c*(1-sx)+d*sx)*sy); } }
-  }
-  let mx=0; for(const v of out) mx=Math.max(mx,v); for(let i=0;i<out.length;i++) out[i]/=mx; return out;
-}
-function woodTextures(finish){
-  const W=1024,H=2048; const c=document.createElement('canvas'); c.width=W;c.height=H; const ctx=c.getContext('2d');
-  const img=ctx.createImageData(W,H); const n=noise2(W,H,5), n2=noise2(W,H,3);
-  const pal={mahogany:[[0x6e,0x39,0x20],[0x4c,0x24,0x13],[0x8a,0x4e,0x2d]], iroko:[[0xa9,0x7a,0x3d],[0x83,0x5a,0x28],[0xc4,0x95,0x52]], ebony:[[0x2a,0x22,0x1c],[0x16,0x11,0x0e],[0x3b,0x30,0x27]]}[finish];
-  const bump=document.createElement('canvas'); bump.width=W;bump.height=H; const bctx=bump.getContext('2d'); const bimg=bctx.createImageData(W,H);
-  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
-    const i=y*W+x; const g=Math.sin((x/W)*110 + n[i]*7 + Math.sin(y/H*5)*2.0); // grain runs along the length (y)
-    const ring=(g*0.5+0.5)**1.6; const fine=n2[i]*0.5+0.5; const pore=(Math.sin(y*0.9+n[i]*40)*0.5+0.5)**12*0.35;
-    const t=ring*0.75+fine*0.25;
-    const r=pal[1][0]+(pal[0][0]-pal[1][0])*t + (pal[2][0]-pal[0][0])*(1-ring)*0.25 - pore*30;
-    const gg=pal[1][1]+(pal[0][1]-pal[1][1])*t + (pal[2][1]-pal[0][1])*(1-ring)*0.25 - pore*25;
-    const b=pal[1][2]+(pal[0][2]-pal[1][2])*t + (pal[2][2]-pal[0][2])*(1-ring)*0.25 - pore*20;
-    const o=i*4; img.data[o]=r; img.data[o+1]=gg; img.data[o+2]=b; img.data[o+3]=255;
-    const bv=255*(0.5+0.25*(ring-0.5)+0.25*(fine-0.5)-pore*0.6); bimg.data[o]=bimg.data[o+1]=bimg.data[o+2]=bv; bimg.data[o+3]=255;
-  }
-  ctx.putImageData(img,0,0); bctx.putImageData(bimg,0,0);
-  const map=new THREE.CanvasTexture(c); map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=8;
-  const bmap=new THREE.CanvasTexture(bump); bmap.wrapS=bmap.wrapT=THREE.RepeatWrapping;
-  return {map,bump:bmap};
-}
-function seedTexture(){
-  const S=256; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d');
-  const n=noise2(S,S,4); const img=ctx.createImageData(S,S);
-  for(let i=0;i<S*S;i++){ const v=n[i]; const t=v*v; const r=0x8e+(0xd8-0x8e)*t, g=0x92+(0xd6-0x92)*t, b=0x74+(0xb2-0x74)*t; const o=i*4;
-    const spot=(v>0.72)?-28:0; img.data[o]=r+spot; img.data[o+1]=g+spot; img.data[o+2]=b+spot; img.data[o+3]=255; }
-  ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
-}
-function clothTexture(){
-  const S=512; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d'); const n=noise2(S,S,5); const img=ctx.createImageData(S,S);
-  for(let i=0;i<S*S;i++){ const v=0.18+n[i]*0.14; const o=i*4; img.data[o]=38*v*2; img.data[o+1]=26*v*2; img.data[o+2]=18*v*2; img.data[o+3]=255; }
-  ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(6,6); return t;
-}
-
-// ---------- scene ----------
-const canvas=document.getElementById('c');
-const renderer=new THREE.WebGLRenderer({canvas,antialias:true,preserveDrawingBuffer:true});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
-renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
-renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.15; renderer.outputColorSpace=THREE.SRGBColorSpace;
-const scene=new THREE.Scene(); scene.background=new THREE.Color(0x0d0906);
-const camera=new THREE.PerspectiveCamera(38,1,0.05,20);
-
-// board geometry: length along Z (towards the player), width along X
-const BW=0.42, BL=1.24, BT=0.085, R=0.19; // width, length, thickness, end radius
-const PIT_R=0.082, PIT_D=0.054, STORE_RX=0.155, STORE_RZ=0.052, STORE_D=0.034;
-const pitCenters=[]; // index 0..5 player's (right column, bottom→top), 6..11 opponent's (left column, top→bottom)
-const colX=0.105, rowZ0=0.37, rowStep=0.148;
-for(let r=0;r<6;r++) pitCenters.push([ colX, rowZ0 - r*rowStep ]);          // 0..5 bottom→top on the right
-for(let r=0;r<6;r++) pitCenters.push([ -colX, (rowZ0 - 5*rowStep) + r*rowStep ]); // 6..11 top→bottom on the left
-const stores=[[0, 0.545],[0,-0.545]]; // player's (near), opponent's (far)
-
-function bowl(dx,dz,rx,rz,depth){ const d=Math.sqrt((dx/rx)**2+(dz/rz)**2); if(d>=1) return 0; const t=1-d*d; return depth*(t*t*(3-2*t)); }
-function carve(x,z){ // returns depth below the top surface at board-local x,z
-  let d=0; for(const [px,pz] of pitCenters) d=Math.max(d,bowl(x-px,z-pz,PIT_R,PIT_R,PIT_D));
-  for(const [sx,sz] of stores) d=Math.max(d,bowl(x-sx,z-sz,STORE_RX,STORE_RZ,STORE_D));
-  return d;
-}
-function inRoundedRect(x,z){ const hx=BW/2, hz=BL/2; const cx=Math.max(0,Math.abs(x)-(hx-R)), cz=Math.max(0,Math.abs(z)-(hz-R)); return cx*cx+cz*cz <= R*R; }
-function edgeDist(x,z){ const hx=BW/2, hz=BL/2; const cx=Math.max(0,Math.abs(x)-(hx-R)), cz=Math.max(0,Math.abs(z)-(hz-R)); return R-Math.sqrt(cx*cx+cz*cz); }
-
-const finish=(new URLSearchParams(location.search).get('finish'))||'mahogany';
-const wood=woodTextures(finish);
-const woodMat=new THREE.MeshStandardMaterial({map:wood.map,bumpMap:wood.bump,bumpScale:0.003,roughness:0.5,metalness:0.0});
-const woodMatSide=woodMat.clone(); woodMatSide.map=wood.map.clone(); woodMatSide.map.repeat.set(0.3,1); woodMatSide.map.needsUpdate=true;
-
-// body: rounded rect extruded with a bevel
-{
-  const s=new THREE.Shape(); const hx=BW/2,hz=BL/2;
-  s.moveTo(-hx+R,-hz); s.lineTo(hx-R,-hz); s.absarc(hx-R,-hz+R,R,-Math.PI/2,0,false); s.lineTo(hx,hz-R); s.absarc(hx-R,hz-R,R,0,Math.PI/2,false);
-  s.lineTo(-hx+R,hz); s.absarc(-hx+R,hz-R,R,Math.PI/2,Math.PI,false); s.lineTo(-hx,-hz+R); s.absarc(-hx+R,-hz+R,R,Math.PI,Math.PI*1.5,false);
-  const g=new THREE.ExtrudeGeometry(s,{depth:BT-0.06,bevelEnabled:false,curveSegments:32});
-  g.rotateX(-Math.PI/2); g.translate(0,0,0);
-  // uv: use xz
-  const pos=g.attributes.position, uv=new Float32Array(pos.count*2); for(let i=0;i<pos.count;i++){ uv[i*2]=(pos.getX(i)/BW+0.5); uv[i*2+1]=(pos.getZ(i)/BL+0.5); }
-  g.setAttribute('uv',new THREE.BufferAttribute(uv,2)); g.computeVertexNormals();
-  const body=new THREE.Mesh(g,woodMat); body.castShadow=true; body.receiveShadow=true; scene.add(body);
-}
-// carved top
-{
-  const g=new THREE.PlaneGeometry(BW+0.01,BL+0.01,210,620); g.rotateX(-Math.PI/2);
-  const pos=g.attributes.position; const top=BT+0.0006;
-  const ER=0.016; for(let i=0;i<pos.count;i++){ const x=pos.getX(i), z=pos.getZ(i); let y=top-carve(x,z); const e=edgeDist(x,z);
-    if(e<0) y=-0.02; else if(e<ER){ const u=ER-e; y=top-ER+Math.sqrt(Math.max(0,ER*ER-u*u)); } pos.setY(i,y); }
-  g.computeVertexNormals();
-  const uv=g.attributes.uv; for(let i=0;i<uv.count;i++){ uv.setXY(i, pos.getX(i)/BW+0.5, pos.getZ(i)/BL+0.5); }
-  const col=new Float32Array(pos.count*3); for(let i=0;i<pos.count;i++){ const c=carve(pos.getX(i),pos.getZ(i)); const ao=1-0.62*Math.pow(Math.min(1,c/PIT_D),0.7); col[i*3]=ao; col[i*3+1]=ao*0.96; col[i*3+2]=ao*0.92; }
-  g.setAttribute('color',new THREE.BufferAttribute(col,3));
-  const topMat=woodMat.clone(); topMat.vertexColors=true;
-  const topMesh=new THREE.Mesh(g,topMat); topMesh.receiveShadow=true; topMesh.castShadow=false; scene.add(topMesh);
-}
-
-// seeds
-const seedGeo=new THREE.SphereGeometry(1,28,20); const seedTex=seedTexture();
-const seedMat=new THREE.MeshStandardMaterial({map:seedTex,color:0xd9d3bf,roughness:0.36,metalness:0.0,bumpMap:seedTex,bumpScale:0.0015});
-const SR=[0.0180,0.0152,0.0138];
-const seedMeshes=[]; let seedSeed=7;
-function rnd(){ seedSeed=(seedSeed*9301+49297)%233280; return seedSeed/233280; }
-function placeSeeds(cx,cz,n,rx,rz,depth){
-  const placed=[]; let tries=0;
-  while(placed.length<n && tries<400){ tries++;
-    const a=rnd()*Math.PI*2, rr=Math.sqrt(rnd())*0.72; const x=cx+Math.cos(a)*rr*(rx-0.02), z=cz+Math.sin(a)*rr*(rz-0.02);
-    if(placed.some(p=>Math.hypot(p.x-x,p.z-z)<0.036)) continue;
-    const y=BT-bowl(x-cx,z-cz,rx,rz,depth)+SR[1]*0.92; placed.push({x,y,z});
-  }
-  for(const p of placed){ const m=new THREE.Mesh(seedGeo,seedMat); m.scale.set(SR[0]*(0.9+rnd()*0.2),SR[1]*(0.9+rnd()*0.2),SR[2]*(0.9+rnd()*0.2)); m.position.set(p.x,p.y,p.z); m.rotation.set(rnd()*0.6-0.3,rnd()*Math.PI*2,rnd()*0.6-0.3); m.castShadow=true; m.receiveShadow=true; scene.add(m); seedMeshes.push(m); }
-}
-const counts=[4,3,2,6,1,5, 4,2,7,0,3,0];
-pitCenters.forEach(([x,z],i)=>placeSeeds(x,z,counts[i],PIT_R,PIT_R,PIT_D));
-placeSeeds(stores[0][0],stores[0][1],8,STORE_RX,STORE_RZ,STORE_D);
-placeSeeds(stores[1][0],stores[1][1],5,STORE_RX,STORE_RZ,STORE_D);
-
-// selected pit glow (player's pit 2, i.e. third from the bottom)
-{
-  const [x,z]=pitCenters[3];
-  const ring=new THREE.Mesh(new THREE.RingGeometry(PIT_R*1.04,PIT_R*1.09,96),new THREE.MeshBasicMaterial({color:0xe6b76f,transparent:true,opacity:0.6,side:THREE.DoubleSide}));
-  ring.rotation.x=-Math.PI/2; ring.position.set(x,BT+0.002,z); scene.add(ring);
-  const glow=new THREE.PointLight(0xffc877,0.06,0.25); glow.position.set(x,BT+0.08,z); scene.add(glow);
-}
-
-// table surface
-{
-  const t=clothTexture(); const g=new THREE.PlaneGeometry(6,6); g.rotateX(-Math.PI/2);
-  const m=new THREE.Mesh(g,new THREE.MeshStandardMaterial({map:t,roughness:0.95,color:0xffffff})); m.receiveShadow=true; m.position.y=-0.0005; scene.add(m);
-}
-
-// lights
-scene.add(new THREE.HemisphereLight(0xffe2c0,0x1a0e07,0.55));
-const key=new THREE.DirectionalLight(0xffd4a4,2.6); key.position.set(-0.9,1.6,0.6); key.castShadow=true; key.shadow.mapSize.set(2048,2048);
-key.shadow.camera.left=-0.8;key.shadow.camera.right=0.8;key.shadow.camera.top=0.9;key.shadow.camera.bottom=-0.9; key.shadow.camera.near=0.2; key.shadow.camera.far=5; key.shadow.bias=-0.0004; key.shadow.normalBias=0.004; scene.add(key);
-const rim=new THREE.DirectionalLight(0xffb070,0.7); rim.position.set(0.8,0.9,-1.2); scene.add(rim);
-const fill=new THREE.PointLight(0xffe8d0,0.25,4); fill.position.set(0.9,1.4,1.3); scene.add(fill);
-
-// camera: as if the board is upright in your hands, you at the near end
-let theta=0, phi=0.72, dist=1.55; const target=new THREE.Vector3(0,0.02,0.02);
-function placeCam(){ camera.position.set(target.x+dist*Math.sin(phi)*Math.sin(theta), target.y+dist*Math.cos(phi), target.z+dist*Math.sin(phi)*Math.cos(theta)); camera.lookAt(target); }
-let drag=null; canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,t:theta,p:phi};canvas.setPointerCapture(e.pointerId);});
-canvas.addEventListener('pointermove',e=>{ if(!drag) return; theta=drag.t-(e.clientX-drag.x)*0.006; phi=Math.min(1.3,Math.max(0.35,drag.p-(e.clientY-drag.y)*0.006)); });
-canvas.addEventListener('pointerup',()=>drag=null);
-canvas.addEventListener('wheel',e=>{dist=Math.min(2.4,Math.max(0.8,dist+e.deltaY*0.001));},{passive:true});
-
-function resize(){ const w=canvas.clientWidth,h=canvas.clientHeight; renderer.setSize(w,h,false); camera.aspect=w/h; camera.updateProjectionMatrix(); }
-window.addEventListener('resize',resize); resize();
-let frames=0;
-function loop(){ placeCam(); renderer.render(scene,camera); frames++; if(frames===3){ window.__done=true; if(location.search.includes("still")) return; } requestAnimationFrame(loop); }
-loop();
-</script>
+<script type="module" src="./game.js"></script>
 </body>
 </html>

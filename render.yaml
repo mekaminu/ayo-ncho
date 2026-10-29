@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: akase
+    name: ayo-ncho
     runtime: node
     plan: free
     buildCommand: npm install

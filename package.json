@@ -1,15 +1,20 @@
 {
-  "name": "akase",
+  "name": "ayo-ncho",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Akase (Ayo / Okwe) — the Nigerian seed board game in real 3D, for phone and computer.",
+  "description": "Ayo & Nchò: Nigerian Mancala — the Nigerian seed board game in real 3D, for phone and computer.",
   "scripts": {
     "start": "node server/index.js",
-    "test": "node --test test/"
+    "test": "node --test"
   },
   "dependencies": {
     "express": "^4.21.2"
   },
-  "engines": { "node": ">=20" }
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "three": "^0.170.0"
+  }
 }

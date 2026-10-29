@@ -1,4 +1,4 @@
-// Akase / Ayo rules engine — shared by server and browser. Pure functions, no DOM.
+// Ayo & Nchò rules engine — shared by server and browser. Pure functions, no DOM.
 //
 // Board layout (indices):
 //   Player 0 ("south") owns pits 0..5, sowing runs 0 → 5 then into player 1's 6 → 11, then back to 0.
