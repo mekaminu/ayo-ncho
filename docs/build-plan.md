@@ -20,7 +20,8 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 
 ## Needs Meka
 
-- [x] Family rules confirmed 29 Oct: Nchò (capture on 4, see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka may send more rules: fold them in when they arrive.
+- [x] Family rules confirmed 29 Oct: Nchò (relay sowing, capture on 4, last 8, bankruptcy, loop stop — see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka sent a rules write-up at 03:12: relay sowing taken as yes unless he says otherwise.
+- [!] Settings screen toggles Meka asked for from that write-up: capture on 2&3 vs 4 only, relay vs single lap. Mock them on the Settings mockup; build after his yes.
 - [!] Create the GitHub repo github.com/mekaminu/ayo-ncho (private) so the runs can push
 - [!] Home / game-over / settings mockups: his yes before they are built (runs make the mockups first)
 

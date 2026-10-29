@@ -95,10 +95,10 @@ test("hard beats easy most of the time", () => {
 test("ncho: a pit reaching 4 mid-sow goes to its side's owner; the last seed making 4 on the other side goes to the sower", () => {
   let g = newGame("ncho");
   // player 0 sows 5 seeds from pit 2 into 3,4,5,6,7. Pit 4 has 3 → 4 (own side: mine). Pit 7 has 3 → 4 by the LAST seed on their side: mine too.
-  g.pits = [0, 0, 5, 0, 3, 0, 3, 3, 0, 0, 0, 0]; g.stores = [17, 17];
+  g.pits = [0, 0, 5, 0, 3, 0, 3, 3, 5, 5, 0, 0]; g.stores = [12, 12];
   const { state, events } = applyMove(g, 2);
-  assert.equal(state.stores[0], 17 + 8);
-  assert.equal(state.stores[1], 17 + 4, "pit 6 reached 4 from a seed that was not the last: the opponent owns that side, so they take it");
+  assert.equal(state.stores[0], 12 + 8);
+  assert.equal(state.stores[1], 12 + 4, "pit 6 reached 4 from a seed that was not the last: the opponent owns that side, so they take it");
   assert.equal(state.pits[6], 0);
 });
 
@@ -117,4 +117,20 @@ test("ncho: with 8 seeds left, the next capture takes everything", () => {
   assert.equal(state.stores[0], 28);
   assert.equal(state.over, true);
   assert.equal(state.winner, 0);
+});
+
+test("ncho: relay sowing — the last seed landing in an occupied pit picks it up and carries on", () => {
+  let g = newGame("ncho");
+  // player 0 sows 2 seeds from pit 0 into 1 and 2; pit 2 had 1 → 2, so it is picked up and sown into 3, 4; pit 4 had 0 → 1: stop.
+  g.pits = [2, 0, 1, 0, 0, 0, 4, 4, 4, 4, 4, 4]; g.stores = [10, 11];
+  const { state, events } = applyMove(g, 0);
+  assert.ok(events.some((e) => e.type === "pickup" && e.relay && e.pit === 2));
+  assert.deepEqual(state.pits.slice(0, 5), [0, 1, 0, 1, 1]);
+});
+
+test("ncho: a repeating position within one turn ends the turn, and seeds are conserved", () => {
+  let g = newGame("ncho");
+  g.pits = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; g.stores = [18, 18];
+  const { state } = applyMove(g, 0);
+  assert.equal(totalSeeds(state), TOTAL_SEEDS);
 });

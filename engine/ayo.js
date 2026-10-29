@@ -9,10 +9,13 @@
 //   "ayo"  — Yoruba Ayo / Oware rules: capture when the LAST seed lands in an opponent pit making 2 or 3,
 //            sweeping backwards through consecutive opponent pits that are also 2 or 3. Lap skips the origin pit.
 //            Feed rule; a move that would capture ALL the opponent's seeds captures nothing (grand slam).
-//   "ncho" — Nchò, the way Meka's family plays (confirmed 29 Oct 2026): any pit that reaches 4 during sowing
-//            goes to the OWNER of that side, whoever sowed; except that if the sower's LAST seed makes a pit on the
-//            opponent's side 4, the SOWER takes it. Several pits can be captured in one move. When 8 seeds are
-//            left on the board, whoever makes the next capture takes all 8. Feed rule applies.
+//   "ncho" — Nchò, the way Meka's family plays (confirmed 29 Oct 2026). RELAY sowing: when the last seed in hand
+//            lands in an occupied pit, that pit is picked up and sowing continues; the turn ends when the last seed
+//            lands in an empty pit or is captured. Any pit that reaches 4 goes to the OWNER of that side, whoever
+//            sowed; except that if the last seed in hand makes a pit on the opponent's side 4, the SOWER takes it.
+//            Several pits can be captured in one turn. With 8 seeds left, whoever captures next takes all 8;
+//            fewer than 4 left (total bankruptcy) ends the game the same way. A position repeating 3 times in one
+//            turn ends the turn. Feed rule applies.
 
 export const PITS = 12;
 export const PER_SIDE = 6;
@@ -99,22 +102,33 @@ export function applyMove(state, pit) {
   if (state.variant === "ncho") {
     pits = state.pits.slice();
     const boardBefore = pits.reduce((a, b) => a + b, 0);
-    let n = pits[pit]; pits[pit] = 0; let i = pit;
+    let n = pits[pit]; pits[pit] = 0; let i = pit; let origin = pit;
+    const seen = new Map(); let drops = 0;
     while (n > 0) {
       i = (i + 1) % PITS;
-      if (i === pit) continue;
-      pits[i] += 1; n -= 1;
+      if (i === origin) continue; // a lap skips the pit the hand was lifted from
+      pits[i] += 1; n -= 1; drops += 1;
       events.push({ type: "drop", pit: i });
       if (pits[i] === 4) {
         const by = (n === 0 && owner(i) !== me) ? me : owner(i);
         stores[by] += 4; pits[i] = 0; captured.push(i);
         events.push({ type: "capture", pits: [i], by, n: 4 });
+        continue;
+      }
+      // Relay sowing: the last seed landing in an occupied pit picks that pit up and carries on.
+      if (n === 0 && pits[i] > 1) {
+        const key = pits.join(",") + "|" + i; const times = (seen.get(key) || 0) + 1; seen.set(key, times);
+        if (times >= 3 || drops > 400) break; // the same position three times in one turn: the turn ends here
+        n = pits[i]; pits[i] = 0; origin = i;
+        events.push({ type: "pickup", pit: i, n, relay: true });
       }
     }
     // Last 8: whoever makes the capture that leaves 4 on the board takes those too.
+    // Total bankruptcy: fewer than 4 seeds left can never fill a pit, so they go to whoever captured last and the game ends.
     const left = pits.reduce((a, b) => a + b, 0);
-    if (captured.length && boardBefore <= 8 && left > 0) {
-      const by = events.filter((e) => e.type === "capture").pop().by; const taken = [];
+    if (left > 0 && ((captured.length && boardBefore <= 8) || left < 4)) {
+      const lastCap = events.filter((e) => e.type === "capture").pop();
+      const by = lastCap ? lastCap.by : (stores[0] >= stores[1] ? 0 : 1); const taken = [];
       for (let k = 0; k < PITS; k++) if (pits[k]) { taken.push(k); }
       stores[by] += left; for (const k of taken) pits[k] = 0;
       events.push({ type: "capture", pits: taken, by, n: left });
