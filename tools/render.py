@@ -4,6 +4,8 @@
 #        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
 #        add --nophysics to play with the seed physics off (seeds fly straight to their pit, as on the weakest phones) and check the setting took
+#        add --keys (with --smoke) to play from the keyboard too: a digit picks a pit (screenshot of the whole page with the hint line), Esc puts it
+#                  back, digit + Enter sows, U undoes, H hints; and to check the pits' screen-reader labels carry the seed counts
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --online: start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
@@ -14,7 +16,7 @@
 #                  and check the Home card says solved (<out>-home.png); --wide for the Mac layout
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -145,7 +147,7 @@ with sync_playwright() as p:
         assert pg.evaluate("document.querySelector('#pzAsk').textContent") == "Capture %d in one turn" % pz["target"]
         assert pg.evaluate("document.querySelector('#pzCard').hidden"), "no result card before a move"
         assert pg.evaluate("getComputedStyle(document.querySelector('.hud.top')).opacity") == "0", "the HUD steps aside for the puzzle"
-        assert pg.evaluate("document.querySelector('#hint').textContent") == "tap a pit on your side"
+        assert pg.evaluate("document.querySelector('#hint').textContent") in ("tap a pit on your side", "click a pit on your side, or press 1–6"), pg.evaluate("document.querySelector('#hint').textContent")  # the keys are offered where a mouse is
         wrong = min(pg.evaluate("window.__ayo.legal"), key=lambda p: pg.evaluate("window.__ayo.tryPit(%d)" % p))  # the weakest move
         tap(pg, wrong)  # a miss first: the card says how short, Try again puts the position back
         pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000)
@@ -197,6 +199,31 @@ with sync_playwright() as p:
         assert before != after, "board did not change"
         print("smoke: before", before, "after", after, "scores", pg.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]"))
         assert pg.evaluate("getComputedStyle(document.querySelector('#shoutBtn')).display") == "none", "shouts are for friends online, not the computer"
+        if keys:  # the keyboard: a digit lights a pit, Esc puts it back, the digit then Enter sows; the pits carry screen-reader labels; U undoes, H hints
+            sel = lambda: pg.evaluate("window.__ayo.selected"); hint = lambda: pg.evaluate("document.querySelector('#hint').textContent")
+            legal = pg.evaluate("window.__ayo.legal"); pit = max(legal); key = str(pit + 1); n = pg.evaluate("window.__ayo.state.pits[%d]" % pit)
+            pg.keyboard.press("Escape"); assert sel() is None
+            pg.keyboard.press("7"); assert sel() is None, "7 is no pit"
+            pg.keyboard.press(key); assert sel() == pit, "key %s should pick pit %d (got %s)" % (key, pit, sel())
+            assert hint() == "pit %s · %d seeds — Enter to sow, or pick another" % (key, n), hint()
+            labels = pg.evaluate("[...document.querySelectorAll('#pits button')].map(b=>[b.getAttribute('aria-label'), b.disabled])")
+            assert len(labels) == 12 and labels[0][0].startswith("Your pit 1 (key 1) · ") and labels[6][0].startswith("Their pit 1 · "), labels
+            assert labels[pit][0].endswith("· picked — Enter to sow") and not labels[pit][1], labels[pit]
+            assert all(d for _, d in labels[6:]), "the other side's pits are not buttons to press"
+            counts = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent)")
+            for i in range(12): assert ("· %d seeds" % counts[i] if counts[i] > 1 else "· 1 seed" if counts[i] == 1 else "· empty") in labels[i][0], (i, counts[i], labels[i])
+            assert pg.evaluate("document.body.classList.contains('keys') && [...document.querySelectorAll('.badge')].slice(0,6).every((b,i)=>b.dataset.key===String(i+1)) && [...document.querySelectorAll('.badge')].slice(6).every(b=>!b.dataset.key)"), "once a key is pressed your pits' badges should show their keys"
+            print("keys: pit", pit, "picked by key", key, "·", hint(), "· label:", labels[pit][0])
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.keyboard.press("Escape"); assert sel() is None, "Esc should put the pit back"
+            assert hint() == "click a pit on your side, or press 1–6", hint()
+            pg.keyboard.press(key); pg.keyboard.press("Enter")  # sow it: the move plays, the opponent answers
+            pg.wait_for_function("document.querySelector('#turn').textContent==='your move' && !window.__ayo.busy && window.__ayo.state.moves.length===4", timeout=240000)
+            assert pg.evaluate("window.__ayo.state.moves[2]") == pit, "Enter did not sow the picked pit"
+            pg.keyboard.press("u"); pg.wait_for_function("window.__ayo.state.moves.length===2 && !window.__ayo.busy", timeout=20000)
+            print("keys: Enter sowed pit", pit, "· U undid it (moves back to 2)")
+            pg.keyboard.press("h"); pg.wait_for_function("document.querySelector('#hintBtn').disabled && document.querySelector('#hint').textContent.includes('would play')", timeout=60000)
+            print("keys: H lit a hint ·", hint())
         if clip:  # record the best turn so far as a short video, the way the Game over card's Clip button does
             pg.set_default_timeout(300000)
             r = pg.evaluate("window.__ayo.clip()")
@@ -211,6 +238,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
+    elif keys: pass  # the picture was taken with the pit picked by its key
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))

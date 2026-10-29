@@ -10,6 +10,7 @@ import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
+import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -167,6 +168,22 @@ function placeBadges() {
   });
 }
 function setBadge(i, n) { badges[i].textContent = n; badges[i].classList.toggle('zero', n === 0); }
+// the pits for a screen reader and the Tab key: one hidden button per pit, your six first, each saying its count; Tab lights a pit, Enter sows it
+const pitBtns = []; const pitLayer = $('#pits');
+for (let i = 0; i < 12; i++) {
+  const b = document.createElement('button'); b.type = 'button'; b.dataset.pit = i; pitLayer.appendChild(b); pitBtns.push(b);
+  b.addEventListener('focus', () => { if (canPress() && legalMoves(state).includes(i) && selected !== i) select(i); });
+  b.addEventListener('click', () => pressPit(i));
+}
+let keysUsed = false; const mouseLikely = matchMedia('(hover: hover) and (pointer: fine)').matches; // a Mac, or a Fold with a mouse: the hint line talks keys
+const keysLikely = () => keysUsed || mouseLikely;
+function paintPits() { // labels and reach from the position: only your own pits with seeds are buttons you can land on, and only on your move
+  const mine = state.turn === you && !state.over && !busy && !(online && !friend) && !(puzzle.on && puzzle.played); const legal = mine ? legalMoves(state) : [];
+  const order = [...Array(6).keys()].map((k) => you * 6 + k).concat([...Array(6).keys()].map((k) => them * 6 + k)); // yours first, near to far
+  if (pitLayer.firstChild !== pitBtns[order[0]]) order.forEach((i) => pitLayer.appendChild(pitBtns[i])); // a screen reader reads them in this order
+  badges.forEach((b, i) => { const k = pitKey(i, you); if (k) b.dataset.key = k; else delete b.dataset.key; }); // once a key is pressed, the count badge on your pits shows its key too
+  order.forEach((i) => { const b = pitBtns[i]; b.setAttribute('aria-label', pitLabel(i, state.pits[i], { you, selected, legal: mine ? legal : null })); b.disabled = !pitEnabled(i, state.pits[i], { you, mine }); b.setAttribute('aria-pressed', String(selected === i)); });
+}
 function tickScore(el, n) { el.textContent = n; el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); }
 
 // ---------- game state ----------
@@ -297,9 +314,11 @@ function showTurnOnline() {
   $('#turn').textContent = state.over ? 'game over' : waiting ? 'waiting' : mine ? 'your move' : '…';
   $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : net.status === 'connecting' ? 'connecting…' : 'no connection')
     : waiting ? `room ${net.code || ''}` : !friend.online ? 'away — their seat is held' : state.over ? '' : mine ? 'waiting' : 'their move';
-  $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine ? (selected === null ? 'tap a pit on your side to sow' : 'tap again to sow, or pick another') : '';
+  $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine ? pickHint('pick') : '';
   $('#undo').disabled = true; $('#hintBtn').disabled = true; $('#shoutBtn').disabled = waiting || link;
 }
+// the line under the board on your move: for a finger, or for the keys once a mouse or a key press says there is a keyboard
+function pickHint(phase) { return selected === null ? hintText(phase, { keys: keysLikely() }) : hintText('picked', { keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected] }); }
 // ---------- shouts: a fixed phrase sent by id to both boards; theirs pops by their face with a knock, yours sits by your name ----------
 const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
 for (const s of SHOUTS) { const b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.text; b.dataset.id = s.id; b.addEventListener('click', () => sendShout(s.id)); shoutMenu.appendChild(b); }
@@ -427,14 +446,15 @@ function refreshStatic() {
   showTurn();
 }
 function showTurn() {
-  if (online) return showTurnOnline();
-  if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : selected === null ? 'tap a pit on your side' : 'tap again to sow, or pick another'; $('#undo').disabled = true; $('#hintBtn').disabled = true; return; }
+  if (online) { showTurnOnline(); paintPits(); return; }
+  if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : pickHint('puzzle'); $('#undo').disabled = true; $('#hintBtn').disabled = true; paintPits(); return; }
   const mine = state.turn === you && !state.over;
   $('#turn').textContent = state.over ? 'game over' : mine ? 'your move' : '…';
   $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…';
-  $('#hint').textContent = state.over ? '' : mine ? (selected === null ? 'tap a pit on your side to sow' : 'tap again to sow, or pick another') : '';
+  $('#hint').textContent = state.over ? '' : mine ? pickHint('pick') : '';
   $('#undo').disabled = busy || state.moves.length < 2;
   $('#hintBtn').disabled = !mine || busy || hintedAt === state.moves.length;
+  paintPits();
 }
 function select(i) {
   selected = i; const [x, z] = pitCenters[i]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true;
@@ -572,7 +592,7 @@ const body = document.body;
 function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle'
   $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms'; $('#puzzle').hidden = which !== 'puzzle';
   const board3d = which === 'play' || which === 'puzzle'; // the puzzle is played on the board, like a game, with the HUD and toolbar stepped aside
-  body.classList.toggle('screen', !board3d); body.classList.toggle('playing', board3d); body.classList.toggle('puzzle', which === 'puzzle');
+  body.classList.toggle('screen', !board3d); body.classList.toggle('playing', board3d); body.classList.toggle('puzzle', which === 'puzzle'); pitLayer.hidden = !board3d;
   const wasIdle = idle; if (which === 'home') { paintHome(); idle = true; } else idle = which === 'rooms'; // the board turns slowly behind Home and the Rooms screen
   if (board3d && wasIdle) { // …and swings back round to face you as the game starts
     const from = theta, to = baseTheta + Math.round((theta - baseTheta) / (2 * Math.PI)) * 2 * Math.PI;
@@ -787,15 +807,40 @@ const lift = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch =
 canvas.addEventListener('pointercancel', (e) => { lift(e); down = null; });
 canvas.addEventListener('pointerup', (e) => {
   const wasPinch = !!pinch || fingers.size > 1; lift(e);
-  const wasDrag = dragged; down = null; if (wasPinch || wasDrag || busy || state.over || state.turn !== you || body.classList.contains('screen') || (puzzle.on && puzzle.played)) return;
+  const wasDrag = dragged; down = null; if (wasPinch || wasDrag || !canPress()) return;
   ptr.set((e.clientX / canvas.clientWidth) * 2 - 1, -(e.clientY / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(board.targets)[0]; if (!hit) return deselect();
-  const pit = hit.object.userData.pit; const legal = legalMoves(state);
-  if (online && !friend) return;
-  if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) $('#hint').textContent = 'you must give the other side seeds'; else shake(pit); return; }
-  if (selected === pit) { if (puzzle.on) puzzlePlay(pit); else if (online) sendMove(pit); else play(pit); } else select(pit);
+  pressPit(hit.object.userData.pit);
 });
 canvas.addEventListener('wheel', (e) => { dist += e.deltaY * 0.001; clampDist(); }, { passive: true });
+// may a pit be pressed right now? (your move, the board showing, nothing in flight, a friend across the board if online)
+function canPress() { return !(busy || state.over || state.turn !== you || body.classList.contains('screen') || (puzzle.on && puzzle.played) || (online && !friend)); }
+// a press on a pit — a tap, a click, a digit, or Enter on its hidden button: first press picks it, the second sows it
+function pressPit(pit) {
+  if (!canPress()) return false;
+  const legal = legalMoves(state);
+  if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) $('#hint').textContent = 'you must give the other side seeds'; else shake(pit); return false; }
+  if (selected === pit) sow(pit); else select(pit);
+  return true;
+}
+function sow(pit) { if (puzzle.on) puzzlePlay(pit); else if (online) sendMove(pit); else play(pit); }
+// the keyboard (the Mac, or a Fold with one): 1–6 pick your pits near to far, Enter sows, U undoes, H hints, Esc puts the pit back or closes a card
+addEventListener('keydown', (e) => {
+  if (e.defaultPrevented) return;
+  const t = e.target; const a = keyAction(e, { tag: t && t.tagName, editable: !!(t && t.isContentEditable), you });
+  if (!a) return;
+  if (a.type === 'deselect') { // Esc closes what is open, nearest first
+    if (!shoutMenu.hidden) toggleShoutMenu(false); else if (!$('#rules').hidden) $('#rules').hidden = true; else if (selected !== null && !busy) deselect(); else return;
+    return e.preventDefault();
+  }
+  if (body.classList.contains('screen') || !$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden) return; // keys play the board, not the screens or a card
+  if (!keysUsed) { keysUsed = true; body.classList.add('keys'); showTurn(); } // from now on the hint line talks keys and your pits' badges show their key
+  e.preventDefault();
+  if (a.type === 'pit') { if (canPress()) pressPit(a.pit); else click(0.5, 0.04); }
+  else if (a.type === 'sow') { if (selected !== null) pressPit(selected); else if (canPress()) $('#hint').textContent = hintText('pick', { keys: true }); }
+  else if (a.type === 'undo') undo();
+  else if (a.type === 'hint') hint();
+});
 function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; tween(260, (t) => { board.ring.position.x = x + Math.sin(t * Math.PI * 4) * 0.006 * (1 - t); }).then(() => { if (selected === null) board.ring.visible = false; else { board.ring.position.x = pitCenters[selected][0]; board.ring.position.z = pitCenters[selected][1]; } }); click(0.5, 0.05); }
 
 $('#undo').addEventListener('click', undo);
