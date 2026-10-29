@@ -12,6 +12,7 @@ import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solved
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
+import { sowPath, pickedHint } from './path.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -322,7 +323,7 @@ function showTurnOnline() {
   $('#undo').disabled = true; $('#hintBtn').disabled = true; $('#shoutBtn').disabled = waiting || link;
 }
 // the line under the board on your move: for a finger, or for the keys once a mouse or a key press says there is a keyboard
-function pickHint(phase) { return selected === null ? hintText(phase, { keys: keysLikely() }) : hintText('picked', { keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected] }); }
+function pickHint(phase) { return selected === null ? hintText(phase, { keys: keysLikely() }) : pickedHint(path, { you, keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected] }); }
 // ---------- shouts: a fixed phrase sent by id to both boards; theirs pops by their face with a knock, yours sits by your name ----------
 const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
 for (const s of SHOUTS) { const b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.text; b.dataset.id = s.id; b.addEventListener('click', () => sendShout(s.id)); shoutMenu.appendChild(b); }
@@ -460,11 +461,41 @@ function showTurn() {
   $('#hintBtn').disabled = !mine || busy || hintedAt === state.moves.length;
   paintPits();
 }
-function select(i) {
+function select(i, preview = true) {
   selected = i; const [x, z] = pitCenters[i]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true;
-  board.glow.position.set(x, BT + 0.08, z); board.glow.visible = true; click(1.4, 0.05); showTurn();
+  board.glow.position.set(x, BT + 0.08, z); board.glow.visible = true; click(1.4, 0.05); if (preview) showPath(i); else clearPath(); showTurn();
 }
-function deselect() { selected = null; board.ring.visible = false; board.glow.visible = false; showTurn(); }
+function deselect() { selected = null; board.ring.visible = false; board.glow.visible = false; clearPath(); showTurn(); }
+
+// ---------- where the seeds will go: on the first tap, the hand's path before the second tap sows ----------
+// web/path.js reads the engine's own events for the move on a copy of the position, so the marks can never disagree with the move:
+// a faint brass ring lands on each pit the hand would sow into, in sowing order (stronger where a relay passes twice), then a copper
+// ring round each pit the move captures and a pool of light on the pit where the turn ends. Settings → Feel → Show where seeds go.
+const pathOn = () => prefs.get('path', '1') === '1';
+let path = null, pathToken = 0, pathGlow = false;
+function showPath(i) {
+  clearPath(); if (!pathOn() || state.turn !== you || owner(i) !== you) return;
+  path = sowPath(state, i); if (!path) return;
+  const token = ++pathToken, M = board.marks, p = path;
+  (async () => {
+    for (let k = 0; k < p.order.length; k++) {
+      if (token !== pathToken) return;
+      const pit = p.order[k], m = M.steps[pit], d = M.dots[pit], strong = p.visits[pit] > 1, y0 = d.position.y;
+      m.visible = true; d.visible = true; // the dot drops onto the pit's edge; the faint ring fades in with it (both stronger where a relay passes twice)
+      tween(220, (t) => { if (token !== pathToken) return; m.material.opacity = (strong ? 0.6 : 0.3) * t; d.material.opacity = 0.95 * Math.min(1, t * 1.6); d.position.y = y0 + (1 - t) * 0.03; const sc = (strong ? 1.35 : 1) * (1.5 - 0.5 * t); d.scale.set(sc, sc, 1); }, easeOut);
+      if (k < 12) click(1.9, 0.012); // the hand counting the pits, quietly
+      await wait(k < 12 ? 55 : 25);
+    }
+    if (token !== pathToken) return;
+    for (const pit of p.captures) { const c = M.caps[pit]; c.visible = true; tween(260, (t) => { if (token !== pathToken) return; c.material.opacity = 0.85 * t; const sc = 1.12 - 0.12 * t; c.scale.set(sc, sc, 1); }, easeOut); }
+    if (p.end !== null) { const e = M.end, [x, z] = pitCenters[p.end]; e.position.x = x; e.position.z = z; e.visible = true; tween(320, (t) => { if (token !== pathToken) return; e.material.opacity = 0.4 * t; }).then(() => { if (token === pathToken) pathGlow = true; }); }
+    if (p.captures.length) click(1.25, 0.035);
+  })();
+}
+function clearPath() {
+  pathToken++; path = null; pathGlow = false; const M = board.marks;
+  for (const m of [...M.steps, ...M.dots, ...M.caps, M.end]) { m.visible = false; m.material.opacity = 0; m.scale.set(1, 1, 1); }
+}
 
 // Play a move's events on the board, one seed at a time.
 async function animate(events, prevStores, pace = PACE) {
@@ -565,7 +596,7 @@ async function puzzleShow() { // Show me: the position comes back, the answer pi
   state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStaticFrom(state);
   daily = markShown(daily, p.key, p.variant); prefs.set('daily', JSON.stringify(daily));
   await wait(350); select(p.answer); $('#hint').textContent = `${CHARACTERS.hard.name}: watch this one…`; await wait(reduceMotion ? 300 : 1100);
-  const r = attempt(p, p.answer); const prevStores = state.stores; state = r.state; board.ring.visible = false; board.glow.visible = false; selected = null;
+  const r = attempt(p, p.answer); const prevStores = state.stores; state = r.state; board.ring.visible = false; board.glow.visible = false; clearPath(); selected = null;
   await animate(r.events, prevStores, Math.max(PACE, 190)); // a touch slower than a game, so the relay can be followed
   busy = false; refreshStatic();
   const shown = dailyEntry(daily, p.key, p.variant);
@@ -621,7 +652,7 @@ function paintSettings() {
   const stones = unlocked(streak, 'stones'); $('[data-set="seeds"] [data-v="stones"]').disabled = !stones;
   $('#seedsSub').textContent = stones ? "Job's tears · river stones (yours: 7 days played)" : `Job's tears · river stones unlock at ${MILESTONES[0].days} days played (${streak.days.length} so far)`;
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
-  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1');
+  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn());
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
@@ -749,7 +780,7 @@ async function recordClip(deliver = true) {
   // the board as it stood before the turn, the chosen pit lit, then the turn at a pace that fits the clip
   layoutFromState(turn.before); refreshStaticFrom(turn.before); cinematic = true;
   if (rec) rec.start(250);
-  await wait(300); select(turn.pit); await wait(600); board.ring.visible = false; board.glow.visible = false;
+  await wait(300); select(turn.pit, false); await wait(600); board.ring.visible = false; board.glow.visible = false;
   await animate(turn.events, turn.before.stores, clipPace(turn, PACE));
   await wait(900); cinematic = false;
   const blob = rec ? await new Promise((res) => { rec.onstop = () => res(new Blob(chunks, { type: rec.mimeType || type })); rec.stop(); }) : null;
@@ -790,7 +821,7 @@ function paintRules() { $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#r
 
 // ---------- first-game tutorial: three tips, then never again ----------
 const TIPS = [
-  'Your six pits are the column nearest you, on the right. Tap one with seeds, then tap again to sow.',
+  'Your six pits are the column nearest you, on the right. Tap one with seeds: brass marks show where its seeds will go. Tap again to sow.',
   'The seeds go one per pit anticlockwise: up your side, then down theirs. The count beside each pit keeps score for you.',
   null, // filled in per rules below
 ];
@@ -888,12 +919,12 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
 function loop(now) {
-  runTweens(now); sim.step((now - last) / 1000, now); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
+  runTweens(now); sim.step((now - last) / 1000, now); if (pathGlow && !reduceMotion) board.marks.end.material.opacity = 0.34 + 0.1 * Math.sin(now / 240); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
   if (frames === 3) { window.__done = true; if (params.get('still')) { running = false; return; } }
   if (window.__freeze || document.hidden) { running = false; return; }
   requestAnimationFrame(loop);

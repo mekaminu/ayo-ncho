@@ -27,7 +27,7 @@ button{font-family:inherit}
 @keyframes bump{0%{transform:scale(1)}40%{transform:scale(1.35);color:var(--brass)}100%{transform:scale(1)}}
 .lab{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .col{display:flex;flex-direction:column}.r{align-items:flex-end}
-#hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 118px);font-size:12px;color:var(--brass);background:rgba(13,9,6,.6);padding:6px 12px;border-radius:999px;pointer-events:none;white-space:nowrap;min-height:1em}
+#hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 118px);font-size:12px;color:var(--brass);background:rgba(13,9,6,.6);padding:6px 12px;border-radius:999px;pointer-events:none;white-space:normal;max-width:min(92vw,560px);text-align:center;line-height:1.35;min-height:1em}
 #hint:empty{display:none}
 #badges{position:fixed;inset:0;pointer-events:none}
 .badge{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:11px;font-weight:600;color:var(--brass);background:rgba(13,9,6,.72);border-radius:10px;padding:1px 6px;line-height:15px;margin:-8px 0 0 -9px;transition:opacity .2s}
@@ -388,6 +388,7 @@ button{font-family:inherit}
       <div class="box">
         <div class="row"><div class="t"><b>Sound</b><span>wood knocks, rattle, scoop</span></div><button class="sw" role="switch" data-set="sound" aria-checked="true" aria-label="Sound"><i></i></button></div>
         <div class="row"><div class="t"><b>Haptics</b><span>a tap for every seed</span></div><button class="sw" role="switch" data-set="haptics" aria-checked="true" aria-label="Haptics"><i></i></button></div>
+        <div class="row"><div class="t"><b>Show where seeds go</b><span>on the first tap, a mark on every pit the hand will reach and a light where it ends</span></div><button class="sw" role="switch" data-set="path" aria-checked="true" aria-label="Show where seeds go"><i></i></button></div>
         <div class="row"><div class="t"><b>Sowing speed</b><span>how fast the hand moves</span></div><div class="seg" data-set="speed"><button class="segbtn" data-v="slow">Slow</button><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="fast">Fast</button></div></div>
         <div class="row"><div class="t"><b>Lighter board</b><span>for slow phones and weak signal · <em id="qualityNow">auto</em></span></div><div class="seg" data-set="quality"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="lite">On</button><button class="segbtn" data-v="full">Off</button></div></div>
         <div class="row"><div class="t"><b>Seed physics</b><span>seeds bounce and roll; off, they fly straight to their pit · <em id="physicsNow">auto</em></span></div><div class="seg" data-set="physics"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="on">On</button><button class="segbtn" data-v="off">Off</button></div></div>

@@ -74,9 +74,34 @@ export function buildBoard(scene, finish = 'mahogany', q = {}) {
   const ring = new THREE.Mesh(new THREE.RingGeometry(PIT_R * 1.04, PIT_R * 1.09, 96), new THREE.MeshBasicMaterial({ color: 0xe6b76f, transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = BT + 0.002; ring.visible = false; group.add(ring);
   const glow = new THREE.PointLight(0xffc877, 0.06, 0.25); glow.visible = false; group.add(glow);
+  const marks = buildPathMarks(group);
 
   scene.add(group);
-  return { group, targets, ring, glow, woodMat };
+  return { group, targets, ring, glow, woodMat, marks };
+}
+
+// Where the seeds will go (shown on the first tap, from the engine's own events): a faint brass ring just inside the rim of
+// every pit the hand would sow into, a pool of lamp light on the pit where the turn ends, and a copper ring round the rim of
+// a pit the move captures. Built once and hidden; game.js lands them in sowing order and clears them on the second tap.
+function glowTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  const r = g.createRadialGradient(32, 32, 2, 32, 32, 32); r.addColorStop(0, 'rgba(255,214,150,1)'); r.addColorStop(0.55, 'rgba(255,196,120,0.55)'); r.addColorStop(1, 'rgba(255,180,100,0)');
+  g.fillStyle = r; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function buildPathMarks(group) {
+  const ringG = new THREE.RingGeometry(PIT_R * 0.86, PIT_R * 0.91, 72), dotG = new THREE.CircleGeometry(PIT_R * 0.14, 24);
+  const capG = new THREE.RingGeometry(PIT_R * 0.98, PIT_R * 1.05, 72), endG = new THREE.CircleGeometry(PIT_R * 1.15, 48);
+  const mk = (geom, mat, x = 0, y = BT + 0.0025, z = 0) => { const m = new THREE.Mesh(geom, mat); m.rotation.x = -Math.PI / 2; m.position.set(x, y, z); m.visible = false; m.renderOrder = 2; group.add(m); return m; };
+  const steps = [], dots = [], caps = [];
+  for (const [x, z] of pitCenters) {
+    steps.push(mk(ringG, new THREE.MeshBasicMaterial({ color: 0xe6b76f, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0025, z));
+    // the mark itself: a brass dot on the bowl's inner slope, at the edge nearest the board's centre line, where seeds seldom sit
+    const dx = x - Math.sign(x) * PIT_R * 0.74, dz = z + PIT_R * 0.42;
+    dots.push(mk(dotG, new THREE.MeshBasicMaterial({ color: 0xf2c57c, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), dx, surfaceY(dx, dz) + 0.0015, dz));
+    caps.push(mk(capG, new THREE.MeshBasicMaterial({ color: 0xff6e3a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z));
+  }
+  const end = mk(endG, new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0xffc877, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0, BT + 0.002, 0);
+  return { steps, dots, caps, end };
 }
 
 export function buildTable(scene, q = {}) {

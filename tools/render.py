@@ -6,6 +6,9 @@
 #        add --nophysics to play with the seed physics off (seeds fly straight to their pit, as on the weakest phones) and check the setting took
 #        add --keys (with --smoke) to play from the keyboard too: a digit picks a pit (screenshot of the whole page with the hint line), Esc puts it
 #                  back, digit + Enter sows, U undoes, H hints; and to check the pits' screen-reader labels carry the seed counts
+#        add --path (with --smoke) to check "where the seeds will go": one tap on the pit with the longest path lands a mark on every pit the hand
+#                  would reach, rings the captures and lights the end pit, and the hint line says where it ends; screenshot of the whole page (<out>);
+#                  Esc clears every mark; with the setting off (Settings → Feel) a tap shows no marks and the old words
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --online: start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
@@ -20,7 +23,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -240,7 +243,7 @@ with sync_playwright() as p:
             pg.keyboard.press("Escape"); assert sel() is None
             pg.keyboard.press("7"); assert sel() is None, "7 is no pit"
             pg.keyboard.press(key); assert sel() == pit, "key %s should pick pit %d (got %s)" % (key, pit, sel())
-            assert hint() == "pit %s · %d seeds — Enter to sow, or pick another" % (key, n), hint()
+            assert hint().startswith("pit %s · " % key) and hint().endswith("— Enter to sow"), hint()  # the path's words sit between (see --path)
             labels = pg.evaluate("[...document.querySelectorAll('#pits button')].map(b=>[b.getAttribute('aria-label'), b.disabled])")
             assert len(labels) == 12 and labels[0][0].startswith("Your pit 1 (key 1) · ") and labels[6][0].startswith("Their pit 1 · "), labels
             assert labels[pit][0].endswith("· picked — Enter to sow") and not labels[pit][1], labels[pit]
@@ -259,6 +262,33 @@ with sync_playwright() as p:
             print("keys: Enter sowed pit", pit, "· U undid it (moves back to 2)")
             pg.keyboard.press("h"); pg.wait_for_function("document.querySelector('#hintBtn').disabled && document.querySelector('#hint').textContent.includes('would play')", timeout=60000)
             print("keys: H lit a hint ·", hint())
+        if path:  # where the seeds will go: one tap, and the marks land in sowing order
+            sel = lambda: pg.evaluate("window.__ayo.selected"); hint = lambda: pg.evaluate("document.querySelector('#hint').textContent"); marks = lambda: pg.evaluate("window.__ayo.marks")
+            legal = pg.evaluate("window.__ayo.legal")
+            # pick the pit whose path touches the most pits, so the picture shows a relay turn where there is one
+            best, bestN = legal[0], -1
+            for m in legal:
+                x, y = pg.evaluate("window.__ayo.pitAt(%d)" % m); pg.mouse.click(x, y); pg.wait_for_function("window.__ayo.selected===%d" % m, timeout=5000)
+                pth = pg.evaluate("window.__ayo.path"); assert pth and pth["pit"] == m, "no path for a legal pit"
+                score = len(pth["order"]) + 4 * len(pth["captures"])  # a relay turn with a capture makes the best picture
+                if score > bestN: best, bestN = m, score
+                pg.keyboard.press("Escape"); assert sel() is None and marks() == {"steps": [], "caps": [], "end": False}, "Esc should clear every mark"
+            if os.environ.get("PATH_BEFORE"): pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=os.environ["PATH_BEFORE"], timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            x, y = pg.evaluate("window.__ayo.pitAt(%d)" % best); pg.mouse.click(x, y)
+            pth = pg.evaluate("window.__ayo.path"); n = len(pth["order"])
+            pg.wait_for_function("window.__ayo.marks.steps.length===%d && window.__ayo.marks.end===%s && window.__ayo.marks.caps.length===%d" % (n, "true" if pth["end"] is not None else "false", len(pth["captures"])), timeout=20000)
+            mk = marks(); assert sorted(mk["steps"]) == sorted(pth["order"]) and sorted(mk["caps"]) == sorted(pth["captures"]), (mk, pth)
+            assert "ends in" in hint() and (hint().endswith("— Enter to sow") or hint().endswith("— tap again to sow")), hint()
+            assert pg.evaluate("document.querySelector('.badge').textContent") != "", "badges still there"
+            print("path: pit", best, "→", n, "pits, relays", len(pth["relays"]), "captures", pth["captures"], "ends", pth["end"], "·", hint())
+            pg.wait_for_timeout(400); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.keyboard.press("Escape"); assert marks() == {"steps": [], "caps": [], "end": False}
+            # the setting off: a tap lights the pit as before, no marks, the old words
+            pg.evaluate("localStorage.setItem('ayo.path','0')"); pg.mouse.click(x, y); pg.wait_for_function("window.__ayo.selected===%d" % best, timeout=5000); pg.wait_for_timeout(600)
+            assert marks() == {"steps": [], "caps": [], "end": False} and pg.evaluate("window.__ayo.path") is None, "the setting off should show no marks"
+            assert hint() in ("tap again to sow, or pick another",) or hint().endswith("— Enter to sow, or pick another"), hint()
+            pg.evaluate("localStorage.setItem('ayo.path','1')"); pg.keyboard.press("Escape")
+            print("path: setting off → no marks ·", hint())
         if clip:  # record the best turn so far as a short video, the way the Game over card's Clip button does
             pg.set_default_timeout(300000)
             r = pg.evaluate("window.__ayo.clip()")
@@ -273,7 +303,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys: pass  # the picture was taken with the pit picked by its key
+    elif keys or path: pass  # the picture was taken with the pit picked (by its key, or with the path shown)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))
