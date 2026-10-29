@@ -10,9 +10,11 @@
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
 #                  <out>-friend.png the friend's view (the far seat, pits nearest them) with the host's shout by his face. --wide for the host on a Mac
+#        --puzzle: open today's daily puzzle (?puzzle=1), play the answer, check the result card says Solved, screenshot it; then Back to home
+#                  and check the Home card says solved (<out>-home.png); --wide for the Mac layout
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -132,10 +134,45 @@ with sync_playwright() as p:
     pg.route("https://fonts.googleapis.com/**", lambda r: r.abort())
     if os.path.exists(three):
         pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=three, content_type="text/javascript"))
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1" if smoke else "?capture=1&stay=home" if home else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
+    if puzzle:  # today's puzzle on the board: the ask at the top, one move, the result card
+        pz = pg.evaluate("window.__ayo.puzzle"); print("puzzle:", json.dumps({k: pz[k] for k in ("key", "target", "answer")}))
+        assert pz["on"] and not pz["played"], "the puzzle screen should be up and waiting"
+        assert not pg.evaluate("document.querySelector('#puzzle').hidden") and pg.evaluate("document.body.classList.contains('puzzle')")
+        assert pg.evaluate("document.querySelector('#pzAsk').textContent") == "Capture %d in one turn" % pz["target"]
+        assert pg.evaluate("document.querySelector('#pzCard').hidden"), "no result card before a move"
+        assert pg.evaluate("getComputedStyle(document.querySelector('.hud.top')).opacity") == "0", "the HUD steps aside for the puzzle"
+        assert pg.evaluate("document.querySelector('#hint').textContent") == "tap a pit on your side"
+        wrong = min(pg.evaluate("window.__ayo.legal"), key=lambda p: pg.evaluate("window.__ayo.tryPit(%d)" % p))  # the weakest move
+        tap(pg, wrong)  # a miss first: the card says how short, Try again puts the position back
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000)
+        pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+        got = pg.evaluate("window.__ayo.puzzle.got"); badge = pg.evaluate("document.querySelector('#pzBadge').textContent"); print("puzzle: wrong pit", wrong, "captured", got, "->", badge)
+        assert pg.evaluate("document.querySelector('#pzGot').textContent") == str(got)
+        assert pg.evaluate("window.__ayo.puzzle.daily.days[window.__ayo.puzzle.key + ':ncho'].tries") == 1
+        pg.click("#pzAgain"); pg.wait_for_function("!window.__ayo.puzzle.played", timeout=5000)
+        assert pg.evaluate("document.querySelector('#pzCard').hidden"), "Try again should hide the card"
+        assert pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent).reduce((a,b)=>a+b,0)") == 48 - sum(pg.evaluate("window.__ayo.state.stores")), "the position was not put back"
+        tap(pg, pz["answer"])  # the answer: the target captured, the card says Solved
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000)
+        pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+        assert pg.evaluate("window.__ayo.puzzle.got") >= pz["target"], "the answer should capture the target"
+        assert pg.evaluate("document.querySelector('#pzBadge').textContent") == "Solved"
+        assert pg.evaluate("document.querySelectorAll('#pzRow span').length") == min(max(pz["target"], pg.evaluate("window.__ayo.puzzle.got")), 16)
+        assert pg.evaluate("document.querySelector('#pzRun').textContent") == "1 day", pg.evaluate("document.querySelector('#pzRun').textContent")
+        print("puzzle: solved", pg.evaluate("document.querySelector('#pzGot').textContent"), "/", pz["target"], "best", pg.evaluate("document.querySelector('#pzBest').textContent"))
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.click("#pzHome"); pg.wait_for_selector("#home:not([hidden])", timeout=5000)
+        assert not pg.evaluate("window.__ayo.puzzle.on") and pg.evaluate("document.querySelector('#puzzleState').textContent") == "solved ✓", pg.evaluate("document.querySelector('#puzzleState').textContent")
+        assert pg.evaluate("document.querySelector('#puzzleAsk').textContent") == "Capture %d in one turn" % pz["target"]
+        out2 = out[:-4] + "-home.png" if out.endswith(".png") else out + "-home.png"
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out2, timeout=120000, animations="disabled")
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
     if smoke:
         before = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position

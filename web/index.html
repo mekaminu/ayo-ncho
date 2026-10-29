@@ -82,6 +82,42 @@ button{font-family:inherit}
 .pill{padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--muted);font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
 .pill[aria-pressed="true"]{border-color:var(--brass);background:rgba(230,183,111,.18);color:var(--brass)}
 .streak{margin:0;text-align:center;font-size:11px;color:var(--muted);letter-spacing:.02em}
+/* the daily puzzle card on Home: one line tall, above the game picker */
+.dailyCard{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-radius:14px;background:rgba(230,183,111,.12);border:1px solid rgba(230,183,111,.4);color:var(--fg);cursor:pointer;text-align:left;width:100%;box-sizing:border-box}
+.dailyCard:active{transform:scale(.99)}
+.dailyCard .col{gap:2px;min-width:0}.dailyCard b{font-size:14px;font-weight:600}
+.eyebrow.brass{color:var(--brass)}
+.dailyRight{display:flex;align-items:center;gap:8px;flex:none;font-size:12px;color:var(--muted)}
+.dailyRight svg{color:var(--brass)}
+.dailyCard.solved .dailyRight span{color:var(--brass)}
+
+/* Daily puzzle: played on the live board; the ask at the top, the result card at the bottom once a move is made */
+#puzzle{position:fixed;inset:0;pointer-events:none}
+#puzzle::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,9,6,.55) 0%,rgba(13,9,6,.1) 22%,rgba(13,9,6,0) 50%,rgba(13,9,6,0) 64%,rgba(13,9,6,.85) 80%,#0d0906 100%);transition:opacity .3s}
+#puzzle.open::before{opacity:.6}
+.puzzleTop{position:absolute;left:max(20px,env(safe-area-inset-left,0px));right:max(20px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 54px);display:flex;flex-direction:column;gap:6px}
+.puzzleHead{display:flex;justify-content:space-between;align-items:center}
+.puzzleTop h2{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:700;line-height:1.05;margin:0}
+.puzzleTop .sub{font-size:13px}
+.puzzleBottom{position:absolute;left:max(20px,env(safe-area-inset-left,0px));right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 34px);display:flex;flex-direction:column;gap:12px;align-items:stretch}
+.puzzleBottom > *{pointer-events:auto}
+.pzCard{gap:12px;animation:pop .3s ease-out}
+.pzScore{display:flex;justify-content:space-between;align-items:flex-end}
+.pzBig{font-family:Fraunces,Georgia,serif;font-size:34px;font-weight:700;line-height:1}
+.pzBig small{font-size:18px;color:var(--muted);font-weight:700}
+.pzBadge{font-size:13px;font-weight:600;color:var(--brass);background:rgba(230,183,111,.14);border:1px solid rgba(230,183,111,.4);border-radius:999px;padding:6px 12px;white-space:nowrap}
+.pzBadge.miss{color:var(--muted);background:var(--soft);border-color:var(--line)}
+.pzRow{display:flex;gap:4px;font-size:18px;letter-spacing:2px;color:var(--brass);line-height:1}
+.pzRow span{animation:seedIn .35s cubic-bezier(.3,1.4,.5,1) backwards}
+.pzRow span.o{color:rgba(230,183,111,.45)}
+@keyframes seedIn{from{opacity:0;transform:translateY(6px) scale(.6)}to{opacity:1;transform:none}}
+.mini.two2{grid-template-columns:repeat(2, minmax(0, 1fr))}
+.pzCard .two .btn{flex:1;flex-direction:row;padding:12px;font-size:14px;text-align:center}
+#pzHome{align-self:center;font-size:13px}
+.puzzle #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 200px)}
+.puzzle .hud,.puzzle .bar{opacity:0;pointer-events:none}
+.puzzle #badges,.puzzle #hint{opacity:1}
+@media (prefers-reduced-motion:reduce){.pzCard,.pzRow span{animation:none}}
 
 /* With friends (the Rooms screen): the same overlay as Home, a little darker at the top for the title */
 #rooms{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;overflow:auto}
@@ -211,6 +247,10 @@ button{font-family:inherit}
 .wide #rooms::before{position:fixed;inset:0;background:linear-gradient(90deg,rgba(13,9,6,.95) 0%,rgba(13,9,6,.85) 34%,rgba(13,9,6,0) 60%)}
 .wide #rooms .homeTop{padding-top:calc(env(safe-area-inset-top,0px) + 26px);align-self:stretch}
 .wide #rooms .homeBottom{width:auto;justify-content:flex-start;padding-bottom:24px}
+.wide #puzzle::before{background:linear-gradient(90deg,rgba(13,9,6,.95) 0%,rgba(13,9,6,.85) 30%,rgba(13,9,6,0) 56%)}
+.wide .puzzleTop{right:auto;width:min(38vw,360px);left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 34px)}
+.wide .puzzleBottom{right:auto;width:min(40vw,380px);left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
+.wide.puzzle #hint{top:calc(env(safe-area-inset-top,0px) + 24px)}
 @media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react{animation:none}}
 </style>
 </head>
@@ -241,6 +281,7 @@ button{font-family:inherit}
     <button class="chip" id="homeSettings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
   </div>
   <div class="homeBottom">
+    <button class="dailyCard" id="puzzleCard" type="button"><span class="col"><span class="eyebrow brass" id="puzzleDay">Daily puzzle</span><b id="puzzleAsk">Capture 8 in one turn</b></span><span class="dailyRight"><span id="puzzleState">not yet played</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></button>
     <div class="gamePick" role="group" aria-label="Which game">
       <button class="segbtn" data-game="ncho" aria-pressed="true">Nchò<small>capture on 4</small></button>
       <button class="segbtn" data-game="ayo" aria-pressed="false">Ayo<small>capture on 2 or 3</small></button>
@@ -280,6 +321,24 @@ button{font-family:inherit}
       <span class="note" id="joinNote">Lose signal mid-game and the room keeps your seat: come back and carry on.</span>
     </form>
     <p class="streak">Family only for now: you let people in · <button class="linkish" id="roomsName" type="button">playing as Meka</button></p>
+  </div>
+</section>
+
+<!-- Daily puzzle, as approved: today's position on the live board, one move to capture the target; the result card once it is played -->
+<section id="puzzle" hidden aria-label="Daily puzzle">
+  <div class="puzzleTop">
+    <div class="puzzleHead"><span class="eyebrow" id="pzDay">Daily puzzle · Thu 29 Oct</span><span class="sub" id="pzRules">Nchò rules</span></div>
+    <h2 id="pzAsk">Capture 8 in one turn</h2>
+    <span class="sub" id="pzHow">One move. Your pits are on the right. Relay sowing counts.</span>
+  </div>
+  <div class="puzzleBottom">
+    <div class="roomCard pzCard" id="pzCard" hidden role="status">
+      <div class="pzScore"><div class="col"><span class="eyebrow">You captured</span><span class="pzBig"><span id="pzGot">8</span> <small>/ <span id="pzTarget">8</span></small></span></div><span class="pzBadge" id="pzBadge">Solved</span></div>
+      <div class="pzRow" id="pzRow" aria-label="8 of 8 seeds">●●●●●●●●</div>
+      <div class="mini two2"><div><span>Your best today</span><b id="pzBest">8 of 8</b></div><div><span>Days solved</span><b id="pzRun">none yet</b></div></div>
+      <div class="two"><button class="btn" id="pzShare" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button><button class="btn ghost" id="pzAgain" type="button">Try again</button></div>
+    </div>
+    <button class="btn quiet" id="pzHome" type="button">Back to home</button>
   </div>
 </section>
 

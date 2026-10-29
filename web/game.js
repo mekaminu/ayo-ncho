@@ -6,6 +6,8 @@ import { CHARACTERS, line, faceFor, MOOD_FOR } from './characters.js';
 import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
+import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
+import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
@@ -426,6 +428,7 @@ function refreshStatic() {
 }
 function showTurn() {
   if (online) return showTurnOnline();
+  if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : selected === null ? 'tap a pit on your side' : 'tap again to sow, or pick another'; $('#undo').disabled = true; $('#hintBtn').disabled = true; return; }
   const mine = state.turn === you && !state.over;
   $('#turn').textContent = state.over ? 'game over' : mine ? 'your move' : '…';
   $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…';
@@ -494,13 +497,65 @@ async function play(pit) {
   }
 }
 
+// ---------- the daily puzzle, as approved: today's position on the live board, one move to capture the target ----------
+// engine/puzzle.js makes the same position for everyone from the date; the board shows it with the usual events and keeps your best on this phone
+let daily = parseDaily(prefs.get('daily', null));
+const puzzle = { on: false, p: null, played: false, got: 0 };
+function todaysPuzzle() { const v = settings.game; if (!puzzle.p || puzzle.p.key !== todayKey() || puzzle.p.variant !== v) puzzle.p = dailyPuzzle(todayKey(), v); return puzzle.p; }
+function paintPuzzleCard() { // the Home card: today's ask and where you stand
+  const p = todaysPuzzle(); const e = dailyEntry(daily, p.key, p.variant);
+  $('#puzzleDay').textContent = `Daily puzzle · ${dayLabel(p.key)}`; $('#puzzleAsk').textContent = `Capture ${p.target} in one turn`;
+  $('#puzzleState').textContent = cardLine(e); $('#puzzleCard').classList.toggle('solved', !!(e && e.solved));
+}
+function openPuzzle() { // Home → the card: the board shows today's position, your pits nearest you, and waits for one move
+  if (online) return; // your game is already saved move by move; Back to home brings it back
+  const p = todaysPuzzle(); puzzle.on = true; puzzle.played = false; puzzle.got = 0; you = 0; them = 1;
+  state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); hintedAt = -1;
+  $('#pzDay').textContent = `Daily puzzle · ${dayLabel(p.key)}`; $('#pzRules').textContent = `${p.variant === 'ncho' ? 'Nchò' : 'Ayo'} rules`; $('#pzAsk').textContent = `Capture ${p.target} in one turn`;
+  $('#pzHow').textContent = p.variant === 'ncho' ? 'One move. Your pits are on the right. Relay sowing counts.' : 'One move. Your pits are on the right. 2s and 3s behind your last seed count too.';
+  $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); showScreen('puzzle');
+}
+async function puzzlePlay(pit) { // one move: the engine's events on the board, then the result card
+  const p = puzzle.p; const r = attempt(p, pit); const prevStores = state.stores; state = r.state; busy = true; puzzle.played = true; deselect();
+  const s = recordDay(streak); streak = s.data; if (s.newDay) prefs.set('streak', JSON.stringify(streak)); // a puzzle move is a move: the calm streak counts the day
+  await animate(r.events, prevStores);
+  busy = false; puzzle.got = r.got; refreshStatic();
+  const rec = recordDaily(daily, p.key, p.variant, r.got, p.target); daily = rec.data; prefs.set('daily', JSON.stringify(daily));
+  paintPuzzleResult(r.got, rec.entry, rec.firstSolve);
+}
+function paintPuzzleResult(got, e, firstSolve) {
+  const p = puzzle.p; const hit = got >= p.target;
+  $('#pzGot').textContent = got; $('#pzTarget').textContent = p.target; $('#pzBadge').textContent = resultLabel(got, p.target); $('#pzBadge').classList.toggle('miss', !hit);
+  const n = Math.min(Math.max(p.target, got), 16); const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', `${got} of ${p.target} seeds`);
+  for (let i = 0; i < n; i++) { const s = document.createElement('span'); s.textContent = i < got ? '●' : '○'; if (i >= got) s.className = 'o'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
+  $('#pzBest').textContent = `${e.got} of ${p.target}`; $('#pzRun').textContent = runLine(solvedRun(daily, p.key));
+  $('#pzAgain').textContent = hit ? 'Play it again' : 'Try again';
+  $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
+  if (hit) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); buzz([20, 40, 20]); if (firstSolve) { const run = solvedRun(daily, p.key); if (run > 1) setTimeout(() => toast(`${run} days in a row`), 900); } }
+  else { click(0.7, 0.08); }
+}
+function puzzleAgain() { if (busy) return; const p = puzzle.p; puzzle.played = false; puzzle.got = 0; state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); click(1.2, 0.05); }
+function closePuzzle() { // Back to home: the board goes back to your game (or a fresh one)
+  if (busy) return; puzzle.on = false; puzzle.played = false; $('#pzCard').hidden = true;
+  if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
+}
+async function sharePuzzle() {
+  const p = puzzle.p; const text = shareText(p, puzzle.got) + (location.protocol === 'https:' ? `\n${location.origin}${location.pathname}?puzzle=1` : '');
+  try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast('Result copied'); } } catch {}
+}
+$('#puzzleCard').addEventListener('click', () => { openPuzzle(); click(1.3, 0.08); });
+$('#pzAgain').addEventListener('click', puzzleAgain);
+$('#pzHome').addEventListener('click', () => { closePuzzle(); click(1, 0.05); });
+$('#pzShare').addEventListener('click', () => { sharePuzzle(); click(1.3, 0.06); });
+
 // ---------- screens ----------
 const body = document.body;
-function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms'
-  $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms';
-  body.classList.toggle('screen', which !== 'play'); body.classList.toggle('playing', which === 'play');
+function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle'
+  $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms'; $('#puzzle').hidden = which !== 'puzzle';
+  const board3d = which === 'play' || which === 'puzzle'; // the puzzle is played on the board, like a game, with the HUD and toolbar stepped aside
+  body.classList.toggle('screen', !board3d); body.classList.toggle('playing', board3d); body.classList.toggle('puzzle', which === 'puzzle');
   const wasIdle = idle; if (which === 'home') { paintHome(); idle = true; } else idle = which === 'rooms'; // the board turns slowly behind Home and the Rooms screen
-  if (which === 'play' && wasIdle) { // …and swings back round to face you as the game starts
+  if (board3d && wasIdle) { // …and swings back round to face you as the game starts
     const from = theta, to = baseTheta + Math.round((theta - baseTheta) / (2 * Math.PI)) * 2 * Math.PI;
     if (Math.abs(to - from) > 0.01) tween(650, (t) => { theta = from + (to - from) * t; }, easeInOut);
   }
@@ -512,7 +567,7 @@ function paintHome() {
   const g = settings.game;
   document.querySelectorAll('[data-game]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.game === g));
   document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.level === level));
-  $('#playSub').textContent = 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak);
+  $('#playSub').textContent = 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak); paintPuzzleCard();
   const saved = savedGame();
   $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
 }
@@ -713,13 +768,13 @@ const lift = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch =
 canvas.addEventListener('pointercancel', (e) => { lift(e); down = null; });
 canvas.addEventListener('pointerup', (e) => {
   const wasPinch = !!pinch || fingers.size > 1; lift(e);
-  const wasDrag = dragged; down = null; if (wasPinch || wasDrag || busy || state.over || state.turn !== you || body.classList.contains('screen')) return;
+  const wasDrag = dragged; down = null; if (wasPinch || wasDrag || busy || state.over || state.turn !== you || body.classList.contains('screen') || (puzzle.on && puzzle.played)) return;
   ptr.set((e.clientX / canvas.clientWidth) * 2 - 1, -(e.clientY / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(board.targets)[0]; if (!hit) return deselect();
   const pit = hit.object.userData.pit; const legal = legalMoves(state);
   if (online && !friend) return;
   if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) $('#hint').textContent = 'you must give the other side seeds'; else shake(pit); return; }
-  if (selected === pit) { if (online) sendMove(pit); else play(pit); } else select(pit);
+  if (selected === pit) { if (puzzle.on) puzzlePlay(pit); else if (online) sendMove(pit); else play(pit); } else select(pit);
 });
 canvas.addEventListener('wheel', (e) => { dist += e.deltaY * 0.001; clampDist(); }, { passive: true });
 function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; tween(260, (t) => { board.ring.position.x = x + Math.sin(t * Math.PI * 4) * 0.006 * (1 - t); }).then(() => { if (selected === null) board.ring.visible = false; else { board.ring.position.x = pitCenters[selected][0]; board.ring.position.z = pitCenters[selected][1]; } }); click(0.5, 0.05); }
@@ -738,13 +793,15 @@ if (roomParam === 'new') openRooms(); // the old way in: the Rooms screen now
 else if (roomParam) startOnline(roomParam); // an invite link: straight to the board, knocking
 else if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected
   state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; layoutFromState(state); refreshStatic(); select(3); showScreen('play');
+} else if (params.get('puzzle')) { // the shared link, and the render: straight to today's puzzle
+  openPuzzle(); if (location.search && !params.get('capture')) history.replaceState(null, '', location.pathname);
 } else if (params.get('capture') && !params.get('stay')) { // the smoke test starts straight into a game
   newRound(); showScreen('play'); if (tipStep === 0) { showTip(TIPS[0]); }
 } else {
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
