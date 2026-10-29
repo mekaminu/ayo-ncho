@@ -172,10 +172,13 @@ function select(i) {
 function deselect() { selected = null; board.ring.visible = false; board.glow.visible = false; showTurn(); }
 
 // Play a move's events on the board, one seed at a time.
+const PACE = 150; // ms between seeds leaving the hand
 async function animate(events, prevStores) {
-  const shown = prevStores.slice();
+  const shown = prevStores.slice(); const pending = [];
   for (const e of events) {
     if (e.type === 'pickup') {
+      await Promise.all(pending); pending.length = 0;
+      if (e.relay) await wait(140);
       const picked = homes[e.pit].splice(0); const [cx, cz] = pitCenters[e.pit];
       await Promise.all(picked.map((m, k) => tween(240, (t) => { m.position.y = surfaceY(m.position.x, m.position.z) + 0.02 + t * 0.14; m.position.x = THREE.MathUtils.lerp(m.position.x, cx + (k % 3 - 1) * 0.018, t * 0.8); m.position.z = THREE.MathUtils.lerp(m.position.z, cz + (Math.floor(k / 3) - 1) * 0.016, t * 0.8); }, easeOut)));
       rattle(picked.length); setBadge(e.pit, 0); animate.cluster = picked;
@@ -184,9 +187,12 @@ async function animate(events, prevStores) {
       // the cluster drifts along with the sowing hand
       const [cx, cz] = pitCenters[e.pit];
       animate.cluster.forEach((s, k) => tween(140, (t) => { s.position.x = THREE.MathUtils.lerp(s.position.x, cx + (k % 3 - 1) * 0.018, t); s.position.z = THREE.MathUtils.lerp(s.position.z, cz + (Math.floor(k / 3) - 1) * 0.016 - 0.03, t); }));
-      await drop(m, e.pit); click(1 + Math.min(count, 8) * 0.04); buzz(8); setBadge(e.pit, count);
+      // a hand sows at a steady pace: the next seed leaves while the last one is still settling
+      pending.push(drop(m, e.pit).then(() => { click(1 + Math.min(count, 8) * 0.04); buzz(8); setBadge(e.pit, count); }));
+      await wait(PACE);
     } else if (e.type === 'capture') {
-      await wait(160); scoop();
+      await Promise.all(pending); pending.length = 0;
+      await wait(120); scoop();
       const store = e.by === you ? 'S0' : 'S1'; const scoreEl = e.by === you ? $('#myScore') : $('#oppScore');
       for (const pit of e.pits) {
         const taken = homes[pit].splice(0); setBadge(pit, 0);
@@ -196,6 +202,7 @@ async function animate(events, prevStores) {
       await wait(e.pits.length > 1 ? 300 : 160);
     }
   }
+  await Promise.all(pending);
 }
 
 async function play(pit) {

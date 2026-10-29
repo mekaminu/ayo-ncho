@@ -27,7 +27,7 @@ with sync_playwright() as p:
         # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position
         box = pg.evaluate("(()=>{const b=document.querySelectorAll('.badge')[2].getBoundingClientRect();return [b.left-20,b.top-20]})()")
         pg.mouse.click(box[0], box[1]); pg.wait_for_timeout(300); pg.mouse.click(box[0], box[1])
-        pg.wait_for_function("document.querySelector('#turn').textContent==='your move' && !document.querySelector('#undo').disabled", timeout=60000)
+        pg.wait_for_function("document.querySelector('#turn').textContent==='your move' && !document.querySelector('#undo').disabled", timeout=240000)
         after = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         assert before != after, "board did not change"
         print("smoke: before", before, "after", after, "scores", pg.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]"))

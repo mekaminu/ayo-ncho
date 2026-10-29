@@ -8,8 +8,8 @@ const G = 3.2;            // gravity (board units are metres but the game feels 
 const REST = 0.32;        // bounciness
 const ROLL = 0.86;        // per-second velocity kept while rolling (friction)
 const PUSH = 0.045;       // how hard seeds shove each other apart
-const SETTLE_SPEED = 0.012;
-const MAX_MS = 1100;      // after this the seed snaps to its slot whatever happened
+const SETTLE_SPEED = 0.02;
+const MAX_MS = 700;      // after this the seed snaps to its slot whatever happened
 
 function slope(x, z) { // surface gradient, for rolling
   const e = 0.004;
@@ -54,7 +54,7 @@ export class SeedSim {
       // drift gently toward the chosen slot so seeds end up spread, not piled on one spot
       p.x += (s.target.x - p.x) * 0.5 * dt; p.z += (s.target.z - p.z) * 0.5 * dt;
       const speed = Math.hypot(v.x, v.y, v.z); const age = now - s.t0;
-      if ((s.onGround > 0.12 && speed < SETTLE_SPEED) || age > MAX_MS) {
+      if ((s.onGround > 0.08 && speed < SETTLE_SPEED) || age > MAX_MS) {
         if (age > MAX_MS) { p.copy(s.target); } else { p.y = surfaceY(p.x, p.z) + s.r; }
         this.live.splice(i, 1); s.resolve();
       }
