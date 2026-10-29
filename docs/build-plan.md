@@ -23,7 +23,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 
 - [~] Daily puzzle: engine done (engine/puzzle.js: date-seeded, same for everyone, 60 days tested solvable, targets 4–20; share text with a seed row). Remains: the Home card and the puzzle screen — mockups added to the Design canvas 29 Oct ("Home — with the daily puzzle card", "Daily puzzle — played and solved"), [!] awaiting Meka's yes
 - [ ] Replay clip: a 10-second recording of a brilliant relay turn to share
-- [ ] Calm streak: days played unlocks a seed set, no punishment for missing a day
+- [x] Calm streak (29 Oct): web/streak.js counts distinct days with a move, never resets; a quiet line on Home ("6 days played · 1 more day for river stones"); 7 days played unlocks the River stones seed set (grey pebbles, docs/render-2026-10-29-stones.png), announced with a toast on the move that crosses it and chosen in Settings → Board → Seeds (swaps in place, no new game). Cowries stay for the store later
 - [ ] Opponent reactions: a line and a face when they lose a big pit, when they win, when you undo
 
 ## Needs Meka

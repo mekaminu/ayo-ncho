@@ -43,6 +43,15 @@ export function seedTexture(q={}){
     const spot=(v>0.72)?-28:0; img.data[o]=r+spot; img.data[o+1]=g+spot; img.data[o+2]=b+spot; img.data[o+3]=255; }
   ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
 }
+// River stones: cool grey with warm speckles and a faint vein, for the seed set the calm streak unlocks.
+export function stoneTexture(q={}){
+  const S=q.seedS||256; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d');
+  const n=noise2(S,S,4), v=noise2(S,S,2); const img=ctx.createImageData(S,S);
+  for(let i=0;i<S*S;i++){ const t=n[i]; const vein=Math.pow(Math.max(0,1-Math.abs(v[i]-0.55)*9),3)*22; const o=i*4;
+    const spot=(t>0.78)?-18:(t<0.22?-10:0); const r=0x7c+(0xa6-0x7c)*t+spot+vein*0.8, g=0x79+(0xa0-0x79)*t+spot+vein*0.7, b=0x74+(0x98-0x74)*t+spot+vein*0.5;
+    img.data[o]=r; img.data[o+1]=g; img.data[o+2]=b; img.data[o+3]=255; }
+  ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
 export function clothTexture(q={}){
   const S=q.clothS||512; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d'); const n=noise2(S,S,5); const img=ctx.createImageData(S,S);
   for(let i=0;i<S*S;i++){ const v=0.18+n[i]*0.14; const o=i*4; img.data[o]=38*v*2; img.data[o+1]=26*v*2; img.data[o+2]=18*v*2; img.data[o+3]=255; }

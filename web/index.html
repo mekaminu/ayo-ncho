@@ -54,6 +54,7 @@ button{font-family:inherit}
 .seg{display:flex;background:rgba(243,233,215,.08);border-radius:999px;padding:3px;gap:3px;flex:none}
 .segbtn{flex:1;border:0;background:none;color:var(--muted);border-radius:999px;padding:7px 11px;font:600 12px Inter,system-ui,sans-serif;cursor:pointer;transition:background .2s,color .2s;white-space:nowrap}
 .segbtn[aria-pressed="true"]{background:var(--brass);color:#1a0f07}
+.segbtn:disabled{opacity:.38;cursor:default}
 .sw{width:46px;height:28px;border-radius:999px;border:0;padding:0;background:rgba(243,233,215,.14);position:relative;flex:none;cursor:pointer;transition:background .2s}
 .sw[aria-checked="true"]{background:var(--brass)}
 .sw i{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:var(--fg);transition:left .2s,background .2s}
@@ -80,6 +81,7 @@ button{font-family:inherit}
 .pills{display:flex;justify-content:center;gap:6px;padding-top:4px;flex-wrap:wrap}
 .pill{padding:7px 14px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--muted);font:600 12px Inter,system-ui,sans-serif;cursor:pointer}
 .pill[aria-pressed="true"]{border-color:var(--brass);background:rgba(230,183,111,.18);color:var(--brass)}
+.streak{margin:0;text-align:center;font-size:11px;color:var(--muted);letter-spacing:.02em}
 
 /* Settings */
 #settings{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column}
@@ -176,6 +178,7 @@ button{font-family:inherit}
       <button class="pill" data-level="medium" aria-pressed="true"><span class="face s"></span>Medium · Nnamdi</button>
       <button class="pill" data-level="hard" aria-pressed="false"><span class="face s"></span>Hard · Mama Ngozi</button>
     </div>
+    <p class="streak" id="streakLine" aria-live="polite"></p>
   </div>
 </section>
 
@@ -195,7 +198,7 @@ button{font-family:inherit}
     <div class="group"><span class="eyebrow">Board</span>
       <div class="box">
         <div class="row"><div class="t"><b>Wood</b><span>mahogany · iroko · ebony</span></div><div class="swatches" data-set="finish"><button class="swatch" data-v="mahogany" aria-label="Mahogany" style="background:#7a3b1c"></button><button class="swatch" data-v="iroko" aria-label="Iroko" style="background:#a97a3d"></button><button class="swatch" data-v="ebony" aria-label="Ebony" style="background:#2a221c"></button></div></div>
-        <div class="row"><div class="t"><b>Seeds</b><span>Job's tears · cowries (soon)</span></div><div class="seg" data-set="seeds"><button class="segbtn" data-v="jobs">Job's tears</button><button class="segbtn" data-v="cowrie" disabled>Cowries</button></div></div>
+        <div class="row"><div class="t"><b>Seeds</b><span id="seedsSub">Job's tears · river stones unlock at 7 days played</span></div><div class="seg" data-set="seeds"><button class="segbtn" data-v="jobs">Job's tears</button><button class="segbtn" data-v="stones" disabled>Stones</button></div></div>
         <div class="row"><div class="t"><b>Seed counts on pits</b><span>little numbers beside each pit</span></div><button class="sw" role="switch" data-set="badges" aria-checked="true" aria-label="Seed counts on pits"><i></i></button></div>
       </div>
     </div>

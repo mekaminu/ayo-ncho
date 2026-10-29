@@ -4,7 +4,8 @@ import { newGame, applyMove, legalMoves, replay, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
 import { CHARACTERS, line } from './characters.js';
 import { decideQuality, browserEnv, tier } from './quality.js';
-import { buildBoard, buildTable, buildLights, seedMaterial, seedGeometryFor, SEED_R, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
+import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES } from './streak.js';
+import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -25,7 +26,16 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 20);
 const finish = params.get('finish') || prefs.get('finish', 'mahogany');
 const board = buildBoard(scene, finish, Q); buildTable(scene, Q); buildLights(scene, Q.lite ? Q.shadow : phone || (window.devicePixelRatio || 1) > 2 ? 1024 : 2048);
-const seedMat = seedMaterial(Q); const seedGeometry = seedGeometryFor(Q);
+const seedGeometry = seedGeometryFor(Q);
+// seed set: Job's tears, or river stones once the calm streak has unlocked them
+let streak = parseStreak(prefs.get('streak', null));
+const seedSetId = () => { const v = prefs.get('seeds', 'jobs'); return v === 'stones' && unlocked(streak, 'stones') ? 'stones' : 'jobs'; };
+let SET = SEED_SETS[seedSetId()]; let seedMat = seedMaterialFor(seedSetId(), Q); const seedMats = { [seedSetId()]: seedMat };
+function applySeedSet() { // swap every seed's look and shape in place (no new game needed)
+  const id = seedSetId(); SET = SEED_SETS[id]; seedMat = seedMats[id] = seedMats[id] || seedMaterialFor(id, Q);
+  for (const m of seeds) { m.material = seedMat; const j = m.userData.jit; m.scale.set(SET.r[0] * j[0], SET.r[1] * j[1], SET.r[2] * j[2]); }
+  for (const k in homes) homes[k].forEach((m, i) => { if (!sim.live.some((e) => e.mesh === m)) m.position.copy(slotPos(k === 'S0' || k === 'S1' ? k : +k, i)); });
+}
 const sim = new SeedSim();
 
 // camera: the board upright in your hands, you at the near end
@@ -53,12 +63,13 @@ function slotPos(home, k) { // resting position for the k-th seed in a home: a t
   const a = j * 2.39996 + (isStore ? +home[1] : home) * 0.7 + layer * 1.1;
   const rr = j === 0 ? 0 : Math.min(1, 0.36 * Math.sqrt(j));
   const x = cx + Math.cos(a) * rr * rx, z = cz + Math.sin(a) * rr * rz;
-  const y = BT - bowl(x - cx, z - cz, isStore ? STORE_RX : PIT_R, isStore ? STORE_RZ : PIT_R, depth) + SEED_R[1] * 0.92 + layer * 0.022;
+  const y = BT - bowl(x - cx, z - cz, isStore ? STORE_RX : PIT_R, isStore ? STORE_RZ : PIT_R, depth) + SET.r[1] * 0.92 + layer * 0.022;
   return new THREE.Vector3(x, y, z);
 }
 function makeSeed() {
   const m = new THREE.Mesh(seedGeometry, seedMat);
-  m.scale.set(SEED_R[0] * (0.9 + rnd() * 0.2), SEED_R[1] * (0.9 + rnd() * 0.2), SEED_R[2] * (0.9 + rnd() * 0.2));
+  m.userData.jit = [0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2]; // each seed its own size, kept across seed sets
+  m.scale.set(SET.r[0] * m.userData.jit[0], SET.r[1] * m.userData.jit[1], SET.r[2] * m.userData.jit[2]);
   m.rotation.set(rnd() * 0.6 - 0.3, rnd() * Math.PI * 2, rnd() * 0.6 - 0.3);
   m.castShadow = true; m.receiveShadow = true; scene.add(m); seeds.push(m); return m;
 }
@@ -241,7 +252,11 @@ async function animate(events, prevStores, pace = PACE) {
 async function play(pit) {
   const { state: next, events } = applyMove(state, pit);
   const prevStores = state.stores; const mover = state.turn; state = next; busy = true; deselect(); $('#undo').disabled = true;
-  if (mover === you) { const got = state.stores[0] - prevStores[0]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; }
+  if (mover === you) {
+    const got = state.stores[0] - prevStores[0]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length;
+    const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak));
+    if (r.unlocked) setTimeout(() => { toast(`${r.unlocked.name} unlocked — pick them in Settings`); buzz([20, 40, 20]); click(1.8, 0.1); setTimeout(() => click(2.4, 0.1), 140); }, 1200);
+  }
   tipFor(events);
   const aiGot = state.stores[1] - prevStores[1], meGot = state.stores[0] - prevStores[0];
   if (mover === ai && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400);
@@ -269,14 +284,16 @@ function paintHome() {
   const g = settings.game;
   document.querySelectorAll('[data-game]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.game === g));
   document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.level === level));
-  $('#playSub').textContent = 'vs ' + levelLabel(level);
+  $('#playSub').textContent = 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak);
   const saved = savedGame();
   $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
 }
 function paintSettings() {
   const r = settings.rules();
   const set = (name, v) => document.querySelectorAll(`[data-set="${name}"] .segbtn, [data-set="${name}"] .swatch`).forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === String(v)));
-  set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', 'jobs'); set('speed', settings.speed);
+  set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', seedSetId()); set('speed', settings.speed);
+  const stones = unlocked(streak, 'stones'); $('[data-set="seeds"] [data-v="stones"]').disabled = !stones;
+  $('#seedsSub').textContent = stones ? "Job's tears · river stones (yours: 7 days played)" : `Job's tears · river stones unlock at ${MILESTONES[0].days} days played (${streak.days.length} so far)`;
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1');
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
@@ -306,6 +323,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
       else if (name === 'capture') { prefs.set('rules.capture', v); rulesChanged(); }
       else if (name === 'relay') { prefs.set('rules.relay', v); rulesChanged(); }
       else if (name === 'finish') { prefs.set('finish', v); toast('New wood on the next game'); }
+      else if (name === 'seeds') { if (v === 'stones' && !unlocked(streak, 'stones')) return; prefs.set('seeds', v); applySeedSet(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto')) { prefs.set('quality', v); save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
       paintSettings(); click(1.2, 0.05);
@@ -439,7 +457,7 @@ if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { quality: { ...quality, tier: Q }, get state() { return state; }, get selected() { return selected; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { quality: { ...quality, tier: Q }, get streak() { return streak; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get selected() { return selected; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

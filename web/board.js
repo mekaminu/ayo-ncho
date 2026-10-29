@@ -1,6 +1,6 @@
 // The 3D board: geometry, materials, lights, camera. Pure scene-building; no game logic here.
 import * as THREE from 'three';
-import { woodTextures, seedTexture, clothTexture } from './textures.js';
+import { woodTextures, seedTexture, stoneTexture, clothTexture } from './textures.js';
 
 // Board sizes (metres). Length runs along Z towards the player, width along X.
 export const BW = 0.42, BL = 1.24, BT = 0.085, R = 0.19;
@@ -96,6 +96,16 @@ export function seedMaterial(q = {}) {
   const tex = seedTexture(q);
   return new THREE.MeshStandardMaterial({ map: tex, color: 0xd9d3bf, roughness: 0.36, metalness: 0, bumpMap: tex, bumpScale: 0.0015 });
 }
-export const SEED_R = [0.0180, 0.0152, 0.0138];
+// Seed sets: Job's tears (the default) and river stones (unlocked by the calm streak). Looks only; the rules never change.
+export const SEED_SETS = {
+  jobs:   { name: "Job's tears", r: [0.0180, 0.0152, 0.0138] },
+  stones: { name: 'River stones', r: [0.0196, 0.0112, 0.0160] }, // flatter, a touch wider: a smooth pebble
+};
+export function seedMaterialFor(set = 'jobs', q = {}) {
+  if (set !== 'stones') return seedMaterial(q);
+  const tex = stoneTexture(q);
+  return new THREE.MeshStandardMaterial({ map: tex, color: 0x8e969c, roughness: 0.42, metalness: 0, bumpMap: tex, bumpScale: 0.0012 });
+}
+export const SEED_R = SEED_SETS.jobs.r;
 export const seedGeometry = new THREE.SphereGeometry(1, 28, 20);
 export function seedGeometryFor(q = {}) { const [a, b] = q.seedSegs || [28, 20]; return a === 28 && b === 20 ? seedGeometry : new THREE.SphereGeometry(1, a, b); }
