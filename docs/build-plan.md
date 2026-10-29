@@ -29,6 +29,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 ## Needs Meka
 
 - [!] Daily puzzle card on Home and the puzzle screen: mockups on the Design canvas (https://claude.ai/artifact/H75vS5iCT5X2Fmft4oYMXP, second row) — awaiting Meka's yes
+- [!] Rooms screen ("With friends — your room and its code": big four-letter code, Invite on WhatsApp, copy link, join by code, the seat held 10 minutes): mockup on the Design canvas (https://claude.ai/artifact/H75vS5iCT5X2Fmft4oYMXP, second row, third board) — awaiting Meka's yes; the server side is already built
 - [x] Make the repo public so the scheduled cloud runs can push — done 29 Oct; runs push from 12:07
 - [!] Render: create the Web Service from mekaminu/ayo-ncho (Free plan, no environment variables) and send the address, so the deploy item can be closed and the tracker gets the test link
 - [!] Clip button on the Game over card (docs/render-2026-10-29-clip.png): the clip records the board only, not the scores or names. Say if you want a name/score strip drawn into the video, or a sound track (the knocks) — both are possible
@@ -84,7 +85,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [ ] Decision for next week: online play with friends first, or the store look first
 
 ### w/c 3 Nov — play with friends online
-- [ ] Rooms with a code and WhatsApp invite (Tete's pattern): moves played on the server with the same engine; reconnect; the members gate (Meka lets people in)
+- [~] Rooms with a code and WhatsApp invite (Tete's pattern): moves played on the server with the same engine; reconnect; the members gate (Meka lets people in) — started early, 29 Oct: the server side is built and tested (server/rooms.js + WebSockets at /ws in server/index.js, protocol in its header): a room with a four-letter code (no I/O), two seats with secret tokens, every move checked by engine/ayo.js and broadcast with its events, a dropped phone rejoins with its token and gets the whole game, presence, rematch when both ask (loser starts), rooms swept after 10 min unjoined / 6 h idle, GET /api/rooms/:code for the invite link; test/server.test.js plays a whole game over two sockets. Remains: the Rooms screen (mockup awaiting Meka's yes — see Needs Meka), the board playing a room's moves (web/), the WhatsApp invite link `/?room=CODE`, the members gate
 - [ ] Voice at the board (Tete's WebRTC), chat, shouts
 - [~] Low-bandwidth mode for family in Nigeria: low-texture board, no physics, moves still shown — the lighter board (quality.js) now switches on by itself on 2g/3g and data saver; remains: a no-physics option and lighter online traffic once rooms exist
 - [ ] Later: ranked ladder; board finishes and seed sets in a store (looks only, never wins)
