@@ -29,7 +29,9 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 ## Needs Meka
 
 - [!] Daily puzzle card on Home and the puzzle screen: mockups on the Design canvas (https://claude.ai/artifact/H75vS5iCT5X2Fmft4oYMXP, second row) — awaiting Meka's yes
-- [!] Make the repo public so the scheduled cloud runs can push (github.com/mekaminu/ayo-ncho/settings → Danger Zone → Change visibility)
+- [x] Make the repo public so the scheduled cloud runs can push — done 29 Oct; runs push from 12:07
+- [!] Render: create the Web Service from mekaminu/ayo-ncho (Free plan, no environment variables) and send the address, so the deploy item can be closed and the tracker gets the test link
+- [!] On the Fold: open Settings → Feel → Lighter board and say whether the full board runs smoothly (then Auto is right) or the lighter one looks good enough to keep (docs/render-2026-10-29-lite.png)
 
 - [x] Family rules confirmed 29 Oct: Nchò (relay sowing, capture on 4, last 8, bankruptcy, loop stop — see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka sent a rules write-up at 03:12: relay sowing taken as yes unless he says otherwise.
 - [!] Settings screen toggles Meka asked for from that write-up: capture on 2&3 vs 4 only, relay vs single lap. Mock them on the Settings mockup; build after his yes.
@@ -71,8 +73,8 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 
 ### Sun 1 Nov — opponents with character, polish, deploy
 - [x] Three opponents with a vector face, a bio and lines (Adaeze the playful child, Nnamdi the cheeky cousin, Mama Ngozi the dry market champion): they speak at game start, when they capture, when they lose a pit of 4+, when you undo, and when the game ends; faces on the HUD, Home pills and Settings
-- [~] Performance pass: pixel ratio capped at 1.5 on phones, 1024 shadow map on phones and high-dpr screens, render loop paused when the tab is hidden; remains: measure on the real Fold, lighter textures on slow connections
-- [ ] Deployed on Render from mekaminu/ayo-ncho; health check; Meka's test link on the tracker
+- [x] Performance pass: pixel ratio capped at 1.5 on phones, 1024 shadow map on phones and high-dpr screens, render loop paused when the tab is hidden (and only ever one loop: a leak that re-added a listener every frame is fixed); lighter board on slow connections and slow phones (web/quality.js: data saver, 2g/3g, ≤2 GB memory or ≤2 cores → half-size wood grain, 512 shadow map, fewer polygons, pixel ratio 1 — same carved look, docs/render-2026-10-29-lite.png; Settings → Feel → Lighter board: Auto / On / Off; `tools/render.py --lite/--full`); the offline cache now includes characters.js and quality.js. Measuring on the real Fold is part of Meka's test on Mon 2 Nov
+- [!] Deployed on Render from mekaminu/ayo-ncho; health check; Meka's test link on the tracker — waits for Meka to create the Render service (render.yaml is ready; see Needs Meka)
 - [x] Hint: Mama Ngozi's best move lit on the board for 1.5 s, one hint per turn
 
 ### Mon 2 Nov — Meka's test and the fixes from it
@@ -83,7 +85,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 ### w/c 3 Nov — play with friends online
 - [ ] Rooms with a code and WhatsApp invite (Tete's pattern): moves played on the server with the same engine; reconnect; the members gate (Meka lets people in)
 - [ ] Voice at the board (Tete's WebRTC), chat, shouts
-- [ ] Low-bandwidth mode for family in Nigeria: low-texture board, no physics, moves still shown
+- [~] Low-bandwidth mode for family in Nigeria: low-texture board, no physics, moves still shown — the lighter board (quality.js) now switches on by itself on 2g/3g and data saver; remains: a no-physics option and lighter online traffic once rooms exist
 - [ ] Later: ranked ladder; board finishes and seed sets in a store (looks only, never wins)
 
 ## Milestones

@@ -3,7 +3,8 @@ import * as THREE from 'three';
 import { newGame, applyMove, legalMoves, replay, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
 import { CHARACTERS, line } from './characters.js';
-import { buildBoard, buildTable, buildLights, seedMaterial, seedGeometry, SEED_R, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
+import { decideQuality, browserEnv, tier } from './quality.js';
+import { buildBoard, buildTable, buildLights, seedMaterial, seedGeometryFor, SEED_R, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -14,14 +15,17 @@ const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?
 const canvas = $('#c');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: !!(params.get('still') || params.get('capture')) });
 const phone = Math.min(innerWidth, innerHeight) < 500;
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, phone ? 1.5 : 2));
+// picture quality: the full board, or a lighter one on slow phones and slow connections (Settings → Feel → Lighter board)
+const quality = decideQuality(browserEnv(prefs.get('quality', 'auto'), params.get('lite')));
+const Q = tier(quality.lite);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, Q.lite ? Q.maxPixelRatio : phone ? 1.5 : 2));
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 20);
 const finish = params.get('finish') || prefs.get('finish', 'mahogany');
-const board = buildBoard(scene, finish); buildTable(scene); buildLights(scene, phone || (window.devicePixelRatio || 1) > 2 ? 1024 : 2048);
-const seedMat = seedMaterial();
+const board = buildBoard(scene, finish, Q); buildTable(scene, Q); buildLights(scene, Q.lite ? Q.shadow : phone || (window.devicePixelRatio || 1) > 2 ? 1024 : 2048);
+const seedMat = seedMaterial(Q); const seedGeometry = seedGeometryFor(Q);
 const sim = new SeedSim();
 
 // camera: the board upright in your hands, you at the near end
@@ -275,6 +279,7 @@ function paintSettings() {
   set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', 'jobs'); set('speed', settings.speed);
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1');
+  set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
 }
 let bubbleTimer = null;
@@ -302,6 +307,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
       else if (name === 'relay') { prefs.set('rules.relay', v); rulesChanged(); }
       else if (name === 'finish') { prefs.set('finish', v); toast('New wood on the next game'); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
+      else if (name === 'quality') { if (v !== prefs.get('quality', 'auto')) { prefs.set('quality', v); save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
       paintSettings(); click(1.2, 0.05);
     }));
   }
@@ -433,17 +439,16 @@ if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get state() { return state; }, get selected() { return selected; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { quality: { ...quality, tier: Q }, get state() { return state; }, get selected() { return selected; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
-let frames = 0, last = performance.now();
+// the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
+let frames = 0, last = performance.now(), running = false;
 function loop(now) {
   runTweens(now); sim.step((now - last) / 1000, now); if (idle && !reduceMotion) theta += (now - last) * 0.00004; last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
-  if (frames === 3) { window.__done = true; if (params.get("still")) return; }
-  if (window.__freeze || document.hidden) return;
-  let hiddenAt = null;
-document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = performance.now(); else { last = performance.now(); if (hiddenAt !== null) requestAnimationFrame(loop); hiddenAt = null; } });
-requestAnimationFrame(loop);
+  if (frames === 3) { window.__done = true; if (params.get('still')) { running = false; return; } }
+  if (window.__freeze || document.hidden) { running = false; return; }
+  requestAnimationFrame(loop);
 }
-let hiddenAt = null;
-document.addEventListener('visibilitychange', () => { if (document.hidden) hiddenAt = performance.now(); else { last = performance.now(); if (hiddenAt !== null) requestAnimationFrame(loop); hiddenAt = null; } });
-requestAnimationFrame(loop);
+function start() { if (running) return; running = true; last = performance.now(); requestAnimationFrame(loop); }
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !window.__freeze && !params.get('still')) start(); });
+start();

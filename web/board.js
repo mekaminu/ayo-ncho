@@ -29,8 +29,8 @@ function edgeDist(x, z) {
   return R - Math.sqrt(cx * cx + cz * cz);
 }
 
-export function buildBoard(scene, finish = 'mahogany') {
-  const wood = woodTextures(finish);
+export function buildBoard(scene, finish = 'mahogany', q = {}) {
+  const wood = woodTextures(finish, q);
   const woodMat = new THREE.MeshStandardMaterial({ map: wood.map, bumpMap: wood.bump, bumpScale: 0.003, roughness: 0.5, metalness: 0 });
   const group = new THREE.Group();
 
@@ -48,7 +48,8 @@ export function buildBoard(scene, finish = 'mahogany') {
   }
   // carved top with a rounded edge and a skirt that drops below the table outside the footprint
   {
-    const g = new THREE.PlaneGeometry(BW + 0.01, BL + 0.01, 210, 620); g.rotateX(-Math.PI / 2);
+    const [sx, sz] = q.topSegs || [210, 620]; // the lighter tier carves the top with fewer polygons
+    const g = new THREE.PlaneGeometry(BW + 0.01, BL + 0.01, sx, sz); g.rotateX(-Math.PI / 2);
     const pos = g.attributes.position; const top = BT + 0.0006; const ER = 0.016;
     for (let i = 0; i < pos.count; i++) {
       const x = pos.getX(i), z = pos.getZ(i); let y = top - carve(x, z); const e = edgeDist(x, z);
@@ -78,8 +79,8 @@ export function buildBoard(scene, finish = 'mahogany') {
   return { group, targets, ring, glow, woodMat };
 }
 
-export function buildTable(scene) {
-  const t = clothTexture(); const g = new THREE.PlaneGeometry(6, 6); g.rotateX(-Math.PI / 2);
+export function buildTable(scene, q = {}) {
+  const t = clothTexture(q); const g = new THREE.PlaneGeometry(6, 6); g.rotateX(-Math.PI / 2);
   const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: t, roughness: 0.95 })); m.receiveShadow = true; m.position.y = -0.0005; scene.add(m);
 }
 
@@ -91,9 +92,10 @@ export function buildLights(scene, shadowSize = 2048) {
   const fill = new THREE.PointLight(0xffe8d0, 0.25, 4); fill.position.set(0.9, 1.4, 1.3); scene.add(fill);
 }
 
-export function seedMaterial() {
-  const tex = seedTexture();
+export function seedMaterial(q = {}) {
+  const tex = seedTexture(q);
   return new THREE.MeshStandardMaterial({ map: tex, color: 0xd9d3bf, roughness: 0.36, metalness: 0, bumpMap: tex, bumpScale: 0.0015 });
 }
 export const SEED_R = [0.0180, 0.0152, 0.0138];
 export const seedGeometry = new THREE.SphereGeometry(1, 28, 20);
+export function seedGeometryFor(q = {}) { const [a, b] = q.seedSegs || [28, 20]; return a === 28 && b === 20 ? seedGeometry : new THREE.SphereGeometry(1, a, b); }

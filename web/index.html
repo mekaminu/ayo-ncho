@@ -92,7 +92,7 @@ button{font-family:inherit}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid rgba(243,233,215,.08)}
 .row:first-child{border-top:0}
 .row .t{display:flex;flex-direction:column;gap:2px;min-width:0}
-.row .t b{font-size:14px;font-weight:600}.row .t span{font-size:11px;color:var(--muted)}
+.row .t b{font-size:14px;font-weight:600}.row .t span{font-size:11px;color:var(--muted)}.row .t em{font-style:normal;color:var(--brass)}
 .swatches{display:flex;gap:8px}
 .swatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer}
 .swatch[aria-pressed="true"]{border-color:var(--brass)}
@@ -204,6 +204,7 @@ button{font-family:inherit}
         <div class="row"><div class="t"><b>Sound</b><span>wood knocks, rattle, scoop</span></div><button class="sw" role="switch" data-set="sound" aria-checked="true" aria-label="Sound"><i></i></button></div>
         <div class="row"><div class="t"><b>Haptics</b><span>a tap for every seed</span></div><button class="sw" role="switch" data-set="haptics" aria-checked="true" aria-label="Haptics"><i></i></button></div>
         <div class="row"><div class="t"><b>Sowing speed</b><span>how fast the hand moves</span></div><div class="seg" data-set="speed"><button class="segbtn" data-v="slow">Slow</button><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="fast">Fast</button></div></div>
+        <div class="row"><div class="t"><b>Lighter board</b><span>for slow phones and weak signal · <em id="qualityNow">auto</em></span></div><div class="seg" data-set="quality"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="lite">On</button><button class="segbtn" data-v="full">Off</button></div></div>
       </div>
     </div>
     <div class="group"><span class="eyebrow">Opponent</span>

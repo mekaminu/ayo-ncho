@@ -1,10 +1,10 @@
 # Render the game with headless Chromium (software WebGL) and optionally play a move.
 # Usage: python3 tools/render.py out.png            -> still frame (mid-game position, pit 4 lit)
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
-#        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page)
+#        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
 import sys, base64, http.server, threading, functools, os, json, time
 from playwright.sync_api import sync_playwright
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
 class Quiet(http.server.SimpleHTTPRequestHandler):
@@ -20,8 +20,9 @@ with sync_playwright() as p:
     pg.route("https://fonts.googleapis.com/**", lambda r: r.abort())
     if os.path.exists(three):
         pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=three, content_type="text/javascript"))
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1" if smoke else "?capture=1&stay=home" if home else "?still=1"), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1" if smoke else "?capture=1&stay=home" if home else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
+    print("quality:", pg.evaluate("JSON.stringify(window.__ayo.quality)"))
     if smoke:
         before = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position

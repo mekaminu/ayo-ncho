@@ -1,4 +1,5 @@
 // Procedural wood, seed and cloth textures (no image files: everything is generated on the device).
+// `q` is a quality tier from quality.js: the lighter one draws the same grain at half size for slow phones.
 import * as THREE from 'three';
 
 
@@ -15,8 +16,8 @@ export function noise2(w,h,oct){ // value noise, returns Float32Array
   }
   let mx=0; for(const v of out) mx=Math.max(mx,v); for(let i=0;i<out.length;i++) out[i]/=mx; return out;
 }
-export function woodTextures(finish){
-  const W=1024,H=2048; const c=document.createElement('canvas'); c.width=W;c.height=H; const ctx=c.getContext('2d');
+export function woodTextures(finish, q={}){
+  const W=q.woodW||1024,H=q.woodH||2048; const c=document.createElement('canvas'); c.width=W;c.height=H; const ctx=c.getContext('2d');
   const img=ctx.createImageData(W,H); const n=noise2(W,H,5), n2=noise2(W,H,3);
   const pal={mahogany:[[0x6e,0x39,0x20],[0x4c,0x24,0x13],[0x8a,0x4e,0x2d]], iroko:[[0xa9,0x7a,0x3d],[0x83,0x5a,0x28],[0xc4,0x95,0x52]], ebony:[[0x2a,0x22,0x1c],[0x16,0x11,0x0e],[0x3b,0x30,0x27]]}[finish];
   const bump=document.createElement('canvas'); bump.width=W;bump.height=H; const bctx=bump.getContext('2d'); const bimg=bctx.createImageData(W,H);
@@ -31,19 +32,19 @@ export function woodTextures(finish){
     const bv=255*(0.5+0.25*(ring-0.5)+0.25*(fine-0.5)-pore*0.6); bimg.data[o]=bimg.data[o+1]=bimg.data[o+2]=bv; bimg.data[o+3]=255;
   }
   ctx.putImageData(img,0,0); bctx.putImageData(bimg,0,0);
-  const map=new THREE.CanvasTexture(c); map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=8;
+  const map=new THREE.CanvasTexture(c); map.colorSpace=THREE.SRGBColorSpace; map.wrapS=map.wrapT=THREE.RepeatWrapping; map.anisotropy=q.anisotropy||8;
   const bmap=new THREE.CanvasTexture(bump); bmap.wrapS=bmap.wrapT=THREE.RepeatWrapping;
   return {map,bump:bmap};
 }
-export function seedTexture(){
-  const S=256; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d');
+export function seedTexture(q={}){
+  const S=q.seedS||256; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d');
   const n=noise2(S,S,4); const img=ctx.createImageData(S,S);
   for(let i=0;i<S*S;i++){ const v=n[i]; const t=v*v; const r=0x8e+(0xd8-0x8e)*t, g=0x92+(0xd6-0x92)*t, b=0x74+(0xb2-0x74)*t; const o=i*4;
     const spot=(v>0.72)?-28:0; img.data[o]=r+spot; img.data[o+1]=g+spot; img.data[o+2]=b+spot; img.data[o+3]=255; }
   ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
 }
-export function clothTexture(){
-  const S=512; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d'); const n=noise2(S,S,5); const img=ctx.createImageData(S,S);
+export function clothTexture(q={}){
+  const S=q.clothS||512; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d'); const n=noise2(S,S,5); const img=ctx.createImageData(S,S);
   for(let i=0;i<S*S;i++){ const v=0.18+n[i]*0.14; const o=i*4; img.data[o]=38*v*2; img.data[o+1]=26*v*2; img.data[o+2]=18*v*2; img.data[o+3]=255; }
   ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(6,6); return t;
 }
