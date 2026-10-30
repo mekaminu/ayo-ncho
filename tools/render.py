@@ -28,6 +28,10 @@
 #                  <out>-friend.png the friend's view (the far seat, pits nearest them) with the host's shout by his face. --wide for the host on a Mac
 #        --puzzle: open today's daily puzzle (?puzzle=1), play the answer, check the result card says Solved, screenshot it; then Back to home
 #                  and check the Home card says solved (<out>-home.png); --wide for the Mac layout
+#        --last8: the last 8 (Nchò) — a saved game one move from the board's last 8 seeds (tools/last8pos.js finds it): Continue, the move is
+#                  played, the seeds left hop, the "Last 8" line comes up under the board with the count, the count badges of the pits still
+#                  holding seeds glow, the opponent says their word (picture <out>); the line stays through their reply while it holds, and a
+#                  first tap shows whether a move sweeps the last seeds. --wide for the Mac
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 #        --local: two of us on one phone — Home → the "Two of us" pill → Play: Player 1 plays, the board swings half a turn round to face
@@ -38,7 +42,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -167,9 +171,13 @@ with sync_playwright() as p:
         saved = {"moves": end["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "hard", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 7 * 60 * 1000}}  # a game that began a few minutes ago
         before = {"easy": {"w": 4, "l": 2, "d": 0, "best": [31, 17], "run": 1}, "medium": {"w": 1, "l": 3, "d": 1, "best": [25, 23], "run": -2}, "hard": {"w": 2, "l": 1, "d": 0, "best": [26, 22], "run": 2}, "last": 1}
         pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.record', %s); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.tutorial', '3');" % (json.dumps(json.dumps(saved)), json.dumps(json.dumps(before))))
+    if last8:  # a saved game against Nnamdi one move from the last 8
+        pos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "last8pos.js"), "5"]).decode())
+        saved = {"moves": pos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "medium", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 5 * 60 * 1000}}
+        pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'medium'); localStorage.setItem('ayo.tutorial', '3');" % json.dumps(json.dumps(saved)))
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or last8 else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -199,6 +207,34 @@ with sync_playwright() as p:
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
+    if last8:
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+        st = pg.evaluate("window.__ayo.state"); assert len(st["moves"]) == len(pos["moves"]) and st["turn"] == 0, "the saved game did not come back"
+        assert not pg.evaluate("window.__ayo.last8.on"), "no Last 8 line before the board is down to 8"
+        tap(pg, pos["pit"])
+        pg.wait_for_function("window.__ayo.last8.hops > 0", timeout=240000)
+        L = pg.evaluate("window.__ayo.last8"); print("last8:", json.dumps(L))
+        assert L["on"] and L["isNew"], "the Last 8 line should come up"
+        assert L["words"] == "%d seeds left · the next capture takes them all" % pos["left"], L["words"]
+        pits = pg.evaluate("window.__ayo.state.pits"); assert sum(pits) == pos["left"] and L["lit"] == len([n for n in pits if n]), (pits, L)
+        bub = pg.evaluate("document.querySelector('#bubble').textContent")
+        assert bub in ("Last eight, cousin. Next chop takes everything.", "Small seeds left. Big stakes."), bub
+        pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length === %d" % (len(pos["moves"]) + 2) + " || window.__ayo.state.over", timeout=240000)
+        pg.wait_for_function("!window.__ayo.busy", timeout=240000)
+        st = pg.evaluate("window.__ayo.state"); L = pg.evaluate("window.__ayo.last8")
+        assert L["on"] == (not st["over"] and 0 < sum(st["pits"]) <= 8), (st, L)
+        assert L["hops"] == pg.evaluate("window.__ayo.last8.hops"), "the moment is once a game"
+        if L["on"] and st["turn"] == 0:  # a first tap names a sweep when the move makes one
+            for m in pg.evaluate("window.__ayo.legal"):
+                x, y = pg.evaluate("window.__ayo.pitAt(%d)" % m); pg.mouse.click(x, y); pg.wait_for_timeout(250)
+                ps = pg.evaluate("window.__ayo.path"); h = pg.evaluate("document.querySelector('#hint').textContent")
+                if ps and ps.get("sweep"): assert "the last %d go to" % ps["sweep"]["n"] in h, h; print("last8: tap says", h)
+                pg.keyboard.press("Escape"); pg.wait_for_timeout(100)
+        print("last8: after their reply the line is", "on" if L["on"] else "off", "·", L["words"])
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
     if puzzle:  # today's puzzle on the board: the ask at the top, one move, the result card
         pz = pg.evaluate("window.__ayo.puzzle"); print("puzzle:", json.dumps({k: pz[k] for k in ("key", "target", "answer")}))
         assert pz["on"] and not pz["played"], "the puzzle screen should be up and waiting"

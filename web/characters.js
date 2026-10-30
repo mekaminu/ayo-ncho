@@ -60,7 +60,7 @@ export function faceFor(level, mood = 'calm') {
 }
 
 // Which face goes with each moment the opponent speaks at.
-export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised' };
+export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised' };
 
 export const CHARACTERS = {
   easy: {
@@ -73,6 +73,7 @@ export const CHARACTERS = {
       win: ['I won! Can we play again?', 'Told you I was winning.'],
       lose: ['Again! One more!', 'You only won because I let you.'],
       firstWin: ['You beat me?! OK. Again, again!'],
+      last8: ['Last eight! Whoever catches next gets them ALL.', 'Ooh, the last ones. Mine, mine, mine.'],
     },
     // your record against them: what they say when you are on a run (yours: you keep winning; theirs: they do)
     runs: { yours: { 3: 'Three in a row? I\'m telling Mama.', 5: 'Five! Are you magic?', more: (n) => `${n} in a row. I give up. No I don't.` },
@@ -88,6 +89,7 @@ export const CHARACTERS = {
       win: ['Cousin, I warned you.', 'GG. Buy me suya.'],
       lose: ['Best of three. Obviously.', 'My phone was lagging.'],
       firstWin: ['Fine. That one counts. Barely.'],
+      last8: ['Last eight, cousin. Next chop takes everything.', 'Small seeds left. Big stakes.'],
     },
     runs: { yours: { 3: 'Three straight? Who have you been practising with?', 5: 'Five in a row. OK, I\'m actually trying now.', more: (n) => `${n} in a row. Cousin, leave something for me.` },
             theirs: { 3: 'Three–zero. Suya is on you.', 5: 'Five. I\'m not even looking at the board.', more: (n) => `${n} and counting. Buy a bigger board.` } },
@@ -102,6 +104,7 @@ export const CHARACTERS = {
       win: ['Come back when you have practised.', 'The board does not lie.'],
       lose: ['Well played. I mean it.', 'Hm. I taught you too well.'],
       firstWin: ['So. You finally beat me. Once.'],
+      last8: ['Eight left. Now we see who counts.', 'The last seeds. Sit up.'],
     },
     runs: { yours: { 3: 'Three in a row? Mama Ngozi is watching.', 5: 'Five. Now the market will talk.', more: (n) => `${n} in a row. The board is yours. For now.` },
             theirs: { 3: 'Three. Come back when the seeds listen to you.', 5: 'Five. Sit well; we are not finished.', more: (n) => `${n}. I am not counting. You are.` } },

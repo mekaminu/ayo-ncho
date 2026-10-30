@@ -45,6 +45,12 @@ button{font-family:inherit}
 #badges{position:fixed;inset:0;pointer-events:none}
 .badge{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:11px;font-weight:600;color:var(--brass);background:rgba(13,9,6,.72);border-radius:10px;padding:1px 6px;line-height:15px;margin:-8px 0 0 -9px;transition:opacity .2s}
 .badge.zero{opacity:.35}
+.badge.last{color:#1a120b;background:var(--brass);box-shadow:0 0 0 1px rgba(255,220,160,.6),0 0 10px rgba(230,183,111,.55)} /* the last 8: the pits still holding seeds */
+#last8{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.7);color:var(--fg);border-radius:999px;padding:5px 12px;font:500 12px Inter,system-ui,sans-serif;line-height:1.35;pointer-events:none}
+#last8[hidden]{display:none}
+#last8 b{color:#1a120b;background:var(--brass);border-radius:999px;padding:0 7px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
+#last8.new{animation:rise .3s ease-out,glint 1.6s ease-out .3s}
+@keyframes glint{0%{box-shadow:0 0 0 0 rgba(230,183,111,.0)}25%{box-shadow:0 0 0 6px rgba(230,183,111,.35),0 0 24px rgba(230,183,111,.5)}100%{box-shadow:0 0 0 0 rgba(230,183,111,0)}}
 .keys .badge[data-key]::before{content:attr(data-key);display:inline-block;margin-right:5px;padding-right:5px;border-right:1px solid rgba(230,183,111,.35);color:var(--fg);opacity:.7;font-weight:500} /* your pits' keys, once a key has been pressed */
 /* the pits for a screen reader and the Tab key: real buttons, out of sight (the board itself is the picture) */
 #pits{position:absolute;left:0;top:0;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap}
@@ -285,7 +291,7 @@ button{font-family:inherit}
 .wide .puzzleTop{right:auto;width:min(38vw,360px);left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 34px)}
 .wide .puzzleBottom{right:auto;width:min(40vw,380px);left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
 .wide.puzzle #hint{top:calc(env(safe-area-inset-top,0px) + 24px)}
-@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take{animation:none}}
+@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#last8.new{animation:none}}
 </style>
 </head>
 <body class="screen">
@@ -295,7 +301,8 @@ button{font-family:inherit}
 <div class="hud top"><div class="who"><span class="face" id="oppFace"></span><div class="col"><span class="name" id="oppName">Nnamdi · Medium</span><span class="sub" id="oppSub">waiting</span></div></div><div class="col r"><span class="score" id="oppScore">0</span><span class="lab">captured</span></div></div>
 <div id="hint" role="status"></div>
 <div id="words"><button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
-<button id="take" hidden type="button" title="Play Mama Ngozi's move through, slowly"><span class="face s" id="takeFace" aria-hidden="true"></span><b id="takeName">Mama Ngozi</b><span id="takeWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>show</i></button></div>
+<button id="take" hidden type="button" title="Play Mama Ngozi's move through, slowly"><span class="face s" id="takeFace" aria-hidden="true"></span><b id="takeName">Mama Ngozi</b><span id="takeWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>show</i></button>
+<div id="last8" hidden role="status"><b>Last 8</b><span id="last8Words"></span></div></div>
 <div id="rec" hidden role="status"><i></i>Recording your best turn…</div>
 <div id="bubble" hidden role="status"></div>
 <div id="myBubble" hidden role="status"></div>

@@ -95,6 +95,7 @@ export function legalMoves(state) {
 
 // Apply a move. Returns a NEW state plus an `events` list the UI animates:
 //   {type:"pickup", pit, n} {type:"drop", pit} … {type:"capture", pits:[...], by, n} {type:"end", winner}
+//   (the Nchò last-8 / bankruptcy sweep is a capture with last8: true)
 export function applyMove(state, pit) {
   if (state.over) throw new Error("game over");
   if (owner(pit) !== state.turn) throw new Error("not your pit");
@@ -153,7 +154,7 @@ export function applyMove(state, pit) {
       const by = lastCap ? lastCap.by : (stores[0] >= stores[1] ? 0 : 1); const taken = [];
       for (let k = 0; k < PITS; k++) if (pits[k]) { taken.push(k); }
       stores[by] += left; for (const k of taken) pits[k] = 0;
-      events.push({ type: "capture", pits: taken, by, n: left });
+      events.push({ type: "capture", pits: taken, by, n: left, last8: true }); // the sweep: the UI can say "the last 6 go to …"
     }
   }
 

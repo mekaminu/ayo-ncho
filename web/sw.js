@@ -1,6 +1,6 @@
 // Offline play: cache the app shell, the engine and three.js so Play vs computer works with no signal.
-const VERSION = 'ayo-v21';
-const SHELL = ['./', './index.html', './game.js', './board.js', './slots.js', './physics.js', './sound.js', './textures.js', './characters.js', './quality.js', './streak.js', './record.js', './clip.js', './online.js', './shouts.js', './daily.js', './keys.js', './path.js', './local.js', './coach.js', './hurry.js', './ai-worker.js', './engine/ayo.js', './engine/ai.js', './engine/puzzle.js', './manifest.webmanifest', './icon.svg', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js'];
+const VERSION = 'ayo-v22';
+const SHELL = ['./', './index.html', './game.js', './board.js', './slots.js', './physics.js', './sound.js', './textures.js', './characters.js', './quality.js', './streak.js', './record.js', './clip.js', './online.js', './shouts.js', './daily.js', './keys.js', './path.js', './local.js', './coach.js', './hurry.js', './last8.js', './ai-worker.js', './engine/ayo.js', './engine/ai.js', './engine/puzzle.js', './manifest.webmanifest', './icon.svg', 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', (e) => {

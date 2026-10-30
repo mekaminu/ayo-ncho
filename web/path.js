@@ -2,6 +2,7 @@
 // Pure functions, no DOM. The path is read from the engine's own events for the move on a copy of the position,
 // so what is shown can never disagree with what applyMove will do; nothing about the rules lives here.
 import { applyMove, legalMoves, sideOf, opponent } from '../engine/ayo.js';
+import { sweepOf, sweepWords } from './last8.js';
 
 // The path of a move for the player to move, or null when the pit cannot be played:
 //   order     the pits the hand sows into, in the order they are first reached
@@ -10,6 +11,7 @@ import { applyMove, legalMoves, sideOf, opponent } from '../engine/ayo.js';
 //   relays    the pits picked up again along the way (relay sowing), in order
 //   captures  every pit the move empties into a store, in order, whoever gets the seeds (the last-8 sweep included)
 //   got/lost  seeds the mover's store gains, and the other side's
+//   sweep     the Nchò last-8 sweep, if the move makes one: { by, n, pits } (the engine marks it)
 //   over      whether the move ends the game, and who wins then
 export function sowPath(state, pit) {
   if (!state || state.over || !legalMoves(state).includes(pit)) return null;
@@ -21,7 +23,7 @@ export function sowPath(state, pit) {
     else if (e.type === 'capture') for (const p of e.pits) if (!captures.includes(p)) captures.push(p);
   }
   return {
-    pit, order, visits, end, relays, captures, drops,
+    pit, order, visits, end, relays, captures, drops, sweep: sweepOf(events),
     got: next.stores[me] - state.stores[me], lost: next.stores[opponent(me)] - state.stores[opponent(me)],
     over: next.over, winner: next.over ? next.winner : null,
   };
@@ -42,6 +44,7 @@ export function pathWords(path, { you = 0 } = {}) {
   parts.push(path.end === null ? 'nothing to sow' : `ends in ${pitName(path.end, you)}`);
   if (path.got) parts.push(`takes ${path.got}`);
   if (path.lost) parts.push(`gives ${path.lost}`);
+  if (path.sweep) parts.push(sweepWords(path.sweep, { you }));
   if (path.over) parts.push(path.winner === 'draw' ? 'ends the game level' : path.winner === you ? 'wins the game' : 'ends the game');
   return parts.join(' · ');
 }
@@ -54,6 +57,7 @@ export function playedWords(path, { you = 0 } = {}) {
   const r = path.relays.length; if (r) parts.push(r === 1 ? 'picked up again once' : r === 2 ? 'picked up again twice' : `picked up again ×${r}`);
   if (path.got) parts.push(`took ${path.got}`);
   if (path.lost) parts.push(`gave ${path.lost}`);
+  if (path.sweep) parts.push(sweepWords(path.sweep, { you, played: true }));
   if (!parts.length || path.over) parts.push(path.end === null ? 'sowed nothing' : `ended in ${pitName(path.end, you)}`);
   if (path.over) parts.push(path.winner === 'draw' ? 'the game ends level' : path.winner === you ? 'you win' : 'they win');
   return parts.join(' · ');
