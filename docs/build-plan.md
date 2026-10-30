@@ -17,6 +17,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 8. **No money, no accounts yet.** Nothing is sold in v1. Later store items are looks only, never wins (same ground rules as Whot).
 9. **Plain English to Meka.** Tracker items say what he can now do, never code names.
 10. **Private details stay out of the repo**: no keys, addresses, numbers.
+10b. **Render costs nothing unless Meka says so.** render.yaml is a Render Blueprint that Render syncs on every push (Meka linked it 30 Oct). Keep `plan: free` and never add services, disks, databases or paid settings to it without Meka's yes recorded under Needs Meka.
 11. **Ideas are welcome.** Meka (29 Oct) wants the game to stand up to the best mancala apps on the stores and asked for more ideas as they come: a run may add an idea to the board under "Ideas (Meka said yes to ideas, mock-first still applies)" with one line of why, and build it once the day's planned items are done. Screens still get a mockup first.
 
 ## Ideas (Meka said yes to ideas, mock-first still applies)
