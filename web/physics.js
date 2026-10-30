@@ -21,7 +21,7 @@ export class SeedSim {
   has(mesh) { return this.live.some((s) => s.mesh === mesh); }
   // Carry `mesh` from where it is to its spot `to` ({ x, y, z, rx, ry, rz }) and let it fall in.
   // opts: flight (s), arc (m, how high the path bows), bowl { cx, cz, ix, iz } (the ellipse its middle must stay inside),
-  // under ([x, y, z] spots of the seeds already in the bowl), seed { a, b }, onBounce(k 0..1), onNudge(index in under, k).
+  // under ([x, y, z] spots of the seeds already in the bowl), seed { a, b }, onBounce(k 0..1, onSeed), onNudge(index in under, k).
   toss(mesh, to, opts) {
     const p = mesh.position, r = mesh.rotation; const flight = Math.max(0.05, opts.flight || 0.24);
     const spin = () => (Math.random() - 0.5) * 5;
@@ -64,7 +64,7 @@ export class SeedSim {
           if (vn < -0.12) { // a bounce, off the slope it hit
             v.x -= (1 + REST) * vn * nx; v.y -= (1 + REST) * vn * ny; v.z -= (1 + REST) * vn * nz;
             s.spin.x *= 0.5; s.spin.y *= 0.5; s.spin.z *= 0.5; const k = Math.min(1, -vn / 0.8);
-            if (s.onBounce) s.onBounce(k); if (f.j >= 0 && s.onNudge) s.onNudge(f.j, k);
+            if (s.onBounce) s.onBounce(k, f.j >= 0); if (f.j >= 0 && s.onNudge) s.onNudge(f.j, k); // how hard, and whether on a seed (a clack) or the wood (a tok)
           } else if (vn < 0) { v.x -= vn * nx; v.y -= vn * ny; v.z -= vn * nz; }
           const keep = Math.exp(-FRICTION * dt); v.x *= keep; v.z *= keep; s.spin.x *= keep; s.spin.y *= keep; s.spin.z *= keep;
           v.x += (to.x - p.x) * PULL * dt; v.z += (to.z - p.z) * PULL * dt;

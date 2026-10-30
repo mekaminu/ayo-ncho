@@ -36,8 +36,8 @@ function rng(n) { let s = (n >>> 0) || 1; return () => { s = (s * 1664525 + 1013
 // Pour n seeds into a bowl. Each spot is { x, y, z } from the bowl's centre at the board top, and how the seed lies there:
 // (seeds gather towards the middle, as they do in a hand-carved bowl that is never quite flat: a trough's first seeds
 // lie together in the middle of its floor rather than scattered over it)
-// yaw (its long side across its nearest neighbour, as seeds settle) and nx, nz (the lean of what it rests on: the slope
-// of the wood, eased; a seed on other seeds leans a little any way).
+// yaw (its long side across its nearest neighbour, as seeds settle), nx, nz (the lean of what it rests on: the slope
+// of the wood, eased; a seed on other seeds leans a little any way) and wood (true when it lies on the bare wood).
 export function pour(shape, seed, n = 48, salt = 1) {
   const { a } = seed; const { ix, iz } = reach(shape, seed); const rand = rng(salt * 7919 + Math.round(shape.rx * 1e4) * 31 + Math.round(shape.rz * 1e4));
   const cx = [], cz = [], wood = [], rest = [], pull = []; const step = a / 4;
@@ -56,7 +56,7 @@ export function pour(shape, seed, n = 48, salt = 1) {
     if (onWood) { const e = 0.002, k2 = 0.6; const hx = -(bowl(x + e, z, shape.rx, shape.rz, shape.depth, shape.flat) - bowl(x - e, z, shape.rx, shape.rz, shape.depth, shape.flat)) / (2 * e), hz = -(bowl(x, z + e, shape.rx, shape.rz, shape.depth, shape.flat) - bowl(x, z - e, shape.rx, shape.rz, shape.depth, shape.flat)) / (2 * e); nx = -hx * k2; nz = -hz * k2; }
     else { nx = (rand() - 0.5) * 0.5; nz = (rand() - 0.5) * 0.5; }
     const nl = Math.hypot(nx, 1, nz);
-    out.push({ x, y, z, yaw, nx: nx / nl, nz: nz / nl });
+    out.push({ x, y, z, yaw, nx: nx / nl, nz: nz / nl, wood: onWood });
     for (let i = 0; i < rest.length; i++) { const r = restOnSeed(cx[i], cz[i], [x, y, z], seed); if (r > rest[i]) rest[i] = r; } // the seeds after it rest on it where they touch it
   }
   return out;
@@ -69,5 +69,5 @@ export function place(s, cx, cz, top, turn = 0) {
   const c = Math.cos(turn), n = Math.sin(turn);
   const x = s.x * c + s.z * n, z = -s.x * n + s.z * c, nx = s.nx * c + s.nz * n, nz = -s.nx * n + s.nz * c;
   const rz = Math.asin(Math.max(-1, Math.min(1, -nx))), rx = Math.asin(Math.max(-1, Math.min(1, nz / Math.cos(rz))));
-  return { x: cx + x, y: top + s.y, z: cz + z, rx, ry: s.yaw + turn, rz };
+  return { x: cx + x, y: top + s.y, z: cz + z, rx, ry: s.yaw + turn, rz, wood: s.wood };
 }

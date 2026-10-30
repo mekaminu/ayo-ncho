@@ -18,6 +18,7 @@ import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach
 import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare } from './local.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT, BT, BW, BL, R as CORNER } from './board.js';
 import { pour, place, reach } from './slots.js';
+import { boardAudio } from './sound.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -160,30 +161,35 @@ function hurryNow() {
   click(1.6, 0.04); buzz(6); return true;
 }
 
-// move one seed along an arc from where it is to its spot (no physics: the weakest phones, or reduced motion)
-function fly(m, home, ms = 170, lift = 0.06) {
+// move one seed along an arc from where it is to its spot (no physics: the weakest phones, reduced motion, a hurried
+// turn); `hit(k, onSeed)` sounds it landing, and again, softly, on its little hop
+function fly(m, home, ms = 170, lift = 0.06, hit = null) {
   const from = m.position.clone(), r0 = m.rotation.clone(); homes[home].push(m); m.userData.home = home; moved(m); const to = slotPose(home, homes[home].length - 1, m);
   const turn = (a, b) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)); const rx = turn(r0.x, to.rx), ry = turn(r0.y, to.ry), rz = turn(r0.z, to.rz);
   return tween(ms, (t) => {
     m.position.lerpVectors(from, to, t); m.position.y += Math.sin(t * Math.PI) * lift;
     m.rotation.set(r0.x + (rx - r0.x) * t, r0.y + (ry - r0.y) * t, r0.z + (rz - r0.z) * t);
-  }, easeInOut).then(() => { put(m, to); return reduceMotion ? null : tween(90, (t) => { m.position.y = to.y + Math.sin(t * Math.PI) * 0.005; }); });
+  }, easeInOut).then(() => { put(m, to); if (hit) hit(0.7, !to.wood); return reduceMotion ? null : tween(90, (t) => { m.position.y = to.y + Math.sin(t * Math.PI) * 0.005; }).then(() => { if (hit) hit(0.12, !to.wood); }); });
 }
 
 // drop a seed into a bowl: carried over and let go just above its spot, it falls, bounces off the wood or the seeds
 // below, rolls into place and nestles; the bowl's wall keeps it in (physics.js). Seeds it lands on rock a little.
 // (With physics off the seed still flies pit to pit in a small arc and lands in its spot: every move is shown.)
-function drop(m, home) {
+// `landed()` runs the moment it first touches down (the pit's count, the score), with its sound and a tap on the phone.
+function drop(m, home, landed = null) {
   const d = Math.hypot(m.position.x - bowlOf(home).c[0], m.position.z - bowlOf(home).c[1]); // sowing next door ~0.15 m, a capture across the board up to ~0.9 m
-  if (hurry.on) return fly(m, home, HURRY_FLY_MS, 0.04); // hurried: a quick arc straight to its spot
-  if (!PHYS.physics || reduceMotion) return fly(m, home, reduceMotion ? 40 : Math.round(180 + 260 * d), 0.03 + 0.1 * d);
+  let first = true; const store = typeof home === 'string';
+  const hit = (k, onSeed) => { land(k, onSeed, m.position, home); if (first) { first = false; buzz(store ? 12 : 8); if (landed) landed(); } };
+  if (hurry.on) return fly(m, home, HURRY_FLY_MS, 0.04, hit); // hurried: a quick arc straight to its spot
+  if (!PHYS.physics || reduceMotion) return fly(m, home, reduceMotion ? 40 : Math.round(180 + 260 * d), 0.03 + 0.1 * d, hit);
   const k = homes[home].length, under = homes[home].slice(); homes[home].push(m); m.userData.home = home; moved(m);
-  const { store, c } = bowlOf(home), seed = seedDims(), { ix, iz } = reach(SHAPES[store ? 'store' : 'pit'], seed);
+  const { c } = bowlOf(home), seed = seedDims(), { ix, iz } = reach(SHAPES[store ? 'store' : 'pit'], seed);
   const below = under.map((o, j) => { const q = slotPose(home, j, o); return [q.x, q.y, q.z]; });
-  return sim.toss(m, slotPose(home, k, m), {
+  const to = slotPose(home, k, m);
+  return sim.toss(m, to, {
     flight: 0.2 + 0.3 * d, arc: 0.012 + 0.12 * d, bowl: { cx: c[0], cz: c[1], ix, iz }, under: below, seed,
-    onBounce: (s) => { if (s > 0.25) tick(0.9 + s * 0.4, 0.05 * s); }, onNudge: (j, s) => rock(under[j], s),
-  });
+    onBounce: hit, onNudge: (j, s) => rock(under[j], s), // every bounce sounds, the first loudest: on the wood a tok, on a seed a clack
+  }).then(() => { if (first) hit(0.25, !to.wood); }); // a seed that slid in without a bounce still lands
 }
 // a seed another lands on rocks a little where it lies, then is still again
 function rock(m, s) {
@@ -199,31 +205,23 @@ function hold(m, to, ms, lift) {
   return tween(ms, (t) => { if (m.userData.v !== v || m.userData.h !== h) return; m.position.set(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t + Math.sin(t * Math.PI) * lift, from.z + (to.z - from.z) * t); m.rotation.set(r0.x + (to.rx - r0.x) * t * 0.5, r0.y, r0.z + (to.rz - r0.z) * t * 0.5); }, easeOut);
 }
 
-// ---------- sound (synthesised on the device; no audio files) ----------
-let actx = null; const soundOn = () => prefs.get('sound', '1') === '1';
-let noiseBuf = null;
-function ctx() { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (!noiseBuf) { noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.1, actx.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; } return actx; }
-// a seed landing on wood: a short knock (tone) plus a tiny burst of noise
-function click(pitch = 1, gain = 0.12) {
-  if (!soundOn()) return; try {
-    const a = ctx(); const t = a.currentTime;
-    const o = a.createOscillator(), g = a.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(1500 * pitch, t); o.frequency.exponentialRampToValueAtTime(420 * pitch, t + 0.045);
-    g.gain.setValueAtTime(gain, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.07); o.connect(g).connect(a.destination); o.start(t); o.stop(t + 0.08);
-    const n = a.createBufferSource(); n.buffer = noiseBuf; const f = a.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 2600 * pitch; f.Q.value = 1.2;
-    const ng = a.createGain(); ng.gain.setValueAtTime(gain * 0.5, t); ng.gain.exponentialRampToValueAtTime(0.001, t + 0.03); n.connect(f).connect(ng).connect(a.destination); n.start(t); n.stop(t + 0.04);
-  } catch {}
+// ---------- sound (made on the device, no audio files: web/sound.js) ----------
+let audio = null; const soundOn = () => prefs.get('sound', '1') === '1';
+function sound() { // the board's audio, made on first use (a tap always comes first, so the phone lets it play)
+  if (!audio) audio = boardAudio(new (window.AudioContext || window.webkitAudioContext)());
+  if (audio.ctx.state === 'suspended') audio.ctx.resume();
+  return audio;
 }
-const tick = (pitch, gain) => click(pitch, gain);
-// a handful of seeds picked up: a quick rattle
-function rattle(n) { for (let i = 0; i < Math.min(n, 6); i++) setTimeout(() => click(0.7 + Math.random() * 0.5, 0.04), i * 28 + Math.random() * 20); }
-// captured seeds scooped away: a short descending sweep
-function scoop() {
-  if (!soundOn()) return; try {
-    const a = ctx(); const t = a.currentTime; const n = a.createBufferSource(); n.buffer = noiseBuf; n.loop = true;
-    const f = a.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 2; f.frequency.setValueAtTime(3200, t); f.frequency.exponentialRampToValueAtTime(600, t + 0.28);
-    const g = a.createGain(); g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.3); n.connect(f).connect(g).connect(a.destination); n.start(t); n.stop(t + 0.32);
-  } catch {}
-}
+const TUNE = [1, 0.95, 1.05, 0.98, 1.07, 0.93, 1.02, 0.96, 1.06, 0.99, 0.94, 1.04]; // each pit carved by hand, each its own note
+const tuneOf = (home) => typeof home === 'string' ? 0.78 : TUNE[home] || 1; // the troughs, bigger and deeper, sound lower
+const at = (pit) => ({ x: pitCenters[pit][0], y: BT, z: pitCenters[pit][1] });
+function panOf(p) { if (!p) return 0; vp.set(p.x, p.y, p.z).project(camera); return Math.max(-0.6, Math.min(0.6, vp.x * 0.55)); } // left of the screen, more in the left ear
+// a seed touching down: the physics says when, how hard (0..1) and whether on the wood or on another seed
+function land(k, onSeed, p, home) { if (!soundOn()) return; try { sound().land(k, onSeed, panOf(p), tuneOf(home)); } catch {} }
+// a tap on the wood: the buttons, a knock at the door, the chimes
+function click(pitch = 1, gain = 0.12) { if (!soundOn()) return; try { sound().tap(pitch, gain); } catch {} }
+// a handful of seeds scooped up: quick small clacks as they jostle in the hand
+function rattle(n, p) { if (!soundOn()) return; try { sound().rattle(n, panOf(p)); } catch {} }
 const buzz = (ms) => { if (prefs.get('haptics', '1') === '1' && navigator.vibrate) navigator.vibrate(ms); };
 
 // ---------- HUD ----------
@@ -659,15 +657,15 @@ async function sowEvents(events, prevStores, pace) {
       await Promise.all(pending); pending.length = 0;
       if (e.relay) await wait(pace);
       // the hand scoops the pit: its seeds rise into a small heap held over the pit (the hand), all of them, however many
-      const picked = homes[e.pit].splice(0); picked.forEach(moved);
+      const picked = homes[e.pit].splice(0); picked.forEach(moved); rattle(picked.length, at(e.pit)); // the seeds click together as the hand closes on them
       await Promise.all(picked.map((m, k) => hold(m, handPose(e.pit, k), 240, 0.03)));
-      rattle(picked.length); setBadge(e.pit, 0); animate.cluster = picked; animate.over = e.pit;
+      setBadge(e.pit, 0); animate.cluster = picked; animate.over = e.pit;
     } else if (e.type === 'drop') {
       // the top seed leaves the hand for this pit while the hand moves on over it; the rest of the heap stays as it is
       const m = animate.cluster.pop(); const count = homes[e.pit].length + 1; animate.over = e.pit;
       animate.cluster.forEach((s, k) => hold(s, handPose(e.pit, k), 140, 0));
       // a hand sows at a steady pace: the next seed leaves while the last one is still settling
-      pending.push(drop(m, e.pit).then(() => { click(1 + Math.min(count, 8) * 0.04); buzz(8); setBadge(e.pit, count); }));
+      pending.push(drop(m, e.pit, () => setBadge(e.pit, count))); // the count goes up as the seed touches down
       await wait(pace);
     } else if (e.type === 'capture') {
       // a hand sweeps up the captured pits into one heap, carries it over the trough and lets the seeds go into it, the
@@ -675,10 +673,10 @@ async function sowEvents(events, prevStores, pace) {
       await Promise.all(pending); pending.length = 0;
       const k = pace / PACES.normal; // the sowing speed sets this hand's speed too
       if (animate.cluster && animate.cluster.length) animate.cluster.forEach((s, j) => { const p = handPose(animate.over, j); p.y += 0.08; hold(s, p, 150 * k, 0); }); // a sowing hand still full rises out of the way (Nchò takes a 4 mid-sowing)
-      await wait(120 * k); scoop();
+      await wait(120 * k);
       const store = 'S' + e.by, scoreEl = e.by === you ? $('#myScore') : $('#oppScore'), hand = [];
       for (const pit of e.pits) {
-        const taken = homes[pit].splice(0); setBadge(pit, 0); taken.forEach(moved);
+        const taken = homes[pit].splice(0); setBadge(pit, 0); taken.forEach(moved); rattle(taken.length, at(pit));
         hand.forEach((s, j) => hold(s, handPose(pit, j), 150 * k, 0));
         await Promise.all(taken.map((m, j) => hold(m, handPose(pit, hand.length + j), 200 * k, 0.025)));
         hand.push(...taken);
@@ -686,7 +684,7 @@ async function sowEvents(events, prevStores, pace) {
       const [sx, sz] = storeCenters[e.by], [fx, fz] = pitCenters[e.pits[e.pits.length - 1]], d = Math.hypot(sx - fx, sz - fz);
       await Promise.all(hand.map((m, j) => hold(m, place(spots('hand')[Math.min(j, 47)], sx, sz, BT + HAND_Y, 0), (260 + 220 * d) * k, 0.06)));
       for (let j = hand.length - 1; j >= 0; j--) {
-        pending.push(drop(hand[j], store).then(() => { shown[e.by]++; tickScore(scoreEl, shown[e.by]); click(0.6, 0.1); buzz(12); }));
+        pending.push(drop(hand[j], store, () => { shown[e.by]++; tickScore(scoreEl, shown[e.by]); })); // the score ticks as each seed lands
         await wait(45 * k);
       }
       await wait(120 * k);
