@@ -15,7 +15,8 @@ import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { sowPath, pickedHint, playedWords } from './path.js';
 import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach.js';
 import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare } from './local.js';
-import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
+import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT, BT, BW, BL, R as CORNER } from './board.js';
+import { pour, place, reach } from './slots.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -46,20 +47,53 @@ let SET = SEED_SETS[seedSetId()]; let seedMat = seedMaterialFor(seedSetId(), Q);
 function applySeedSet() { // swap every seed's look and shape in place (no new game needed)
   const id = seedSetId(); SET = SEED_SETS[id]; seedMat = seedMats[id] = seedMats[id] || seedMaterialFor(id, Q);
   for (const m of seeds) { m.material = seedMat; const j = m.userData.jit; m.scale.set(SET.r[0] * j[0], SET.r[1] * j[1], SET.r[2] * j[2]); }
-  for (const k in homes) homes[k].forEach((m, i) => { if (!sim.live.some((e) => e.mesh === m)) m.position.copy(slotPos(k === 'S0' || k === 'S1' ? k : +k, i)); });
+  for (const k in homes) homes[k].forEach((m, i) => { if (!sim.has(m)) put(m, slotPose(k === 'S0' || k === 'S1' ? k : +k, i, m)); });
 }
-const sim = new SeedSim();
+const sim = new SeedSim(surfaceY);
 
 // camera: the board upright in your hands, you at the near end
 let baseTheta = 0; /* π when you hold the far seat of an online room: your pits still nearest you */ let theta = 0, phi = 0.72, dist = 1.55; const target = new THREE.Vector3(0, 0.02, 0.02);
 function placeCam() { camera.position.set(target.x + dist * Math.sin(phi) * Math.sin(theta), target.y + dist * Math.cos(phi), target.z + dist * Math.sin(phi) * Math.cos(theta)); camera.lookAt(target); }
-let wide = false;
+let wide = null, fitDist = 1.55;
+// The board's edge, along its top and its foot: all of it has to be on screen.
+const EDGE = []; const vp = new THREE.Vector3();
+for (const [sx, sz, a0] of [[1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI], [1, -1, Math.PI * 1.5]]) for (let i = 0; i <= 6; i++) {
+  const a = a0 + i / 6 * Math.PI / 2, x = sx * (BW / 2 - CORNER) + CORNER * Math.cos(a), z = sz * (BL / 2 - CORNER) + CORNER * Math.sin(a); EDGE.push([x, BT, z], [x, 0, z]);
+}
+function onScreen(w, h) { // the board's box on screen, in px
+  camera.updateMatrixWorld(); let l = Infinity, r = -Infinity, t = Infinity, b = -Infinity;
+  for (const [x, y, z] of EDGE) { vp.set(x, y, z).project(camera); const px = (vp.x + 1) / 2 * w, py = (1 - vp.y) / 2 * h; l = Math.min(l, px); r = Math.max(r, px); t = Math.min(t, py); b = Math.max(b, py); }
+  return { l, r, t, b };
+}
+// the room the bars leave for the board, measured from the page (so it follows the notch, the home bar and the fonts)
+function room(w, h) {
+  const top = $('.hud.top').getBoundingClientRect(), bot = $('.hud.bottom').getBoundingClientRect(), bar = $('.bar').getBoundingClientRect();
+  if (wide) return { l: Math.max(top.right, bot.right) + 16, r: Math.min(w, bar.left) - 16, t: top.top + 40, b: h - 18 }; // the scores down the left, the buttons down the right, the hint line across the top
+  return { l: 14, r: w - 14, t: top.bottom + 10, b: bot.top - 48 }; // between the opponent's row and the hint line over your row (room for two lines of it)
+}
+// Frame the board: all of it, both troughs and every pit, in the room the bars leave, whatever the screen's shape (a tall
+// phone, a Fold opened out, a laptop): the camera stands back just as far as it must and the picture is moved to sit in
+// the middle of that room. A squarer screen looks a little more along the board, so the board can be bigger on it.
+// (30 Oct: on Meka's Fold the near trough sat under the buttons.) Pinch and the wheel zoom from here.
+function frame() {
+  const w = canvas.clientWidth, h = canvas.clientHeight; if (!w || !h) return;
+  const R = room(w, h), fw = Math.max(80, R.r - R.l), fh = Math.max(80, R.b - R.t);
+  phi = wide ? 0.5 : 0.72 + 0.14 * Math.min(1, Math.max(0, (1.5 - fh / fw) / 0.6));
+  const th = theta; theta = 0; camera.clearViewOffset();
+  let lo = 0.5, hi = 8;
+  for (let i = 0; i < 22; i++) { dist = (lo + hi) / 2; placeCam(); const b = onScreen(w, h); if (b.r - b.l <= fw && b.b - b.t <= fh) hi = dist; else lo = dist; }
+  dist = fitDist = hi; placeCam(); const b = onScreen(w, h);
+  camera.setViewOffset(w, h, ((b.l + b.r) - (R.l + R.r)) / 2, ((b.t + b.b) - (R.t + R.b)) / 2, w, h);
+  theta = th; placeCam();
+}
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
-  const nowWide = w > h * 1.1; if (nowWide !== wide) { wide = nowWide; dist = wide ? 1.8 : 1.55; phi = wide ? 0.5 : 0.72; theta = baseTheta; }
+  const nowWide = w > h * 1.1; if (nowWide !== wide) { wide = nowWide; theta = baseTheta; }
   document.documentElement.classList.toggle('wide', wide);
+  frame();
 }
 addEventListener('resize', resize); resize();
+if (document.fonts) document.fonts.ready.then(frame); // the bars settle their height once the fonts are in
 
 // ---------- seeds ----------
 // Each seed is a mesh with a home (pit index 0..11, or 'S0'/'S1' for the stores) and a slot number in that home.
@@ -67,29 +101,35 @@ const seeds = []; // all 48 meshes
 const homes = { S0: [], S1: [] }; for (let i = 0; i < 12; i++) homes[i] = [];
 let rs = 11; const rnd = () => { rs = (rs * 9301 + 49297) % 233280; return rs / 233280; };
 
-function slotPos(home, k) { // resting position for the k-th seed in a home: a tight spiral, piling up when full
-  const isStore = typeof home === 'string';
-  const [cx, cz] = isStore ? storeCenters[+home[1]] : pitCenters[home];
-  const rx = isStore ? STORE_RX - 0.03 : PIT_R - 0.03, rz = isStore ? STORE_RZ - 0.02 : PIT_R - 0.03, depth = isStore ? STORE_D : PIT_D;
-  const per = isStore ? 14 : 8; const layer = Math.floor(k / per), j = k % per;
-  const a = j * 2.39996 + (isStore ? +home[1] : home) * 0.7 + layer * 1.1;
-  const rr = j === 0 ? 0 : Math.min(1, 0.36 * Math.sqrt(j));
-  const x = cx + Math.cos(a) * rr * rx, z = cz + Math.sin(a) * rr * rz;
-  const y = BT - bowl(x - cx, z - cz, isStore ? STORE_RX : PIT_R, isStore ? STORE_RZ : PIT_R, depth) + SET.r[1] * 0.92 + layer * 0.022;
-  return new THREE.Vector3(x, y, z);
+// Where seeds lie (slots.js pours them in): the k-th seed of a pit or trough always has the k-th spot, so a pit of four
+// is four seeds at the bottom and a winner's seeds lie as a bed in the trough, below the rim, not heaped over it.
+const SHAPES = { pit: { rx: PIT_R, rz: PIT_R, depth: PIT_D }, store: { rx: STORE_RX, rz: STORE_RZ, depth: STORE_D, flat: STORE_FLAT }, hand: { rx: 0.062, rz: 0.062, depth: 0.016 } };
+const HAND_Y = 0.07; // the hand holds the seeds this far over the board
+const seedDims = () => { const [a, b, c] = SET.r; return { a: (a + c) / 2 * 0.98, b }; };
+const poured = {};
+function spots(kind) { const key = seedSetId() + ':' + kind; return poured[key] || (poured[key] = pour(SHAPES[kind], seedDims(), 48, kind.length)); }
+function bowlOf(home) { const store = typeof home === 'string'; return { store, c: store ? storeCenters[+home[1]] : pitCenters[home], turn: store ? (home === 'S1' ? Math.PI : 0) : home * 2.39996 }; }
+function slotPose(home, k, m) { // where the k-th seed of a home lies, and how it lies there
+  const { store, c, turn } = bowlOf(home); const list = spots(store ? 'store' : 'pit');
+  const p = place(list[Math.min(k, list.length - 1)], c[0], c[1], BT, turn);
+  if (m) p.y += SET.r[1] * (m.userData.jit[1] - 1); // a bigger seed sits a touch higher
+  return p;
 }
+const handPose = (pit, k) => place(spots('hand')[Math.min(k, 47)], pitCenters[pit][0], pitCenters[pit][1], BT + HAND_Y, pit * 1.3);
+function put(m, p) { m.position.set(p.x, p.y, p.z); m.rotation.set(p.rx, p.ry, p.rz); }
 function makeSeed() {
-  const m = new THREE.Mesh(seedGeometry, seedMat);
+  const m = new THREE.Mesh(seedGeometry, seedMat); m.rotation.order = 'XZY'; // turned to its yaw, then leant with what it rests on (slots.js)
   m.userData.jit = [0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2]; // each seed its own size, kept across seed sets
   m.scale.set(SET.r[0] * m.userData.jit[0], SET.r[1] * m.userData.jit[1], SET.r[2] * m.userData.jit[2]);
   m.rotation.set(rnd() * 0.6 - 0.3, rnd() * Math.PI * 2, rnd() * 0.6 - 0.3);
   m.castShadow = true; m.receiveShadow = true; scene.add(m); seeds.push(m); return m;
 }
 function settle(m, home) { // put a seed at rest in a home (no animation)
-  homes[home].push(m); m.userData.home = home; m.position.copy(slotPos(home, homes[home].length - 1));
+  homes[home].push(m); m.userData.home = home; moved(m); put(m, slotPose(home, homes[home].length - 1, m));
 }
+const moved = (m) => { m.userData.v = (m.userData.v || 0) + 1; }; // a seed on the move: anything rocking it lets go
 function layoutFromState(s) { // rebuild every seed's home from an engine state (used for new game, undo, resume)
-  for (const k in homes) homes[k].length = 0;
+  sim.finish(); for (const k in homes) homes[k].length = 0;
   let n = 0;
   const take = () => seeds[n++] || makeSeed();
   s.pits.forEach((c, i) => { for (let j = 0; j < c; j++) settle(take(), i); });
@@ -111,25 +151,42 @@ function runTweens(now) {
 const easeOut = (t) => 1 - (1 - t) ** 3, easeIn = (t) => t * t, easeInOut = (t) => t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 const wait = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? 0 : ms));
 
-// move one seed along an arc from where it is to a resting slot
-function fly(m, home, ms = 170, lift = 0.09) {
-  const from = m.position.clone(); homes[home].push(m); m.userData.home = home; const to = slotPos(home, homes[home].length - 1);
-  const r0 = m.rotation.clone(); const spin = (rnd() - 0.5) * 1.5;
+// move one seed along an arc from where it is to its spot (no physics: the weakest phones, or reduced motion)
+function fly(m, home, ms = 170, lift = 0.06) {
+  const from = m.position.clone(), r0 = m.rotation.clone(); homes[home].push(m); m.userData.home = home; moved(m); const to = slotPose(home, homes[home].length - 1, m);
+  const turn = (a, b) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)); const rx = turn(r0.x, to.rx), ry = turn(r0.y, to.ry), rz = turn(r0.z, to.rz);
   return tween(ms, (t) => {
     m.position.lerpVectors(from, to, t); m.position.y += Math.sin(t * Math.PI) * lift;
-    m.rotation.y = r0.y + spin * t;
-  }, easeInOut).then(() => tween(90, (t) => { m.position.y = to.y + Math.sin(t * Math.PI) * 0.006; }));
+    m.rotation.set(r0.x + (rx - r0.x) * t, r0.y + (ry - r0.y) * t, r0.z + (rz - r0.z) * t);
+  }, easeInOut).then(() => { put(m, to); return reduceMotion ? null : tween(90, (t) => { m.position.y = to.y + Math.sin(t * Math.PI) * 0.005; }); });
 }
 
-// drop a seed into a bowl with real-ish physics: it falls, bounces, rolls and is nudged by the seeds already there
-// (with physics off, the seed still flies pit to pit in a small arc and lands in its slot: every move is shown, nothing rolls)
-function drop(m, home, flight = 0.22) {
-  if (!PHYS.physics) return fly(m, home, Math.round(flight * 1000), 0.06);
-  homes[home].push(m); m.userData.home = home; const target = slotPos(home, homes[home].length - 1);
-  const others = homes[home].filter((o) => o !== m);
-  const p = sim.toss(m, target, others, m.scale.y * 0.95, reduceMotion ? 0.05 : flight);
-  const entry = sim.live[sim.live.length - 1]; if (entry) entry.onBounce = (k) => { if (k > 0.25) tick(0.9 + k * 0.4, 0.05 * k); };
-  return p;
+// drop a seed into a bowl: carried over and let go just above its spot, it falls, bounces off the wood or the seeds
+// below, rolls into place and nestles; the bowl's wall keeps it in (physics.js). Seeds it lands on rock a little.
+// (With physics off the seed still flies pit to pit in a small arc and lands in its spot: every move is shown.)
+function drop(m, home) {
+  const d = Math.hypot(m.position.x - bowlOf(home).c[0], m.position.z - bowlOf(home).c[1]); // sowing next door ~0.15 m, a capture across the board up to ~0.9 m
+  if (!PHYS.physics || reduceMotion) return fly(m, home, reduceMotion ? 40 : Math.round(180 + 260 * d), 0.03 + 0.1 * d);
+  const k = homes[home].length, under = homes[home].slice(); homes[home].push(m); m.userData.home = home; moved(m);
+  const { store, c } = bowlOf(home), seed = seedDims(), { ix, iz } = reach(SHAPES[store ? 'store' : 'pit'], seed);
+  const below = under.map((o, j) => { const q = slotPose(home, j, o); return [q.x, q.y, q.z]; });
+  return sim.toss(m, slotPose(home, k, m), {
+    flight: 0.2 + 0.3 * d, arc: 0.012 + 0.12 * d, bowl: { cx: c[0], cz: c[1], ix, iz }, under: below, seed,
+    onBounce: (s) => { if (s > 0.25) tick(0.9 + s * 0.4, 0.05 * s); }, onNudge: (j, s) => rock(under[j], s),
+  });
+}
+// a seed another lands on rocks a little where it lies, then is still again
+function rock(m, s) {
+  if (!m || s < 0.2 || m.userData.rocking) return; m.userData.rocking = true;
+  const v = m.userData.v, x0 = m.rotation.x, z0 = m.rotation.z, a = 0.05 + 0.12 * s, sx = rnd() < 0.5 ? -1 : 1, sz = rnd() - 0.5;
+  tween(280, (t) => { if (m.userData.v !== v) return; const w = Math.sin(t * Math.PI * 2.5) * (1 - t) * a; m.rotation.x = x0 + w * sx; m.rotation.z = z0 + w * sz; })
+    .then(() => { if (m.userData.v === v) { m.rotation.x = x0; m.rotation.z = z0; } m.userData.rocking = false; });
+}
+
+// carry a seed to a pose (a place in the hand), bowing up `lift` on the way
+function hold(m, to, ms, lift) {
+  const from = m.position.clone(), r0 = m.rotation.clone(), v = m.userData.v, h = m.userData.h = (m.userData.h || 0) + 1; // a newer hold, or a drop, takes over
+  return tween(ms, (t) => { if (m.userData.v !== v || m.userData.h !== h) return; m.position.set(from.x + (to.x - from.x) * t, from.y + (to.y - from.y) * t + Math.sin(t * Math.PI) * lift, from.z + (to.z - from.z) * t); m.rotation.set(r0.x + (to.rx - r0.x) * t * 0.5, r0.y, r0.z + (to.rz - r0.z) * t * 0.5); }, easeOut);
 }
 
 // ---------- sound (synthesised on the device; no audio files) ----------
@@ -587,26 +644,38 @@ async function animate(events, prevStores, pace = PACE) {
     if (e.type === 'pickup') {
       await Promise.all(pending); pending.length = 0;
       if (e.relay) await wait(pace);
-      const picked = homes[e.pit].splice(0); const [cx, cz] = pitCenters[e.pit];
-      await Promise.all(picked.map((m, k) => tween(240, (t) => { m.position.y = surfaceY(m.position.x, m.position.z) + 0.02 + t * 0.14; m.position.x = THREE.MathUtils.lerp(m.position.x, cx + (k % 3 - 1) * 0.018, t * 0.8); m.position.z = THREE.MathUtils.lerp(m.position.z, cz + (Math.floor(k / 3) - 1) * 0.016, t * 0.8); }, easeOut)));
-      rattle(picked.length); setBadge(e.pit, 0); animate.cluster = picked;
+      // the hand scoops the pit: its seeds rise into a small heap held over the pit (the hand), all of them, however many
+      const picked = homes[e.pit].splice(0); picked.forEach(moved);
+      await Promise.all(picked.map((m, k) => hold(m, handPose(e.pit, k), 240, 0.03)));
+      rattle(picked.length); setBadge(e.pit, 0); animate.cluster = picked; animate.over = e.pit;
     } else if (e.type === 'drop') {
-      const m = animate.cluster.shift(); const count = homes[e.pit].length + 1;
-      const [cx, cz] = pitCenters[e.pit];
-      animate.cluster.forEach((s, k) => tween(140, (t) => { s.position.x = THREE.MathUtils.lerp(s.position.x, cx + (k % 3 - 1) * 0.018, t); s.position.z = THREE.MathUtils.lerp(s.position.z, cz + (Math.floor(k / 3) - 1) * 0.016 - 0.03, t); }));
+      // the top seed leaves the hand for this pit while the hand moves on over it; the rest of the heap stays as it is
+      const m = animate.cluster.pop(); const count = homes[e.pit].length + 1; animate.over = e.pit;
+      animate.cluster.forEach((s, k) => hold(s, handPose(e.pit, k), 140, 0));
       // a hand sows at a steady pace: the next seed leaves while the last one is still settling
       pending.push(drop(m, e.pit).then(() => { click(1 + Math.min(count, 8) * 0.04); buzz(8); setBadge(e.pit, count); }));
       await wait(pace);
     } else if (e.type === 'capture') {
+      // a hand sweeps up the captured pits into one heap, carries it over the trough and lets the seeds go into it, the
+      // top ones first: they drop, bounce and lie down in their places (no seeds streaming loose across the board)
       await Promise.all(pending); pending.length = 0;
-      await wait(120); scoop();
-      const store = 'S' + e.by; const scoreEl = e.by === you ? $('#myScore') : $('#oppScore');
+      const k = pace / PACES.normal; // the sowing speed sets this hand's speed too
+      if (animate.cluster && animate.cluster.length) animate.cluster.forEach((s, j) => { const p = handPose(animate.over, j); p.y += 0.08; hold(s, p, 150 * k, 0); }); // a sowing hand still full rises out of the way (Nchò takes a 4 mid-sowing)
+      await wait(120 * k); scoop();
+      const store = 'S' + e.by, scoreEl = e.by === you ? $('#myScore') : $('#oppScore'), hand = [];
       for (const pit of e.pits) {
-        const taken = homes[pit].splice(0); setBadge(pit, 0);
-        for (const m of taken) { drop(m, store, 0.3).then(() => { shown[e.by]++; tickScore(scoreEl, shown[e.by]); click(0.6, 0.1); buzz(12); }); await wait(70); }
-        await wait(120);
+        const taken = homes[pit].splice(0); setBadge(pit, 0); taken.forEach(moved);
+        hand.forEach((s, j) => hold(s, handPose(pit, j), 150 * k, 0));
+        await Promise.all(taken.map((m, j) => hold(m, handPose(pit, hand.length + j), 200 * k, 0.025)));
+        hand.push(...taken);
       }
-      await wait(e.pits.length > 1 ? 300 : 160);
+      const [sx, sz] = storeCenters[e.by], [fx, fz] = pitCenters[e.pits[e.pits.length - 1]], d = Math.hypot(sx - fx, sz - fz);
+      await Promise.all(hand.map((m, j) => hold(m, place(spots('hand')[Math.min(j, 47)], sx, sz, BT + HAND_Y, 0), (260 + 220 * d) * k, 0.06)));
+      for (let j = hand.length - 1; j >= 0; j--) {
+        pending.push(drop(hand[j], store).then(() => { shown[e.by]++; tickScore(scoreEl, shown[e.by]); click(0.6, 0.1); buzz(12); }));
+        await wait(45 * k);
+      }
+      await wait(120 * k);
     }
   }
   await Promise.all(pending);
@@ -938,7 +1007,7 @@ function tipFor(events) {
 // ---------- input ----------
 const ray = new THREE.Raycaster(), ptr = new THREE.Vector2(); let down = null, dragged = false;
 const fingers = new Map(); let pinch = null; // two-finger zoom on the phone
-const clampDist = () => { dist = Math.min(2.4, Math.max(0.8, dist)); };
+const clampDist = () => { dist = Math.min(fitDist * 1.6, Math.max(fitDist * 0.5, dist)); };
 canvas.addEventListener('pointerdown', (e) => {
   if (!shoutMenu.hidden) toggleShoutMenu(false); // a tap on the board closes the shout row
   fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
@@ -1003,8 +1072,10 @@ soundBtn.addEventListener('click', () => { prefs.set('sound', soundOn() ? '0' : 
 paintRules(); paintMyName(); layoutFromState(state); refreshStatic();
 if (roomParam === 'new') openRooms(); // the old way in: the Rooms screen now
 else if (roomParam) startOnline(roomParam); // an invite link: straight to the board, knocking
-else if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected
-  state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; layoutFromState(state); refreshStatic(); select(3); showScreen('play');
+else if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected (?still=late: near the end, both troughs full)
+  if (params.get('still') === 'late') { state.pits = [0, 1, 0, 2, 1, 0, 0, 1, 1, 0, 1, 1]; state.stores = [18, 22]; }
+  else { state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; }
+  layoutFromState(state); refreshStatic(); select(3); showScreen('play');
 } else if (params.get('puzzle')) { // the shared link, and the render: straight to today's puzzle
   openPuzzle(); if (location.search && !params.get('capture')) history.replaceState(null, '', location.pathname);
 } else if (params.get('capture') && !params.get('stay')) { // the smoke test starts straight into a game
@@ -1013,7 +1084,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

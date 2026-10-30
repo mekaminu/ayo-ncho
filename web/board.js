@@ -1,25 +1,27 @@
 // The 3D board: geometry, materials, lights, camera. Pure scene-building; no game logic here.
 import * as THREE from 'three';
 import { woodTextures, seedTexture, stoneTexture, clothTexture } from './textures.js';
+import { bowl } from './slots.js'; // the bowl's curve lives with the seeds that lie in it
+export { bowl };
 
 // Board sizes (metres). Length runs along Z towards the player, width along X.
-export const BW = 0.42, BL = 1.24, BT = 0.085, R = 0.19;
-export const PIT_R = 0.082, PIT_D = 0.054, STORE_RX = 0.155, STORE_RZ = 0.052, STORE_D = 0.034;
+export const BW = 0.42, BL = 1.28, BT = 0.085, R = 0.19;
+// The end troughs are round-ish cups that fill the board's rounded ends, deeper than the pits are and flatter-bottomed
+// (30 Oct, after Meka saw 22 seeds heaped over the old shallow trough): a winner's seeds lie in them, below the rim.
+// The board grew 4 cm to make room; the walls to the nearest pits and to the rim stay 6 mm and 8 mm.
+export const PIT_R = 0.082, PIT_D = 0.054, STORE_RX = 0.154, STORE_RZ = 0.086, STORE_D = 0.058, STORE_FLAT = 1.8;
 
 // Pit centres by engine index: 0..5 the player's (right column, near → far), 6..11 the opponent's (left column, far → near).
 export const pitCenters = [];
 const colX = 0.105, rowZ0 = 0.37, rowStep = 0.148;
 for (let r = 0; r < 6; r++) pitCenters.push([colX, rowZ0 - r * rowStep]);
 for (let r = 0; r < 6; r++) pitCenters.push([-colX, (rowZ0 - 5 * rowStep) + r * rowStep]);
-export const storeCenters = [[0, 0.545], [0, -0.545]]; // player's (near), opponent's (far)
+export const storeCenters = [[0, 0.528], [0, -0.528]]; // player's (near), opponent's (far)
 
-export function bowl(dx, dz, rx, rz, depth) {
-  const d = Math.sqrt((dx / rx) ** 2 + (dz / rz) ** 2); if (d >= 1) return 0; const t = 1 - d * d; return depth * (t * t * (3 - 2 * t));
-}
 export function carve(x, z) {
   let d = 0;
   for (const [px, pz] of pitCenters) d = Math.max(d, bowl(x - px, z - pz, PIT_R, PIT_R, PIT_D));
-  for (const [sx, sz] of storeCenters) d = Math.max(d, bowl(x - sx, z - sz, STORE_RX, STORE_RZ, STORE_D));
+  for (const [sx, sz] of storeCenters) d = Math.max(d, bowl(x - sx, z - sz, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT));
   return d;
 }
 // Height of the carved surface at board-local x,z.
