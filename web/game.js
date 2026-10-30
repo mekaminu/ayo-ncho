@@ -13,6 +13,7 @@ import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } fr
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { sowPath, pickedHint, playedWords } from './path.js';
+import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare } from './local.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, bowl, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, BT } from './board.js';
 
 const $ = (s) => document.querySelector(s);
@@ -164,7 +165,7 @@ const v3 = new THREE.Vector3();
 function placeBadges() {
   const w = canvas.clientWidth, h = canvas.clientHeight; const show = prefs.get('badges', '1') === '1';
   pitCenters.forEach(([x, z], i) => {
-    const flip = you === 1 ? -1 : 1; // from the far seat the board is seen the other way round: badges stay at the outer, nearer corner of each pit
+    const flip = badgeFlip(theta); // seen from the far end (the far seat of a room, or two of us passing the phone) the board is the other way round: badges stay at the outer, nearer corner of each pit
     v3.set(x + (i < 6 ? PIT_R * 0.7 : -PIT_R * 0.7), BT + 0.01, z + PIT_R * 0.75 * flip).project(camera);
     const b = badges[i]; b.style.transform = `translate(${(v3.x * 0.5 + 0.5) * w}px, ${(-v3.y * 0.5 + 0.5) * h}px)`; b.hidden = !show;
   });
@@ -199,10 +200,21 @@ const settings = {
   },
   get level() { return prefs.get('level', 'medium'); },
   get speed() { return prefs.get('speed', 'normal'); },
+  get mode() { return prefs.get('mode', 'ai'); }, // 'ai': the chosen opponent · 'local': two of us on this phone
 };
 const PACES = { slow: 230, normal: 150, fast: 90 };
 let PACE = PACES[settings.speed] || 150;
-let you = 0, them = 1; // engine seats: offline you are always 0; in a room you take the seat the server gives you
+let you = 0, them = 1; // engine seats: against the computer you are always 0; in a room you take the seat the server gives you; two of us: the player to move
+// two of us on one phone (web/local.js): no computer plays; after each move the near seat passes to the other player and the board swings
+// round to face them (Settings → Feel → Pass the phone — off when the Fold lies flat between you and each side already has its pits nearest it)
+let local = false; const swingOn = () => prefs.get('swing', '1') === '1';
+function seat(s) { you = s; them = 1 - s; baseTheta = s === 1 ? Math.PI : 0; } // the near seat (the camera gets there by the screen's swing, or passTurn's)
+async function passTurn() { // two of us: the player to move takes the near seat; the board turns on round to face them, never back the way it came
+  const s = seatOf(state); if (s === you) return;
+  busy = true; deselect(); seat(s);
+  if (swingOn()) { const from = theta, to = swingTheta(theta, s); click(1.1, 0.04); await tween(700, (t) => { theta = from + (to - from) * t; }, easeInOut); }
+  busy = false; refreshStatic();
+}
 const names = { easy: 'Adaeze', medium: 'Nnamdi', hard: 'Mama Ngozi' };
 const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
@@ -218,9 +230,10 @@ function paintRecordPills() { document.querySelectorAll('.pill[data-level] small
 const roomParam = params.get('still') ? null : params.get('room');
 let online = false, roomWanted = null; // online while a room is open, knocked on or joined (from the Rooms screen, or ?room=CODE from an invite link); roomWanted: 'NEW' or the code asked for
 let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
-const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : levelLabel(level);
-const myName = () => prefs.get('name', '') || $('#meName').textContent || 'Player';
-function paintMyName() { const n = prefs.get('name', ''); if (n) { $('#meName').textContent = n; $('#goMe span').textContent = n; } }
+const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : local ? LNAMES[them] : levelLabel(level);
+const defaultMe = $('#meName').textContent;
+const myName = () => prefs.get('name', '') || defaultMe || 'Player';
+function paintMyName() { const n = local ? LNAMES[you] : prefs.get('name', '') || defaultMe; $('#meName').textContent = n; $('#goMe span').textContent = n; } // two of us: the near card is whoever is to move
 // the name card: asked once (before a room is opened or knocked on), then remembered on this phone
 function askName(verb) {
   return new Promise((res) => {
@@ -366,7 +379,7 @@ function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location
 function startOnline(code, { stay = false } = {}) {
   // code: 'new' opens a room, a four-letter code knocks on one. stay: asked from the Rooms screen, which stays up (the door card over it)
   // until a friend is in; otherwise (an invite link) the board shows at once with "Joining the room…"
-  roomWanted = String(code).toUpperCase(); online = true;
+  roomWanted = String(code).toUpperCase(); online = true; local = false;
   net = new Online((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
   const self = net; const on = (t, fn) => self.on(t, (d) => { if (net === self) fn(d); }); // a room left behind (Back, a new name) says nothing more
   let held = null; try { held = JSON.parse(prefs.get('room', 'null')); } catch {}
@@ -439,12 +452,12 @@ async function hint() {
 }
 
 function paintFaces() {
-  $('#oppFace').innerHTML = online ? initialFace(friend ? friend.name : '?') : faceFor(level, mood);
+  $('#oppFace').innerHTML = online ? initialFace(friend ? friend.name : '?') : local ? initialFace(String(them + 1)) : faceFor(level, mood); // two of us: the far player's number on a brass ring
   document.querySelectorAll('.pill[data-level]').forEach((b) => { b.querySelector('.face').innerHTML = CHARACTERS[b.dataset.level].face; });
   document.querySelectorAll('[data-face]').forEach((f) => { f.innerHTML = CHARACTERS[f.dataset.face].face; });
 }
 function refreshStatic() {
-  paintFaces();
+  paintFaces(); paintMyName();
   state.pits.forEach((n, i) => setBadge(i, n));
   $('#myScore').textContent = state.stores[you]; $('#oppScore').textContent = state.stores[them];
   $('#oppName').textContent = oppLabel();
@@ -454,10 +467,10 @@ function showTurn() {
   if (online) { showTurnOnline(); paintPits(); return; }
   if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : pickHint('puzzle'); $('#undo').disabled = true; $('#hintBtn').disabled = true; paintPits(); return; }
   const mine = state.turn === you && !state.over;
-  $('#turn').textContent = state.over ? 'game over' : mine ? 'your move' : '…';
-  $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…';
+  if (local) { const w = localTurn(state); $('#turn').textContent = mine || state.over ? w.turn : '…'; $('#oppSub').textContent = mine ? w.sub : state.over ? '' : 'passing the phone…'; }
+  else { $('#turn').textContent = state.over ? 'game over' : mine ? 'your move' : '…'; $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…'; }
   $('#hint').textContent = state.over ? '' : mine ? pickHint('pick') : '';
-  $('#undo').disabled = busy || state.moves.length < 2;
+  $('#undo').disabled = busy || state.moves.length < (local ? 1 : 2);
   $('#hintBtn').disabled = !mine || busy || hintedAt === state.moves.length;
   paintPits();
 }
@@ -512,7 +525,7 @@ let theirs = null, replaying = false, theirsFade = null; const lastBtn = $('#las
 function explain(before, pit, events) {
   hideExplain(); if (!pathOn() || state.over || !body.classList.contains('playing')) return;
   const p = sowPath(before, pit); if (!p) return;
-  theirs = { before, pit, events, path: p, name: online ? (friend ? friend.name : 'They') : names[level] };
+  theirs = { before, pit, events, path: p, name: online ? (friend ? friend.name : 'They') : local ? LNAMES[before.turn] : names[level] };
   $('#lastName').textContent = theirs.name; $('#lastWords').textContent = playedWords(p, { you });
   lastBtn.setAttribute('aria-label', `${theirs.name}'s move: ${playedWords(p, { you })}. Watch it again, slowly`); lastBtn.hidden = false;
   if (selected !== null) return; // a pit already picked: its own path is showing
@@ -571,16 +584,17 @@ async function play(pit) {
   const prevStores = state.stores; const mover = state.turn; const before = state; state = next; busy = true; deselect(); $('#undo').disabled = true;
   if (mover === you) {
     hideExplain(); // their last move is old news once you have played
-    const got = state.stores[0] - prevStores[0]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length;
+    const got = state.stores[mover] - prevStores[mover]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === mover).length; // two of us: the biggest turn by either
     const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak));
     if (r.unlocked) setTimeout(() => { toast(`${r.unlocked.name} unlocked — pick them in Settings`); buzz([20, 40, 20]); click(1.8, 0.1); setTimeout(() => click(2.4, 0.1), 140); }, 1200);
   }
   tipFor(events);
   const aiGot = state.stores[1] - prevStores[1], meGot = state.stores[0] - prevStores[0];
-  if (mover === them && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400);
+  if (!local) { if (mover === them && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400); }
   await animate(events, prevStores);
   busy = false; refreshStatic(); save();
   if (state.over) return gameOver();
+  if (local) { await passTurn(); explain(before, pit, events); return; } // two of us: the board turns to the next player, with the move just played explained for them
   if (mover === them) explain(before, pit, events); // their move, explained: the ghost of its path and the words, tap to watch it again
   if (state.turn === them) {
     showTurn(); await wait(350); if (mood === 'calm') react('think');
@@ -603,7 +617,7 @@ function paintPuzzleCard() { // the Home card: today's ask and where you stand
 }
 function openPuzzle() { // Home → the card: the board shows today's position, your pits nearest you, and waits for one move
   if (online) return; // your game is already saved move by move; Back to home brings it back
-  const p = todaysPuzzle(); puzzle.on = true; puzzle.played = false; puzzle.got = 0; you = 0; them = 1;
+  const p = todaysPuzzle(); puzzle.on = true; puzzle.played = false; puzzle.got = 0; seat(0);
   state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); hintedAt = -1;
   $('#pzDay').textContent = `Daily puzzle · ${dayLabel(p.key)}`; $('#pzRules').textContent = `${p.variant === 'ncho' ? 'Nchò' : 'Ayo'} rules`; $('#pzAsk').textContent = `Capture ${p.target} in one turn`;
   $('#pzHow').textContent = p.variant === 'ncho' ? 'One move. Your pits are on the right. Relay sowing counts.' : 'One move. Your pits are on the right. 2s and 3s behind your last seed count too.';
@@ -680,10 +694,11 @@ let idle = true; // the home screen slowly turns the board
 function paintHome() {
   const g = settings.game;
   document.querySelectorAll('[data-game]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.game === g));
-  document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.level === level));
-  $('#playSub').textContent = 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak); paintPuzzleCard(); paintRecordPills();
+  document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', settings.mode !== 'local' && b.dataset.level === level));
+  const two = settings.mode === 'local'; $('.pill[data-mode="local"]').setAttribute('aria-pressed', two);
+  $('#playSub').textContent = two ? LOCAL_SUB : 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak); paintPuzzleCard(); paintRecordPills();
   const saved = savedGame();
-  $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
+  $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? saved.local ? localContinue(saved) : `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
 }
 function paintSettings() {
   const r = settings.rules();
@@ -692,29 +707,30 @@ function paintSettings() {
   const stones = unlocked(streak, 'stones'); $('[data-set="seeds"] [data-v="stones"]').disabled = !stones;
   $('#seedsSub').textContent = stones ? "Job's tears · river stones (yours: 7 days played)" : `Job's tears · river stones unlock at ${MILESTONES[0].days} days played (${streak.days.length} so far)`;
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
-  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn());
+  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('swing', swingOn());
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
-  document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
+  document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
+  const two = $('.choose[data-mode="local"]'); two.setAttribute('aria-pressed', settings.mode === 'local'); two.textContent = settings.mode === 'local' ? 'Chosen' : 'Choose';
 }
 // ---------- the opponent's face reacts: a mood for a moment, then back to calm; blinks now and then while waiting ----------
 let mood = 'calm', moodTimer = null, blinkTimer = null;
 function react(next, ms = 2600) {
-  if (params.get('still') || online) return; clearTimeout(moodTimer); mood = next; const f = $('#oppFace'); f.innerHTML = faceFor(level, mood);
+  if (params.get('still') || online || local) return; clearTimeout(moodTimer); mood = next; const f = $('#oppFace'); f.innerHTML = faceFor(level, mood);
   if (next !== 'calm' && next !== 'blink' && next !== 'think') { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); }
   if (next !== 'calm' && next !== 'think') moodTimer = setTimeout(() => react('calm'), ms);
 }
 function blinkLoop() { // a blink every few seconds, only on a calm face, never under reduced motion
-  clearTimeout(blinkTimer); if (reduceMotion || params.get('still') || online) return;
+  clearTimeout(blinkTimer); if (reduceMotion || params.get('still') || online || local) return;
   blinkTimer = setTimeout(() => { if (mood === 'calm' && body.classList.contains('playing')) { $('#oppFace').innerHTML = faceFor(level, 'blink'); setTimeout(() => { if (mood === 'calm') $('#oppFace').innerHTML = faceFor(level, 'calm'); }, 130); } blinkLoop(); }, 2800 + Math.random() * 4200);
 }
 let bubbleTimer = null;
 function say(moment) {
-  if (online) return; // a friend speaks for themselves
+  if (online || local) return; // a friend speaks for themselves, and two of us need no third voice
   sayText(line(level, moment), MOOD_FOR[moment] || 'calm');
 }
 function sayText(text, mood = 'calm', ms = 2600) { // the opponent says these words, with the face to match
-  if (online) return; react(mood);
+  if (online || local) return; react(mood);
   if (!text || params.get('still')) return;
   const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, ms);
 }
@@ -745,9 +761,11 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
     }));
   }
 });
-document.querySelectorAll('.choose[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); mood = 'calm'; paintSettings(); refreshStatic(); click(1.2, 0.05); }));
+document.querySelectorAll('.choose[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); mood = 'calm'; paintSettings(); refreshStatic(); click(1.2, 0.05); }));
+$('.choose[data-mode="local"]').addEventListener('click', () => { prefs.set('mode', 'local'); paintSettings(); click(1.2, 0.05); toast('Two of us on the next game'); });
 document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('click', () => { prefs.set('game.variant', b.dataset.game); prefs.set('rules.capture', ''); prefs.set('rules.relay', ''); prefs.set('rules.last8', ''); paintHome(); click(1.2, 0.05); }));
-document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); paintHome(); click(1.2, 0.05); }));
+document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); paintHome(); click(1.2, 0.05); }));
+$('.pill[data-mode="local"]').addEventListener('click', () => { prefs.set('mode', 'local'); paintHome(); click(1.2, 0.05); }); // two of us on this phone: no computer plays
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
 $('#playBtn').addEventListener('click', () => { newRound(); showScreen('play'); click(1.3, 0.08); });
 $('#continueBtn').addEventListener('click', () => { if (resume()) { hideExplain(); layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
@@ -762,7 +780,7 @@ $('#settingsRules').addEventListener('click', () => { $('#rules').hidden = false
 function gameOver() {
   const a = state.stores[you], b = state.stores[them]; const win = state.winner === you; const draw = state.winner === 'draw';
   $('#goEyebrow').textContent = `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves`;
-  $('#goTitle').textContent = draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
+  $('#goTitle').textContent = local ? localTitle(state) : draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
   $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = oppLabel();
   $('#rematch').textContent = online ? (friend && friend.wantsRematch ? `Play again — ${friend.name} is ready` : 'Play again') : 'Play again'; $('#rematch').disabled = false;
   $('#goMe').classList.toggle('win', a >= b); $('#goOpp').classList.toggle('win', b > a);
@@ -771,12 +789,12 @@ function gameOver() {
   const word = paintRecord(a, b);
   $('#gameover').hidden = false; if (!online) prefs.set('game', 'null');
   if (word) sayText(word.text, word.mood); else say(win ? 'lose' : 'win'); // a run or a first win is worth their word more than the usual line
-  if (win) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
+  if (win || (local && !draw)) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
 }
 // your record against this opponent, counted once per game (the game's start time is its id) and shown on the card with their face;
 // when the result is worth a word (your first win against them, a run of 3, 5, 10…) they say it, on the card and in the bubble
 function paintRecord(a, b) {
-  const box = $('#goRecord'); if (online || puzzle.on) { box.hidden = true; return null; }
+  const box = $('#goRecord'); if (online || puzzle.on || local) { box.hidden = true; return null; } // two of us keeps no record: the phone cannot tell who sat where
   const r = recordGame(records, level, a, b, stats.started); records = r.data; if (r.counted) prefs.set('record', JSON.stringify(records));
   const text = recordLine(r.entry, r.counted && r.newBest); if (!text) { box.hidden = true; return null; }
   $('#goRecLine').innerHTML = text.split(' · ').map((p) => p.startsWith('new best') ? `<em>${p}</em>` : p).join(' · '); // our own numbers and words, nothing typed
@@ -796,7 +814,7 @@ $('#replayBtn').addEventListener('click', async () => {
 });
 function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); $('#myScore').textContent = s.stores[you]; $('#oppScore').textContent = s.stores[them]; }
 $('#shareBtn').addEventListener('click', async () => {
-  const a = state.stores[you], b = state.stores[them]; const text = `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`;
+  const a = state.stores[you], b = state.stores[them]; const text = local ? localShare(state) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`;
   try {
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/png')); const file = blob && new File([blob], 'ayo-ncho.png', { type: 'image/png' });
     if (navigator.share && file && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ text, files: [file] });
@@ -826,7 +844,7 @@ async function recordClip(deliver = true) {
   const blob = rec ? await new Promise((res) => { rec.onstop = () => res(new Blob(chunks, { type: rec.mimeType || type })); rec.stop(); }) : null;
   const ms = Math.round(performance.now() - t0); $('#rec').hidden = true;
   layoutFromState(state); refreshStatic(); busy = false; clipping = false; selected = null; if (wasOver) $('#gameover').hidden = false;
-  const caption = clipCaption(turn, online ? oppLabel() : names[level], state.variant);
+  const caption = clipCaption(turn, online || local ? oppLabel() : names[level], state.variant);
   if (deliver) await deliverClip(blob, caption);
   return { size: blob ? blob.size : 0, type: blob ? blob.type : null, ms, turn: { index: turn.index, seeds: turn.seeds, relays: turn.relays, drops: turn.drops } };
 }
@@ -844,18 +862,19 @@ async function deliverClip(blob, caption) {
 }
 $('#clipBtn').addEventListener('click', () => { recordClip(); click(1.3, 0.08); });
 
-function save() { if (online) return; prefs.set('game', JSON.stringify({ moves: state.moves, variant: state.variant, rules: state.rules, level, stats })); }
-function savedGame() { try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length) { const s = replay(g.moves, g.variant, g.rules); return s.over ? null : s; } } catch {} return null; }
+function save() { if (online) return; prefs.set('game', JSON.stringify({ moves: state.moves, variant: state.variant, rules: state.rules, level, stats, local })); }
+function savedGame() { try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length) { const s = replay(g.moves, g.variant, g.rules); return s.over ? null : { ...s, local: !!g.local }; } } catch {} return null; }
 function resume() {
-  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; return !state.over; } } catch {}
-  return false;
+  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; local = !!g.local; seat(local ? seatOf(state) : 0); return !state.over; } } catch {}
+  local = false; seat(0); return false;
 }
-function newRound() { hideExplain(); state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); setTimeout(() => say('start'), 600); }
-function kickAi() { if (state.turn === them && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
-function undo() {
-  if (busy || online || state.moves.length < 2) return;
-  const moves = state.moves.slice(0, state.turn === you ? -2 : -1);
-  hideExplain(); state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06); say('undo');
+function newRound() { hideExplain(); local = settings.mode === 'local'; seat(0); state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); if (local) setTimeout(() => toast(`${LNAMES[0]} starts — pass the phone after each move`), 600); else setTimeout(() => say('start'), 600); }
+function kickAi() { if (!local && state.turn === them && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
+async function undo() {
+  if (busy || online || state.moves.length < (local ? 1 : 2)) return;
+  const moves = local ? localUndo(state.moves) : state.moves.slice(0, state.turn === you ? -2 : -1); // two of us: one move back, and the board turns back to whoever played it
+  hideExplain(); state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
+  if (local) await passTurn(); else say('undo');
 }
 function paintRules() { $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
 
@@ -959,7 +978,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, replayLast, get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, replayLast, get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

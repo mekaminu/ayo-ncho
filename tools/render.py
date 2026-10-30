@@ -22,11 +22,15 @@
 #                  and check the Home card says solved (<out>-home.png); --wide for the Mac layout
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
+#        --local: two of us on one phone — Home → the "Two of us" pill → Play: Player 1 plays, the board swings half a turn round to face
+#                  Player 2 (the HUD names them, the move just played is explained for them; picture <out>), Player 2 plays and it swings on,
+#                  Undo takes one move back and turns back to whoever played it; Home says "Two of us · …" under Continue; with Settings →
+#                  Feel → Pass the phone off the seat still passes but the board stays. --wide for the Fold open / the Mac
 #        --record: your record against each opponent — a phone with games already played against all three and a saved game one move from a
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -156,7 +160,7 @@ with sync_playwright() as p:
         before = {"easy": {"w": 4, "l": 2, "d": 0, "best": [31, 17], "run": 1}, "medium": {"w": 1, "l": 3, "d": 1, "best": [25, 23], "run": -2}, "hard": {"w": 2, "l": 1, "d": 0, "best": [26, 22], "run": 2}, "last": 1}
         pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.record', %s); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.tutorial', '3');" % (json.dumps(json.dumps(saved)), json.dumps(json.dumps(before))))
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -235,6 +239,49 @@ with sync_playwright() as p:
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
+    if local:  # two of us on one phone: no computer, the near seat passes after every move and the board turns to face it
+        pg.click('.pill[data-mode="local"]'); pg.wait_for_function("document.querySelector('#playSub').textContent==='Two of us · pass the phone'", timeout=5000)
+        assert pg.evaluate("document.querySelector('.pill[data-mode=\"local\"]').getAttribute('aria-pressed')") == "true" and pg.evaluate("[...document.querySelectorAll('.pill[data-level]')].every(b=>b.getAttribute('aria-pressed')==='false')"), "the pill should be the one chosen"
+        pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy && window.__ayo.local && window.__ayo.seat===0", timeout=20000)
+        def settled():  # the camera at rest: the swing from Home's slow turn (a tween) is over
+            pg.wait_for_function("window.__ayo.tweens===0 && !window.__ayo.busy", timeout=20000); return pg.evaluate("window.__ayo.theta")
+        th0 = settled(); assert abs(((th0 % (2 * 3.141592653589793)) + 2 * 3.141592653589793) % (2 * 3.141592653589793)) < 0.05, th0
+        assert pg.evaluate("document.querySelector('#meName').textContent") == "Player 1" and pg.evaluate("document.querySelector('#oppName').textContent") == "Player 2", "the near card is Player 1, the far one Player 2"
+        assert pg.evaluate("document.querySelector('#oppSub').textContent") == "waiting" and pg.evaluate("document.querySelector('#turn').textContent") == "your move"
+        tap(pg, 2)  # Player 1 plays: the board turns half a turn to face Player 2
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.seat===1 && window.__ayo.state.moves.length===1 && document.querySelector('#turn').textContent==='your move'", timeout=240000)
+        th1 = pg.evaluate("window.__ayo.theta"); assert abs(th1 - th0 - 3.141592653589793) < 0.05, (th0, th1)
+        assert pg.evaluate("document.querySelector('#meName').textContent") == "Player 2" and pg.evaluate("document.querySelector('#oppName').textContent") == "Player 1"
+        assert pg.evaluate("document.querySelector('#oppSub').textContent") == "waiting" and pg.evaluate("document.querySelector('#bubble').hidden"), "nobody speaks for a computer that is not playing"
+        ex = pg.evaluate("window.__ayo.explain"); assert ex and ex["name"] == "Player 1" and ex["moves"] == 0, ex  # Player 1's move, explained for Player 2
+        assert pg.evaluate("document.querySelector('#lastName').textContent") == "Player 1" and not pg.evaluate("document.querySelector('#lastMove').hidden")
+        assert not pg.evaluate("document.querySelector('#undo').disabled"), "one move back is allowed"
+        legal = pg.evaluate("window.__ayo.legal"); assert legal and all(6 <= p <= 11 for p in legal), legal  # Player 2's pits
+        print("local: Player 1 played pit 2 · board turned", round(th0, 2), "→", round(th1, 2), "· explained:", pg.evaluate("document.querySelector('#lastWords').textContent"))
+        pg.wait_for_timeout(600); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        tap(pg, max(legal))  # Player 2 plays: on it turns, to Player 1
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.seat===0 && window.__ayo.state.moves.length===2 && document.querySelector('#turn').textContent==='your move'", timeout=240000)
+        th2 = pg.evaluate("window.__ayo.theta"); assert abs(th2 - th1 - 3.141592653589793) < 0.05, (th1, th2)
+        assert pg.evaluate("document.querySelector('#meName').textContent") == "Player 1" and pg.evaluate("window.__ayo.explain")["name"] == "Player 2"
+        pg.click("#undo")  # one move back: Player 2 has it again and the board turns to them
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.seat===1 && window.__ayo.state.moves.length===1", timeout=20000)
+        th3 = pg.evaluate("window.__ayo.theta"); assert abs(th3 - th2 - 3.141592653589793) < 0.05, (th2, th3)
+        assert pg.evaluate("document.querySelector('#meName').textContent") == "Player 2" and pg.evaluate("window.__ayo.explain") is None
+        print("local: Player 2 played, Undo gave it back; board at", round(th3, 2))
+        pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])", timeout=5000)
+        cont = pg.evaluate("document.querySelector('#continueSub').textContent"); assert cont.startswith("Two of us · ") and cont.endswith("· 1 moves in"), cont
+        assert json.loads(pg.evaluate("localStorage.getItem('ayo.game')"))["local"] is True
+        pg.evaluate("localStorage.setItem('ayo.swing','0')")  # the phone lies flat: the seat still passes, the board stays
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy && window.__ayo.seat===1", timeout=20000)
+        th4 = settled(); tap(pg, max(pg.evaluate("window.__ayo.legal")))
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.seat===0 && window.__ayo.state.moves.length===2", timeout=240000)
+        th5 = pg.evaluate("window.__ayo.theta"); assert abs(th5 - th4) < 0.05, ("with Pass the phone off the board must not turn", th4, th5)
+        assert pg.evaluate("document.querySelector('#meName').textContent") == "Player 1"
+        pg.evaluate("localStorage.setItem('ayo.swing','1')")
+        print("local: Pass the phone off → seat passed, board stayed ·", cont)
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
     if smoke:
         before = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position

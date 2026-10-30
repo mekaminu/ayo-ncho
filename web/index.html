@@ -327,6 +327,7 @@ button{font-family:inherit}
       <button class="pill" data-level="easy" aria-pressed="false"><span class="face s"></span><span class="pt">Easy · Adaeze<small class="rec"></small></span></button>
       <button class="pill" data-level="medium" aria-pressed="true"><span class="face s"></span><span class="pt">Medium · Nnamdi<small class="rec"></small></span></button>
       <button class="pill" data-level="hard" aria-pressed="false"><span class="face s"></span><span class="pt">Hard · Mama Ngozi<small class="rec"></small></span></button>
+      <button class="pill" data-mode="local" aria-pressed="false" title="Two players on this phone — pass it after each move, or lay it flat between you"><span class="face s"><svg viewBox="0 0 44 44" width="100%" height="100%" aria-hidden="true"><circle cx="22" cy="22" r="22" fill="#3a2718"/><circle cx="22" cy="22" r="19" fill="none" stroke="#e6b76f" stroke-opacity=".55"/><circle cx="16" cy="17" r="5" fill="#e6b76f"/><path d="M7 32c1-6 5-9 9-9s8 3 9 9" fill="#e6b76f"/><circle cx="29" cy="19" r="4.2" fill="#e6b76f" fill-opacity=".7"/><path d="M23 32c.8-4.5 3.4-7.5 6.5-7.5S35 27.5 36 32" fill="#e6b76f" fill-opacity=".7"/></svg></span><span class="pt">Two of us<small class="rec">on this phone</small></span></button>
     </div>
     <p class="streak" id="streakLine" aria-live="polite"></p>
   </div>
@@ -399,6 +400,7 @@ button{font-family:inherit}
       <div class="box">
         <div class="row"><div class="t"><b>Sound</b><span>wood knocks, rattle, scoop</span></div><button class="sw" role="switch" data-set="sound" aria-checked="true" aria-label="Sound"><i></i></button></div>
         <div class="row"><div class="t"><b>Haptics</b><span>a tap for every seed</span></div><button class="sw" role="switch" data-set="haptics" aria-checked="true" aria-label="Haptics"><i></i></button></div>
+        <div class="row"><div class="t"><b>Pass the phone</b><span>two of us: the board turns round to face whoever is to move; off when the phone lies flat between you</span></div><button class="sw" role="switch" data-set="swing" aria-checked="true" aria-label="Pass the phone"><i></i></button></div>
         <div class="row"><div class="t"><b>Show where seeds go</b><span>on the first tap, a mark on every pit the hand will reach and a light where it ends; after their move, its path and the words, tap to watch it again</span></div><button class="sw" role="switch" data-set="path" aria-checked="true" aria-label="Show where seeds go"><i></i></button></div>
         <div class="row"><div class="t"><b>Sowing speed</b><span>how fast the hand moves</span></div><div class="seg" data-set="speed"><button class="segbtn" data-v="slow">Slow</button><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="fast">Fast</button></div></div>
         <div class="row"><div class="t"><b>Lighter board</b><span>for slow phones and weak signal · <em id="qualityNow">auto</em></span></div><div class="seg" data-set="quality"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="lite">On</button><button class="segbtn" data-v="full">Off</button></div></div>
@@ -410,6 +412,7 @@ button{font-family:inherit}
         <div class="row"><div class="who"><span class="face m" data-face="easy"></span><div class="t"><b>Adaeze</b><span>Easy · nine years old and sure she is winning</span></div></div><button class="choose" data-level="easy">Choose</button></div>
         <div class="row"><div class="who"><span class="face m" data-face="medium"></span><div class="t"><b>Nnamdi</b><span>Medium · your quick cousin, talks more than he plans</span></div></div><button class="choose" data-level="medium">Choose</button></div>
         <div class="row"><div class="who"><span class="face m" data-face="hard"></span><div class="t"><b>Mama Ngozi</b><span>Hard · thirty years at the market</span></div></div><button class="choose" data-level="hard">Choose</button></div>
+        <div class="row"><div class="who"><span class="face m"><svg viewBox="0 0 44 44" width="100%" height="100%" aria-hidden="true"><circle cx="22" cy="22" r="22" fill="#3a2718"/><circle cx="22" cy="22" r="19" fill="none" stroke="#e6b76f" stroke-opacity=".55"/><circle cx="16" cy="17" r="5" fill="#e6b76f"/><path d="M7 32c1-6 5-9 9-9s8 3 9 9" fill="#e6b76f"/><circle cx="29" cy="19" r="4.2" fill="#e6b76f" fill-opacity=".7"/><path d="M23 32c.8-4.5 3.4-7.5 6.5-7.5S35 27.5 36 32" fill="#e6b76f" fill-opacity=".7"/></svg></span><div class="t"><b>Two of us</b><span>no computer · pass the phone after each move, or lay the Fold flat between you</span></div></div><button class="choose" data-mode="local">Choose</button></div>
       </div>
     </div>
     <button class="btn quiet" id="settingsRules">How to play · Credits</button>
