@@ -12,6 +12,10 @@
 #        add --explain (with --smoke) to check "their move, explained": after the opponent's reply its path stays faint on the board with the
 #                  words under it ("Nnamdi · picked up again twice · took 4"; screenshot <out>), the marks fade by themselves, a tap on the words
 #                  replays that turn slowly (<out>-again.png mid-replay) and leaves the game as it was; with the setting off nothing is explained
+#        add --take (with --smoke) to check "Mama Ngozi's take": the weakest opening move is played against her; after her reply a line with
+#                  her face lands under the board naming the better pit ("your pit 1 was the move · 7 seeds better"; screenshot <out>,
+#                  with her dry word in the bubble), a tap on it plays that move through slowly (<out>-show.png mid-way) and leaves the game as
+#                  it was, Undo takes it away, and with the setting off (Settings → Feel) a weak move earns no word
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --online: start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
@@ -30,7 +34,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -160,6 +164,7 @@ with sync_playwright() as p:
         before = {"easy": {"w": 4, "l": 2, "d": 0, "best": [31, 17], "run": 1}, "medium": {"w": 1, "l": 3, "d": 1, "best": [25, 23], "run": -2}, "hard": {"w": 2, "l": 1, "d": 0, "best": [26, 22], "run": 2}, "last": 1}
         pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.record', %s); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.tutorial', '3');" % (json.dumps(json.dumps(saved)), json.dumps(json.dumps(before))))
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
+    if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
     pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
@@ -284,9 +289,16 @@ with sync_playwright() as p:
         srv.shutdown(); print("wrote", out); sys.exit(0)
     if smoke:
         before = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
-        # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position
-        box = pg.evaluate("(()=>{const b=document.querySelectorAll('.badge')[2].getBoundingClientRect();return [b.left-20,b.top-20]})()")
-        pg.mouse.click(box[0], box[1]); pg.wait_for_timeout(300); pg.mouse.click(box[0], box[1])
+        if take:  # the weakest opening move by the hard search's own rating, so her take is sure to come
+            rated = pg.evaluate("window.__ayo.rate()"); worst = rated[-1]["pit"]; gap = rated[0]["value"] - rated[-1]["value"]
+            assert len(rated) == 6 and gap >= 3, ("the opening should have a clearly weaker pit", rated)
+            assert pg.evaluate("document.querySelector('#oppName').textContent") == "Mama Ngozi · Hard"
+            print("take: opening rated", [(r["pit"], round(r["value"], 1)) for r in rated], "· playing the weakest, pit", worst)
+            tap(pg, worst)
+        else:
+            # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position
+            box = pg.evaluate("(()=>{const b=document.querySelectorAll('.badge')[2].getBoundingClientRect();return [b.left-20,b.top-20]})()")
+            pg.mouse.click(box[0], box[1]); pg.wait_for_timeout(300); pg.mouse.click(box[0], box[1])
         pg.wait_for_function("document.querySelector('#turn').textContent==='your move' && !document.querySelector('#undo').disabled", timeout=240000)
         after = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         assert before != after, "board did not change"
@@ -370,6 +382,37 @@ with sync_playwright() as p:
             assert pg.evaluate("document.querySelector('#lastMove').hidden") and pg.evaluate("window.__ayo.explain") is None and pg.evaluate("window.__ayo.marks.steps.length") == 0, "with the setting off nothing should be explained"
             pg.evaluate("localStorage.setItem('ayo.path','1')")
             print("explain: setting off → no words, no marks")
+        if take:  # Mama Ngozi's take on the weak move: the line under the board, a tap plays the better move through, Undo takes it away, the setting off silences her
+            pg.wait_for_function("window.__ayo.take !== null", timeout=20000)
+            tk = pg.evaluate("window.__ayo.take"); assert tk["played"] == worst and tk["pit"] == rated[0]["pit"] and tk["moves"] == 0 and tk["kind"] == "better", tk
+            assert not pg.evaluate("document.querySelector('#take').hidden") and pg.evaluate("document.querySelector('#takeWords').textContent") == tk["words"]
+            assert tk["words"].startswith("your pit %d was the move · " % (rated[0]["pit"] + 1)) and tk["words"].endswith("seeds better"), tk["words"]
+            assert pg.evaluate("document.querySelector('#takeFace svg') !== null"), "her face should be on the line"
+            assert pg.evaluate("document.querySelector('#takeName').textContent") == "Her take", "across the board from her the chip says Her take"
+            assert not pg.evaluate("document.querySelector('#lastMove').hidden"), "her reply is explained under it as usual"
+            r1 = pg.evaluate("document.querySelector('#take').getBoundingClientRect().toJSON()"); r2 = pg.evaluate("document.querySelector('#lastMove').getBoundingClientRect().toJSON()")
+            assert (r1["top"] > r2["bottom"] - 1) if wide else (r1["bottom"] < r2["top"] + 1), ("her take sits above their move's words on the phone, below them on the Mac", r1, r2)
+            pg.wait_for_function("!document.querySelector('#bubble').hidden", timeout=5000); said = pg.evaluate("document.querySelector('#bubble').textContent")
+            print("take:", tk["words"], "· she says:", said)
+            pg.wait_for_timeout(500); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            moves = pg.evaluate("window.__ayo.state.moves.length"); badges = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
+            pg.click("#take"); pg.wait_for_function("window.__ayo.replaying && window.__ayo.busy", timeout=5000)
+            assert pg.evaluate("document.querySelector('#turn').textContent") == "watching" and pg.evaluate("document.querySelector('#hint').textContent") == "Mama Ngozi's move, slowly", pg.evaluate("document.querySelector('#hint').textContent")
+            pg.wait_for_function("window.__ayo.marks.steps.length===%d && window.__ayo.marks.caps.length===%d" % (len(tk["order"]), len(tk["captures"])), timeout=20000)
+            out2 = out[:-4] + "-show.png" if out.endswith(".png") else out + "-show.png"
+            pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out2, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.wait_for_function("!window.__ayo.replaying && !window.__ayo.busy", timeout=240000)
+            assert pg.evaluate("window.__ayo.state.moves.length") == moves and pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')") == badges, "showing her move must leave the game as it was"
+            assert pg.evaluate("window.__ayo.take") is not None and not pg.evaluate("document.querySelector('#take').hidden"), "her take stays until your move"
+            assert pg.evaluate("document.querySelector('#turn').textContent") == "your move" and not pg.evaluate("document.querySelector('#undo').disabled")
+            print("take: her move shown; the board is as it was")
+            pg.click("#undo"); pg.wait_for_function("window.__ayo.state.moves.length===0 && !window.__ayo.busy", timeout=20000)
+            assert pg.evaluate("window.__ayo.take") is None and pg.evaluate("document.querySelector('#take').hidden"), "Undo takes her take away"
+            pg.evaluate("localStorage.setItem('ayo.take','0')"); tap(pg, worst)  # the setting off: the same weak move, no word
+            pg.wait_for_function("document.querySelector('#turn').textContent==='your move' && !window.__ayo.busy && window.__ayo.state.moves.length===2", timeout=240000)
+            pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.take") is None and pg.evaluate("document.querySelector('#take').hidden"), "with the setting off she says nothing"
+            pg.evaluate("localStorage.setItem('ayo.take','1')")
+            print("take: Undo cleared it · setting off → no word")
         if clip:  # record the best turn so far as a short video, the way the Game over card's Clip button does
             pg.set_default_timeout(300000)
             r = pg.evaluate("window.__ayo.clip()")
@@ -384,7 +427,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or explain: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or explain or take: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))

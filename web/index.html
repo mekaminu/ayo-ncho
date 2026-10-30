@@ -29,15 +29,19 @@ button{font-family:inherit}
 .col{display:flex;flex-direction:column}.r{align-items:flex-end}
 #hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 118px);font-size:12px;color:var(--brass);background:rgba(13,9,6,.6);padding:6px 12px;border-radius:999px;pointer-events:none;white-space:normal;max-width:min(92vw,560px);text-align:center;line-height:1.35;min-height:1em}
 #hint:empty{display:none}
-/* their move, explained: the words of the opponent's last turn, tappable to watch it again slowly */
-#lastMove{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 152px);display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.45);color:var(--fg);border-radius:999px;padding:6px 10px 6px 12px;font:500 12px Inter,system-ui,sans-serif;line-height:1.35;text-align:left;cursor:pointer;z-index:2;animation:rise .3s ease-out;transition:opacity .25s,border-color .15s}
-#lastMove b{color:var(--brass);font-weight:600;white-space:nowrap}
-#lastMove b::after{content:" ·";opacity:.5}
-#lastMove i{font-style:normal;color:var(--brass);display:inline-flex;align-items:center;gap:4px;border-left:1px solid rgba(230,183,111,.35);padding-left:8px;white-space:nowrap;opacity:.9}
-#lastMove:hover{border-color:var(--brass)}#lastMove:active{transform:translateX(-50%) scale(.97)}
-#lastMove.live{border-color:var(--brass);pointer-events:none}#lastMove.live i{opacity:.5}
-@keyframes rise{from{opacity:0;transform:translate(-50%,8px)}to{opacity:1;transform:translate(-50%,0)}}
-#lastMove:not([hidden]) ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 198px)} /* the first-game tip steps up above the words */
+/* the words under the board: their move, explained (tappable to watch it again slowly) and, above it on the phone, Mama Ngozi's take on your own last move */
+#words{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 152px);display:flex;flex-direction:column-reverse;align-items:center;gap:6px;width:max-content;max-width:min(92vw,560px);z-index:2;transition:opacity .25s}
+#lastMove,#take{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.45);color:var(--fg);border-radius:999px;padding:6px 10px 6px 12px;font:500 12px Inter,system-ui,sans-serif;line-height:1.35;text-align:left;cursor:pointer;animation:rise .3s ease-out;transition:border-color .15s,transform .15s}
+#lastMove b,#take b{color:var(--brass);font-weight:600;white-space:nowrap}
+#lastMove b::after,#take b::after{content:" ·";opacity:.5}
+#lastMove i,#take i{font-style:normal;color:var(--brass);display:inline-flex;align-items:center;gap:4px;border-left:1px solid rgba(230,183,111,.35);padding-left:8px;white-space:nowrap;opacity:.9}
+#lastMove:hover,#take:hover{border-color:var(--brass)}#lastMove:active,#take:active{transform:scale(.97)}
+#lastMove.live,#take.live{border-color:var(--brass);pointer-events:none}#lastMove.live i,#take.live i{opacity:.5}
+#take{padding:4px 10px 4px 5px;border-color:rgba(230,183,111,.6)}
+#take .face.s{margin:0;width:22px;height:22px;border:1px solid rgba(230,183,111,.5)}
+@keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+#words:has(> :not([hidden])) ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 200px)} /* the first-game tip steps up above the words */
+#words:has(#lastMove:not([hidden])):has(#take:not([hidden])) ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 252px)}
 #badges{position:fixed;inset:0;pointer-events:none}
 .badge{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:11px;font-weight:600;color:var(--brass);background:rgba(13,9,6,.72);border-radius:10px;padding:1px 6px;line-height:15px;margin:-8px 0 0 -9px;transition:opacity .2s}
 .badge.zero{opacity:.35}
@@ -50,8 +54,8 @@ button{font-family:inherit}
 .chip:hover{border-color:var(--brass)}.chip:active{transform:scale(.92)}.chip:disabled{opacity:.35;cursor:default}
 .chip[aria-pressed="false"] svg{opacity:.4}
 .chip:focus-visible,.btn:focus-visible,.segbtn:focus-visible,.sw:focus-visible,.pill:focus-visible,.swatch:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
-.playing .hud,.playing .bar,.playing #badges,.playing #hint,.playing #lastMove{opacity:1}
-.screen .hud,.screen .bar,.screen #badges,.screen #hint,.screen #lastMove{opacity:0;pointer-events:none}
+.playing .hud,.playing .bar,.playing #badges,.playing #hint,.playing #words{opacity:1}
+.screen .hud,.screen .bar,.screen #badges,.screen #hint,.screen #words{opacity:0;pointer-events:none}
 
 /* cards and buttons */
 .card{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:18px;padding:22px 22px;width:min(88vw,350px);box-sizing:border-box;display:flex;flex-direction:column;gap:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);animation:pop .3s ease-out;max-height:calc(100vh - 40px);overflow:auto}
@@ -267,7 +271,7 @@ button{font-family:inherit}
 .wide .hud .score{font-size:40px}
 .wide .bar{left:auto;right:0;bottom:50%;transform:translateY(50%);flex-direction:column;padding:0 max(24px,env(safe-area-inset-right,0px)) 0 0}
 .wide #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 24px);left:50%}
-.wide #lastMove{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 60px)}
+.wide #words{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 60px);flex-direction:column} /* on the Mac the words hang under the hint line, her take below their move */
 .wide #home{flex-direction:row;align-items:stretch}
 .wide #home::before{background:linear-gradient(90deg,rgba(13,9,6,.95) 0%,rgba(13,9,6,.85) 34%,rgba(13,9,6,0) 60%)}
 .wide .homeTop{align-self:flex-start;padding-top:calc(env(safe-area-inset-top,0px) + 34px)}
@@ -281,7 +285,7 @@ button{font-family:inherit}
 .wide .puzzleTop{right:auto;width:min(38vw,360px);left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 34px)}
 .wide .puzzleBottom{right:auto;width:min(40vw,380px);left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
 .wide.puzzle #hint{top:calc(env(safe-area-inset-top,0px) + 24px)}
-@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove{animation:none}}
+@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take{animation:none}}
 </style>
 </head>
 <body class="screen">
@@ -290,7 +294,8 @@ button{font-family:inherit}
 <div id="pits" role="group" aria-label="The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back"></div>
 <div class="hud top"><div class="who"><span class="face" id="oppFace"></span><div class="col"><span class="name" id="oppName">Nnamdi · Medium</span><span class="sub" id="oppSub">waiting</span></div></div><div class="col r"><span class="score" id="oppScore">0</span><span class="lab">captured</span></div></div>
 <div id="hint" role="status"></div>
-<button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
+<div id="words"><button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
+<button id="take" hidden type="button" title="Play Mama Ngozi's move through, slowly"><span class="face s" id="takeFace" aria-hidden="true"></span><b id="takeName">Mama Ngozi</b><span id="takeWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>show</i></button></div>
 <div id="rec" hidden role="status"><i></i>Recording your best turn…</div>
 <div id="bubble" hidden role="status"></div>
 <div id="myBubble" hidden role="status"></div>
@@ -402,6 +407,7 @@ button{font-family:inherit}
         <div class="row"><div class="t"><b>Haptics</b><span>a tap for every seed</span></div><button class="sw" role="switch" data-set="haptics" aria-checked="true" aria-label="Haptics"><i></i></button></div>
         <div class="row"><div class="t"><b>Pass the phone</b><span>two of us: the board turns round to face whoever is to move; off when the phone lies flat between you</span></div><button class="sw" role="switch" data-set="swing" aria-checked="true" aria-label="Pass the phone"><i></i></button></div>
         <div class="row"><div class="t"><b>Show where seeds go</b><span>on the first tap, a mark on every pit the hand will reach and a light where it ends; after their move, its path and the words, tap to watch it again</span></div><button class="sw" role="switch" data-set="path" aria-checked="true" aria-label="Show where seeds go"><i></i></button></div>
+        <div class="row"><div class="t"><b>Mama Ngozi's take</b><span>after your move against the computer, if a clearly better pit was there she says which one under the board; tap it to see that move play through</span></div><button class="sw" role="switch" data-set="take" aria-checked="true" aria-label="Mama Ngozi's take"><i></i></button></div>
         <div class="row"><div class="t"><b>Sowing speed</b><span>how fast the hand moves</span></div><div class="seg" data-set="speed"><button class="segbtn" data-v="slow">Slow</button><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="fast">Fast</button></div></div>
         <div class="row"><div class="t"><b>Lighter board</b><span>for slow phones and weak signal · <em id="qualityNow">auto</em></span></div><div class="seg" data-set="quality"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="lite">On</button><button class="segbtn" data-v="full">Off</button></div></div>
         <div class="row"><div class="t"><b>Seed physics</b><span>seeds bounce and roll; off, they fly straight to their pit · <em id="physicsNow">auto</em></span></div><div class="seg" data-set="physics"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="on">On</button><button class="segbtn" data-v="off">Off</button></div></div>

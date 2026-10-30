@@ -51,3 +51,14 @@ export function chooseMove(state, level = "medium", rng = Math.random) {
   }
   return bestMove;
 }
+
+// Every legal move rated at a level's depth, best first (ties by pit), with none of the level's noise: the coach's view of a
+// position. The first entry is the move chooseMove would play at that level with its noise off; `value` is in seeds (store
+// difference for the player to move after the search), ±1000 for a forced win or loss.
+export function rateMoves(state, level = "hard") {
+  const cfg = LEVELS[level] || LEVELS.hard;
+  const me = state.turn;
+  return legalMoves(state)
+    .map((m) => { const { state: next } = applyMove(state, m); return { pit: m, value: search(next, cfg.depth - 1, -Infinity, Infinity, me) }; })
+    .sort((a, b) => b.value - a.value || a.pit - b.pit);
+}
