@@ -40,7 +40,7 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [!] The daily puzzle as built (docs/render-2026-10-29-puzzle.png): the Nchò/Ayo switch on Home picks which game's puzzle you get (each has its own position each day; the Home card and the screen say which rules) — say if it should always be Nchò. The share words are "Ayo & Nchò daily · 2026-10-29 · captured 8/8" over a row of seeds — say if you want other words
 - [!] The Rooms screen as built: the WhatsApp message reads "Come and play Ayo & Nchò with me — open the link, say your name and knock, and I'll let you in. Room EDNE." plus the link — say if you want other words; Back on the screen closes your room (the code stops working) — say if it should stay open while you go back to Home
 - [x] Make the repo public so the scheduled cloud runs can push — done 29 Oct; runs push from 12:07
-- [!] Render: create the Web Service from mekaminu/ayo-ncho (Free plan, no environment variables) and send the address, so the deploy item can be closed and the tracker gets the test link
+- [!] Render: create the Web Service from mekaminu/ayo-ncho (Free plan, no environment variables) and send the address, so the deploy item can be closed and the tracker gets the test link. One click: https://render.com/deploy?repo=https://github.com/mekaminu/ayo-ncho (render.yaml is the blueprint) → sign in → Apply. Checked 30 Oct: the server starts, /healthz answers, 101 tests green
 - [!] Clip button on the Game over card (docs/render-2026-10-29-clip.png): the clip records the board only, not the scores or names. Say if you want a name/score strip drawn into the video, or a sound track (the knocks) — both are possible
 - [!] Shouts across the board (docs/render-2026-10-29-shouts.png): eight fixed phrases for now (Oya, your move! · Chai! · Ha ha! · Well played · Not so fast · Ewo! · Good game · One minute…). Say if you want different words, Igbo or Yoruba ones, or typed chat / voice next
 - [!] The door (docs/render-2026-10-29-door.png): a friend who opens your link knocks with their name and you tap Let in or Not now before they take the seat; a card asks each phone its name once. Say if you would rather the link let the first person straight in (no door), or if the Not now message should say something else
@@ -52,8 +52,8 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 - [!] On the Fold: open Settings → Feel → Lighter board and say whether the full board runs smoothly (then Auto is right) or the lighter one looks good enough to keep (docs/render-2026-10-29-lite.png); while there, try Seed physics → Off and say whether seeds flying straight to their pit still feel right for the weakest phones
 
 - [x] Family rules confirmed 29 Oct: Nchò (relay sowing, capture on 4, last 8, bankruptcy, loop stop — see engine/ayo.js header) is the default; Ayo stays as the second game, chosen in the Rules card. Meka sent a rules write-up at 03:12: relay sowing taken as yes unless he says otherwise.
-- [!] Settings screen toggles Meka asked for from that write-up: capture on 2&3 vs 4 only, relay vs single lap. Mock them on the Settings mockup; build after his yes.
-- [!] Create the GitHub repo github.com/mekaminu/ayo-ncho (private) so the runs can push
+- [x] Settings screen toggles Meka asked for from that write-up: capture on 2&3 vs 4 only, relay vs single lap — mocked, approved and built 29 Oct (Settings → Rules)
+- [x] Create the GitHub repo github.com/mekaminu/ayo-ncho — created 29 Oct, made public 29 Oct 11:53 so the scheduled runs can push (Meka may make it private again before the store work)
 - [x] Home / Game over / Settings mockups made 29 Oct on the Design canvas "Ayo & Nchò — screens" (https://claude.ai/artifact/H75vS5iCT5X2Fmft4oYMXP): Meka said yes at 03:32 on 29 Oct. Build them as drawn.
 
 ## Daily plan
