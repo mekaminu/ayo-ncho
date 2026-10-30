@@ -16,6 +16,10 @@
 #                  her face lands under the board naming the better pit ("your pit 1 was the move · 7 seeds better"; screenshot <out>,
 #                  with her dry word in the bubble), a tap on it plays that move through slowly (<out>-show.png mid-way) and leaves the game as
 #                  it was, Undo takes it away, and with the setting off (Settings → Feel) a weak move earns no word
+#        add --hurry (with --smoke) to check "tap to hurry": the pit with the longest turn is sown; while it plays the hint line says
+#                  "tap the board to hurry" (screenshot <out>), a real tap on the board hurries the rest of the turn ("hurrying…"), the turn
+#                  still ends with every pit's count as the engine says, and the opponent's reply starts again at the normal speed, where
+#                  Space hurries it too
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --online: start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
@@ -34,7 +38,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -295,6 +299,26 @@ with sync_playwright() as p:
             assert pg.evaluate("document.querySelector('#oppName').textContent") == "Mama Ngozi · Hard"
             print("take: opening rated", [(r["pit"], round(r["value"], 1)) for r in rated], "· playing the weakest, pit", worst)
             tap(pg, worst)
+        elif hurry:  # the opening with the most drops (a relay in Nchò), hurried by a tap partway through
+            pg.evaluate("localStorage.setItem('ayo.tutorial', '3')")
+            best = max(pg.evaluate("window.__ayo.legal"), key=lambda i: pg.evaluate("window.__ayo.state.pits[%d]" % i))
+            tap(pg, best)
+            pg.wait_for_function("window.__ayo.hurry.playing", timeout=20000)
+            h = pg.evaluate("window.__ayo.hurry"); print("hurry: playing", json.dumps(h))
+            assert h["words"] and h["hint"].endswith("to hurry") and not h["on"], h
+            pg.wait_for_timeout(500)
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            t0 = time.time(); x, y = pg.evaluate("window.__ayo.pitAt(9)"); pg.mouse.click(x, y)  # a tap on the board (their side: no pit of yours is pressed)
+            h = pg.evaluate("window.__ayo.hurry"); assert h["on"] and h["hint"].endswith("hurrying…"), h
+            pg.wait_for_function("!window.__ayo.hurry.playing", timeout=60000); print("hurry: rest of the turn took %.1f s after the tap" % (time.time() - t0))
+            st = pg.evaluate("window.__ayo.state"); counts = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent)")
+            assert counts == st["pits"], ("the hurried turn must end as the engine says", counts, st["pits"])
+            assert not pg.evaluate("window.__ayo.hurry.on"), "the hurry ends with the turn"
+            if st["turn"] == 1 and not st["over"]:  # the reply comes at the normal speed; Space hurries it too
+                pg.wait_for_function("window.__ayo.hurry.playing", timeout=120000)
+                assert not pg.evaluate("window.__ayo.hurry.on"), "the next turn starts at the normal speed"
+                pg.keyboard.press("Space"); assert pg.evaluate("window.__ayo.hurry.on"), "Space should hurry the reply"
+                print("hurry: Space hurried the reply")
         else:
             # tap the player's pit 2 (third from the near end, right column): project its centre via the badge position
             box = pg.evaluate("(()=>{const b=document.querySelectorAll('.badge')[2].getBoundingClientRect();return [b.left-20,b.top-20]})()")
@@ -427,7 +451,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or explain or take: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or explain or take or hurry: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))
