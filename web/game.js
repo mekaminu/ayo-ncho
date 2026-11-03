@@ -23,6 +23,7 @@ import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './la
 import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown } from './handcount.js';
 import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
+import { makeAway } from './away.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -351,6 +352,14 @@ function paintRecordPills() { document.querySelectorAll('.pill[data-level] small
 const roomParam = params.get('still') ? null : params.get('room');
 let online = false, roomWanted = null; // online while a room is open, knocked on or joined (from the Rooms screen, or ?room=CODE from an invite link); roomWanted: 'NEW' or the code asked for
 let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
+// your move, even in another tab: what the friend does while this page is out of sight is said on the tab's title, icon and the app's badge
+let awayIcon = null; const awayIconLoad = () => { if (awayIcon === null) { awayIcon = ''; fetch('./icon.svg').then((r) => r.text()).then((t) => { awayIcon = t; }).catch(() => {}); } };
+const away = makeAway({ doc: document, nav: navigator, icon: () => awayIcon, chime: () => { click(1.6, 0.07); setTimeout(() => click(2.1, 0.07), 150); } });
+const awayNote = (kind, d = {}) => { if (online) away.note(kind, { name: friend ? friend.name : undefined, ...d }); };
+const awayBack = () => { if (!isAwayNow()) away.back(); };
+const isAwayNow = () => document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus());
+for (const ev of ['focus', 'pointerdown', 'keydown']) addEventListener(ev, awayBack, true);
+document.addEventListener('visibilitychange', awayBack);
 const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : local ? LNAMES[them] : levelLabel(level);
 const defaultMe = $('#meName').textContent;
 const myName = () => prefs.get('name', '') || defaultMe || 'Player';
@@ -399,7 +408,7 @@ function paintRoomStatus() { // what the room card says, from the connection and
   setRoomStatus(knocks.length ? 'door' : 'open', knocks.length ? `${knocks[0].name} is at the door` : undefined);
 }
 function stopOnline() { // leave before anyone joined (Back on the Rooms screen, or a knock the host refused): the board is yours again, no reload
-  if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
+  away.back(); if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
   $('#knockCard').hidden = true; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
   hideExplain(); if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
 }
@@ -476,6 +485,7 @@ function sendShout(id) {
 function showShout(seat, id) {
   const text = shoutText(id); if (!text) return;
   if (seat === them) {
+    awayNote('shout', { text });
     const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, SHOUT_SHOW_MS);
     const f = $('#oppFace'); if (!reduceMotion) { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); }
     shoutKnocks(id).forEach((p, i) => setTimeout(() => click(p, 0.1), i * 110)); buzz([15, 30, 15]);
@@ -524,16 +534,16 @@ function startOnline(code, { stay = false } = {}) {
   on('room', ({ room, started, resync }) => {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
-    if (!had && friend) { if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); }
+    if (!had && friend) { if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
     if (started) { hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
-    else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
+    else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); awayNote('rematch'); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
-  on('move', (m) => { moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
+  on('move', (m) => { if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
   on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
   on('shout', ({ seat, id }) => showShout(seat, id));
   // the door: this phone knocked and waits for the host; or (as host) someone is knocking on ours
   on('knocked', ({ host }) => { const again = knocking; knocking = true; if (roomsShowing()) { showScreen('play'); $('#oppFace').innerHTML = initialFace(host); } showTurn(); if (!again) { toast(`Knocked — ${host} decides`); click(1.1, 0.08); } });
-  on('knock', () => { knockSound(); });
+  on('knock', ({ name }) => { knockSound(); awayNote('knock', { name }); });
   on('error', (e) => {
     busy = false;
     if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomWanted, myName()); } // our old seat is gone: knock for the free one
@@ -554,7 +564,7 @@ function startOnline(code, { stay = false } = {}) {
   on('status', () => { if (net !== self) return; if (seated || net.knock) showTurn(); paintRoomStatus(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && net === self) net.wake(); });
   addEventListener('online', () => { if (net === self) net.wake(); });
-  body.classList.add('online'); if (!stay) showScreen('play');
+  body.classList.add('online'); awayIconLoad(); if (!stay) showScreen('play');
   $('#oppName').textContent = 'Joining the room…'; $('#oppSub').textContent = ''; $('#turn').textContent = ''; $('#hint').textContent = ''; $('#shoutBtn').disabled = true;
   $('#oppFace').innerHTML = initialFace('?');
   const rejoining = held && roomWanted !== 'NEW' && held.code === roomWanted;
@@ -1227,7 +1237,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

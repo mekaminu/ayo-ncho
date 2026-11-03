@@ -30,7 +30,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online: start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also checks the away title: the host's tab goes out of sight, the friend moves, the title says it): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -144,8 +144,18 @@ if online:
         assert before != mid, "the friend's board did not follow the host's move"
         assert mid == host.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')"), "the two boards disagree"
         assert host.evaluate("window.__ayo.state.moves.length") == 1
+        # your move, even in another tab: the host's page goes out of sight before the friend answers; the tab's title and icon say it
+        host.evaluate("Object.defineProperty(document, 'hidden', { configurable: true, get: () => true })")
         tap(friend, 6)  # the friend answers from the far seat (their pits are 6..11, drawn nearest them)
+        host.wait_for_function("window.__ayo.away.count>0", timeout=60000)
+        aw = host.evaluate("window.__ayo.away"); print("away: the host's tab says", repr(aw["title"]))
+        assert aw["title"] == "Your move · Tete played — Ayo & Nchò" or aw["title"] == "Tete played — Ayo & Nchò", aw
+        assert aw["icon"].startswith("data:image/svg+xml,"), "the tab's icon should carry its brass dot"
+        assert friend.evaluate("window.__ayo.away.count") == 0, "the friend's own move says nothing on the friend's tab"
+        host.evaluate("delete document.hidden; document.dispatchEvent(new Event('visibilitychange'))")  # back: the board (paused while out of sight) plays Tete's move
+        aw = host.evaluate("window.__ayo.away"); assert aw["count"] == 0 and aw["title"] == "Ayo & Nchò" and aw["icon"].endswith("icon.svg"), aw
         host.wait_for_function("document.querySelector('#turn').textContent==='your move'", timeout=240000)
+        print("away: back at the board, the title and icon are plain again")
         friend.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===2", timeout=240000)
         after = host.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         assert after != mid and after == friend.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')"), "the host's board did not follow the friend's move"
