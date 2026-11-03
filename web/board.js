@@ -76,10 +76,13 @@ export function buildBoard(scene, finish = 'mahogany', q = {}) {
   const ring = new THREE.Mesh(new THREE.RingGeometry(PIT_R * 1.04, PIT_R * 1.09, 96), new THREE.MeshBasicMaterial({ color: 0xe6b76f, transparent: true, opacity: 0.6, side: THREE.DoubleSide }));
   ring.rotation.x = -Math.PI / 2; ring.position.y = BT + 0.002; ring.visible = false; group.add(ring);
   const glow = new THREE.PointLight(0xffc877, 0.06, 0.25); glow.visible = false; group.add(glow);
+  // the mouse on the Mac: a fainter brass ring on the rim of the playable pit under the pointer (web/hover.js says when)
+  const hover = new THREE.Mesh(ring.geometry, new THREE.MeshBasicMaterial({ color: 0xe6b76f, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
+  hover.rotation.x = -Math.PI / 2; hover.position.y = BT + 0.0018; hover.visible = false; group.add(hover);
   const marks = buildPathMarks(group);
 
   scene.add(group);
-  return { group, targets, ring, glow, woodMat, marks };
+  return { group, targets, ring, glow, hover, woodMat, marks };
 }
 
 // Where the seeds will go (shown on the first tap, from the engine's own events): a faint brass ring just inside the rim of
