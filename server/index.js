@@ -1,8 +1,8 @@
 // Ayo & Nchò server: serves the web app and runs the online rooms (WebSockets at /ws, the same rules engine as the board).
 // Protocol (JSON, one object per message):
-//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"shout", id} | {t:"ping"}
+//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"resign"} | {t:"shout", id} | {t:"ping"}
 //   server → {t:"joined", code, token, seat, room} | {t:"knocked", code, id, host, hostOnline} | {t:"knock", id, name} | {t:"room", room} (presence, a knock, rematch, new game; resync:true when asked for)
-//            | {t:"move", seat, pit, n, stores} | {t:"shout", seat, id} | {t:"error", code, msg} | {t:"pong"}
+//            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n} (that seat gave up) | {t:"shout", seat, id} | {t:"error", code, msg} | {t:"pong"}
 // The door: {t:"join"} does not seat anyone. It KNOCKS: the knocker gets {t:"knocked"} and waits; the host's board gets {t:"knock"} (and a
 // {t:"room"} whose room.knocks lists everyone at the door, so a host who reconnects still sees them). The host answers {t:"let", id, in:true}
 // and the knocker is seated ({t:"joined"}), or in:false and the knocker gets {t:"error", code:"notlet"}. A member who holds a token rejoins
@@ -15,7 +15,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { Rooms, RoomError, normaliseCode, moveMessage } from "./rooms.js";
+import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage } from "./rooms.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -82,6 +82,7 @@ export function createServer({ rooms = new Rooms(), sweepEvery = 60 * 1000 } = {
           case "rejoin": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token));
           case "let": return answerDoor(ws, m);
           case "move": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.move(ws.room, ws.token, m.pit); return broadcast(ws.room, moveMessage(r)); }
+          case "resign": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.resign(ws.room, ws.token); return broadcast(ws.room, resignMessage(r)); }
           case "sync": { if (!ws.room) throw new RoomError("unseated", "join a room first"); return send(ws, { t: "room", room: rooms.snapshot(ws.room), resync: true }); }
           case "shout": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.shout(ws.room, ws.token, m.id); return broadcast(ws.room, { t: "shout", ...r }); }
           case "rematch": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.rematch(ws.room, ws.token); return broadcast(ws.room, { t: "room", room: r.room, started: r.started }); }

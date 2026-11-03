@@ -10,7 +10,7 @@
 // token never knocks again: rejoin() is theirs. Knocks that are not answered are held until the knocker goes
 // away (withdraw) or the room is swept.
 import { randomUUID } from "node:crypto";
-import { newGame, applyMove, legalMoves, replay, RULES } from "../engine/ayo.js";
+import { newGame, applyMove, legalMoves, replay, resign, RULES } from "../engine/ayo.js";
 import { isShout, mayShout } from "../web/shouts.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
@@ -138,6 +138,18 @@ export class Rooms {
     return { seat, pit, events, state: publicState(state) };
   }
 
+  // Giving up: either seat may end the game it is in, on either player's move; the other seat wins whatever the score.
+  // The rematch that follows is opened by whoever gave up (the loser starts).
+  resign(code, token) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
+    if (room.game.over) fail("over", "the game is over");
+    const { state } = resign(room.game, seat);
+    room.game = state; room.touchedAt = this.now();
+    return { seat, state: publicState(state) };
+  }
+
   // A shout across the board: one of the fixed phrases (web/shouts.js), by id only, one at a time per seat.
   shout(code, token, id) {
     const room = this.get(code);
@@ -193,7 +205,7 @@ export class Rooms {
 // The game as the clients see it. moves lets a client rebuild the position with the shared engine (replay) and check it matches;
 // quiet (moves since the last capture) is sent too, so a board that applies the next move itself ends a stalemate on the same move the server does.
 export function publicState(g) {
-  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, variant: g.variant, rules: { ...g.rules } };
+  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, resigned: g.resigned ?? null, variant: g.variant, rules: { ...g.rules } };
 }
 
 // What travels for a move: the seat, the pit, how many moves have been played and both scores — a few dozen bytes.
@@ -201,5 +213,9 @@ export function publicState(g) {
 // check it agrees, and ask for the whole room ({t:"sync"}) if it does not. A relay turn's events alone can run to kilobytes.
 export function moveMessage({ seat, pit, state }) {
   return { t: "move", seat, pit, n: state.moves.length, stores: state.stores.slice() };
+}
+// Giving up travels as small as a move: the seat and how many moves had been played (a board that disagrees asks for the room).
+export function resignMessage({ seat, state }) {
+  return { t: "resign", seat, n: state.moves.length };
 }
 export { replay };

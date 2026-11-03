@@ -8,22 +8,23 @@
 //   net.on('move',   ({ seat, pit, events, state }) => …) // events and state rebuilt here with the engine from the small message the server sends
 //   net.on('room',   ({ room, started, resync }) => …) // presence, a knock, a rematch asked for, a new game started; resync: the whole room after this board fell behind
 //   net.on('resync', ({ why }) => …)           // this board could not rebuild a move and has asked for the room (a 'room' with resync follows)
+//   net.on('resign', ({ seat, events, state }) => …) // that seat gave up the game: the other seat wins (events: one 'end')
 //   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
-//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.leave()
+//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.resign() / net.leave()
 
-import { applyMove } from '../engine/ayo.js';
+import { applyMove, resign } from '../engine/ayo.js';
 
 export const BACKOFF_MS = [800, 1600, 3200, 6400, 10000]; // between reconnect attempts, then every 10 s
 
 // The game as the server shows it, made into an engine-shaped state the board can read (legalMoves, replay for undo-less play).
 export function stateFrom(pub) {
-  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null };
+  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null, resigned: pub.resigned ?? null };
 }
 // The other way round: an engine state as the server would show it (what a 'move' carries once rebuilt).
 export function publicFrom(s) {
-  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, variant: s.variant, rules: { ...s.rules } };
+  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, resigned: s.resigned ?? null, variant: s.variant, rules: { ...s.rules } };
 }
 
 // A move arrives small — {seat, pit, n, stores} — because every board has the same engine as the server. Rebuild the
@@ -36,6 +37,13 @@ export function rebuildMove(pub, m) {
   if (s.moves.length !== m.n) return null;
   if (!Array.isArray(m.stores) || m.stores[0] !== s.stores[0] || m.stores[1] !== s.stores[1]) return null;
   return { events: r.events, state: publicFrom(s) };
+}
+
+// Giving up arrives as {seat, n}: the same engine ends the room's game on this board; n must match the moves played here.
+export function rebuildResign(pub, m) {
+  if (!pub || !Array.isArray(pub.moves) || pub.moves.length !== m.n || pub.over) return null;
+  let r; try { r = resign(stateFrom(pub), m.seat); } catch { return null; }
+  return { events: r.events, state: publicFrom(r.state) };
 }
 
 // The invite link for a room: the app's own address with ?room=CODE.
@@ -80,6 +88,7 @@ export class Online {
   let(id, yes = true) { return this.send({ t: 'let', id, in: !!yes }); } // the host answers the door
   move(pit) { return this.send({ t: 'move', pit }); }
   rematch() { return this.send({ t: 'rematch' }); }
+  resign() { return this.send({ t: 'resign' }); } // give up the game in play
   shout(id) { return this.send({ t: 'shout', id }); }
   leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; this.knock = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
 
@@ -132,6 +141,12 @@ export class Online {
         }
         if (this.room) this.room.state = state;
         return this.emit('move', { seat: m.seat, pit: m.pit, events, state });
+      }
+      case 'resign': {
+        const r = rebuildResign(this.room && this.room.state, m);
+        if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'resign' }); }
+        if (this.room) this.room.state = r.state;
+        return this.emit('resign', { seat: m.seat, events: r.events, state: r.state });
       }
       case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
       case 'error':

@@ -24,6 +24,7 @@ import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown } from './handcount.js';
 import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
 import { makeAway } from './away.js';
+import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -476,7 +477,21 @@ function pickHint(phase) {
 // ---------- shouts: a fixed phrase sent by id to both boards; theirs pops by their face with a knock, yours sits by your name ----------
 const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
 for (const s of SHOUTS) { const b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.text; b.dataset.id = s.id; b.addEventListener('click', () => sendShout(s.id)); shoutMenu.appendChild(b); }
-function toggleShoutMenu(open = shoutMenu.hidden) { shoutMenu.hidden = !open; $('#shoutBtn').setAttribute('aria-expanded', String(open)); }
+// giving up: the last button in the row, apart from the phrases; it asks once more ("Tap again to give up") before it goes
+const giveUp = document.createElement('button'); giveUp.className = 'pill giveup'; giveUp.type = 'button'; giveUp.id = 'giveUpBtn'; shoutMenu.appendChild(giveUp);
+const giveGuard = makeGuard(); let giveTimer = null;
+function paintGiveUp() { const armed = giveGuard.armed; giveUp.textContent = armed ? (keysLikely() ? GIVEUP_KEYS.armed : GIVEUP.armed) : GIVEUP.idle; giveUp.classList.toggle('armed', armed); giveUp.setAttribute('aria-label', armed ? 'Give up this game — press again to confirm' : 'Give up this game'); }
+giveUp.addEventListener('click', () => {
+  if (!mayGiveUp({ online, friend, over: state.over, seated: net && net.seat !== null })) return toggleShoutMenu(false);
+  const r = giveGuard.tap(performance.now()); clearTimeout(giveTimer);
+  if (r === 'armed') { paintGiveUp(); click(0.7, 0.08); buzz(15); giveTimer = setTimeout(() => { giveGuard.reset(); paintGiveUp(); }, GIVEUP_MS); return; }
+  toggleShoutMenu(false); if (net.resign()) { click(0.55, 0.1); buzz([30, 40, 30]); }
+});
+function toggleShoutMenu(open = shoutMenu.hidden) {
+  shoutMenu.hidden = !open; $('#shoutBtn').setAttribute('aria-expanded', String(open));
+  clearTimeout(giveTimer); giveGuard.reset(); paintGiveUp();
+  giveUp.hidden = !mayGiveUp({ online, friend, over: state.over, seated: net && net.seat !== null }); // only while a game with a friend is in play
+}
 function sendShout(id) {
   toggleShoutMenu(false); if (!net || !friend) return false;
   const t = performance.now(); if (t - shoutAt < SHOUT_GAP_MS) return false; // one at a time, like the server says
@@ -513,6 +528,20 @@ async function showMove({ seat, pit, events, state: pub }) {
   if (!state.over && crossedLast8(before, state)) last8Moment();
   if (state.over) gameOver(); else { if (before.over) $('#gameover').hidden = true; if (seat === them) explain(before, pit, events); } // a friend's move, explained too
 }
+// someone gave up: the giver's row of seeds is pushed a little toward the winner, as when a board is pushed across, then the card
+async function showResign({ seat, state: pub }) {
+  state = stateFrom(pub); busy = true; deselect(); hideExplain(); $('#undo').disabled = true; selected = null;
+  const w = gaveUpWords(seat, you, friend ? friend.name : undefined); toast(w.toast);
+  if (seat === them) { const f = $('#oppFace'); if (!reduceMotion) { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); } buzz([20, 40, 20]); }
+  [0.9, 0.7].forEach((p, k) => setTimeout(() => click(p, 0.09), k * 160)); // two low knocks on the wood
+  if (!reduceMotion) {
+    const row = [...Array(6).keys()].map((k) => seat * 6 + k); const dir = Math.sign(pitCenters[(1 - seat) * 6][1] - pitCenters[seat * 6][1]) || 1;
+    const ms = row.flatMap((i) => homes[i]).map((m) => [m, m.position.z, m.position.y]); if (ms.length) rattle(Math.min(ms.length, 5), at(row[2]));
+    await tween(520, (t) => { const k = Math.sin(t * Math.PI); ms.forEach(([m, z0, y0]) => { m.position.z = z0 + dir * k * 0.014; m.position.y = y0 + k * 0.006; }); })
+      .then(() => ms.forEach(([m, z0, y0]) => { m.position.z = z0; m.position.y = y0; }));
+  }
+  await wait(380); busy = false; refreshStatic(); gameOver();
+}
 function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
 function startOnline(code, { stay = false } = {}) {
   // code: 'new' opens a room, a four-letter code knocks on one. stay: asked from the Rooms screen, which stays up (the door card over it)
@@ -539,6 +568,7 @@ function startOnline(code, { stay = false } = {}) {
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); awayNote('rematch'); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
   on('move', (m) => { if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
+  on('resign', (m) => { if (m.seat === them) { const s = stateFrom(m.state); awayNote('over', { result: s.winner === you ? 'won' : 'lost', gaveUp: true }); } moveQueue = moveQueue.then(() => showResign(m)).catch((e) => console.error(e)); });
   on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
   on('shout', ({ seat, id }) => showShout(seat, id));
   // the door: this phone knocked and waits for the host; or (as host) someone is knocking on ours
@@ -987,11 +1017,12 @@ $('#settingsRules').addEventListener('click', () => { $('#rules').hidden = false
 // game over card, as approved
 function gameOver() {
   const a = state.stores[you], b = state.stores[them]; const win = state.winner === you; const draw = state.winner === 'draw';
-  $('#goEyebrow').textContent = `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves`;
-  $('#goTitle').textContent = local ? localTitle(state) : draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
+  const gave = online && state.resigned != null ? gaveUpWords(state.resigned, you, oppLabel()) : null; // a game someone gave up: the result is theirs to give, whatever the seeds say
+  $('#goEyebrow').textContent = `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves${gave ? ' · ' + gave.who : ''}`;
+  $('#goTitle').textContent = gave ? gave.title : local ? localTitle(state) : draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
   $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = oppLabel();
   $('#rematch').textContent = online ? (friend && friend.wantsRematch ? `Play again — ${friend.name} is ready` : 'Play again') : 'Play again'; $('#rematch').disabled = false;
-  $('#goMe').classList.toggle('win', a >= b); $('#goOpp').classList.toggle('win', b > a);
+  $('#goMe').classList.toggle('win', gave ? win : a >= b); $('#goOpp').classList.toggle('win', gave ? state.winner === them : b > a);
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   const word = paintRecord(a, b); paintStory();
@@ -1030,7 +1061,7 @@ function paintStory() {
     + `<path class="ln" pathLength="1" d="${p.line}"/>`
     + (p.big ? `<circle class="big pop" style="animation-delay:1.35s" cx="${p.big.x}" cy="${p.big.y}" r="5"/>` : '')
     + (p.mark ? `<circle class="good pop" style="animation-delay:1.55s" cx="${p.mark.x}" cy="${p.mark.y}" r="3.4"/>` : '');
-  const words = storyWords(st, { me, them: other }); $('#goStoryWords').textContent = words; $('#goStoryMe').textContent = me === 'You' ? 'you' : me; $('#goStoryThem').textContent = other;
+  const words = storyWords(st, { me, them: other, gaveUp: online && state.resigned != null ? gaveUpWords(state.resigned, you, other).story : undefined }); $('#goStoryWords').textContent = words; $('#goStoryMe').textContent = me === 'You' ? 'you' : me; $('#goStoryThem').textContent = other;
   box.querySelector('.words svg').style.display = st.biggest ? '' : 'none'; box.disabled = !st.biggest;
   box.setAttribute('aria-label', `How the game went: ${words}${st.biggest ? '. Tap to watch that move again' : ''}`);
   box.hidden = false; story = st;

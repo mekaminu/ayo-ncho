@@ -28,6 +28,7 @@ export function gameStory(moves, variant = 'ncho', rules = {}, player = 0) {
 
 // The words under the line, from the reader's side. names: { me, them } as the card shows them ("You" reads best for me).
 // "You led for good from move 31 · biggest swing: move 24, 12 seeds your way" — move numbers count from 1, as people do.
+// names.gaveUp ("Tete gave up"): a game someone gave up ends with it, after the move it happened on.
 export function storyWords(story, names = { me: 'You', them: 'They' }) {
   if (!story || !story.moves) return '';
   const parts = [];
@@ -38,6 +39,7 @@ export function storyWords(story, names = { me: 'You', them: 'They' }) {
   }
   const b = story.biggest;
   if (b) parts.push(`biggest swing: move ${b.index + 1}, ${Math.abs(b.swing)} seeds ${b.swing > 0 ? (names.me === 'You' ? 'your' : names.me + "'s") : names.them + "'s"} way`);
+  if (names.gaveUp) parts.push(`${names.gaveUp} after move ${story.moves}`);
   return parts.join(' · ');
 }
 

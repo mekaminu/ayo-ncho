@@ -30,7 +30,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online (also checks the away title: the host's tab goes out of sight, the friend moves, the title says it): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also checks the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -179,9 +179,30 @@ if online:
         print("online: shouts went both ways")
         out2 = out[:-4] + "-friend.png" if out.endswith(".png") else out + "-friend.png"
         friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out2, timeout=120000, animations="disabled")
+        friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        # giving up: the last button in the host's shout row asks once more, then the game ends on both boards for Tete
+        host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
+        assert host.evaluate("!document.querySelector('#giveUpBtn').hidden && document.querySelector('#giveUpBtn').textContent") == "Give up this game"
+        host.click("#giveUpBtn")
+        gu = host.evaluate("[document.querySelector('#giveUpBtn').textContent, document.querySelector('#giveUpBtn').classList.contains('armed'), document.querySelector('#shoutMenu').hidden]")
+        assert gu[0] in ("Tap again to give up", "Click again to give up") and gu[1] and not gu[2], gu
+        out4 = out[:-4] + "-giveup-ask.png" if out.endswith(".png") else out + "-giveup-ask.png"
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(150); host.screenshot(path=out4, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        assert not host.evaluate("window.__ayo.state.over"), "one tap does not give up"
+        if not host.evaluate("document.querySelector('#giveUpBtn').classList.contains('armed')"): host.click("#giveUpBtn")  # the picture took longer than the 3 s the button waits: ask again
+        host.click("#giveUpBtn")
+        for pg in (host, friend): pg.wait_for_function("!document.querySelector('#gameover').hidden && window.__ayo.state.resigned===0", timeout=60000)
+        hc = host.evaluate("[document.querySelector('#goTitle').textContent, document.querySelector('#goEyebrow').textContent]")
+        fc = friend.evaluate("[document.querySelector('#goTitle').textContent, document.querySelector('#goEyebrow').textContent, document.querySelector('#goMe').classList.contains('win')]")
+        assert hc[0] == "Tete wins" and hc[1].endswith("You gave up"), hc
+        assert fc[0] == "You win" and fc[1].endswith("Meka gave up") and fc[2], fc
+        assert host.evaluate("window.__ayo.state.winner") == 1 and friend.evaluate("window.__ayo.state.winner") == 1
+        print("give up: host's card", hc, "· Tete's card", fc[:2])
+        out5 = out[:-4] + "-giveup.png" if out.endswith(".png") else out + "-giveup.png"
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out5, timeout=120000, animations="disabled")
         b.close(); node.terminate()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
-    srv.shutdown(); print("wrote", out, out3, "and", out2); sys.exit(0)
+    srv.shutdown(); print("wrote", out, out3, out2, out4, "and", out5); sys.exit(0)
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
     pg = b.new_page(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2 if not (wide or home) else 1)

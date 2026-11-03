@@ -266,10 +266,15 @@ button{font-family:inherit}
 #shoutMenu{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 124px);display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(92vw,370px);z-index:3;animation:pop .25s ease-out}
 #shoutMenu .pill{background:var(--card);color:var(--fg);border-color:rgba(230,183,111,.35);font-size:13px;padding:9px 14px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
 #shoutMenu .pill:hover{border-color:var(--brass)}#shoutMenu .pill:active{transform:scale(.95)}
+#shoutMenu .giveup{flex-basis:100%;max-width:240px;margin-top:4px;background:rgb(24,15,9);color:var(--muted);border-color:rgba(214,112,72,.35);border-style:dashed}
+#shoutMenu .giveup:hover{border-color:#d67048;color:var(--fg)}
+#shoutMenu .giveup.armed{color:#f6d9c8;border-style:solid;border-color:#d67048;background:rgb(84,32,15);animation:armPulse 1s ease-in-out infinite}
+@keyframes armPulse{50%{box-shadow:0 0 0 4px rgba(214,112,72,.22),0 8px 24px rgba(0,0,0,.45)}}
+#shoutMenu .giveup[hidden]{display:none}
 #myBubble{position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 124px);max-width:min(70vw,280px);background:rgba(230,183,111,.18);border:1px solid rgba(230,183,111,.5);color:var(--fg);border-radius:14px 14px 4px 14px;padding:9px 12px;font-size:13px;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:pop .25s ease-out;pointer-events:none;z-index:2}
 .wide #shoutMenu{left:auto;right:max(84px,calc(env(safe-area-inset-right,0px) + 84px));bottom:50%;transform:translateY(50%);width:min(32vw,320px);justify-content:flex-end}
 .wide #myBubble{right:auto;left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 118px);border-radius:14px 14px 14px 4px}
-@media (prefers-reduced-motion:reduce){#shoutMenu,#myBubble{animation:none}}
+@media (prefers-reduced-motion:reduce){#shoutMenu,#myBubble,#shoutMenu .giveup.armed{animation:none}}
 /* with friends: the name card and the door */
 .field{width:100%;box-sizing:border-box;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:500 16px Inter,system-ui,sans-serif;color:var(--fg);outline:none;-webkit-user-select:text;user-select:text}
 .field:focus{border-color:var(--brass)}

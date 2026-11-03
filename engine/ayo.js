@@ -197,6 +197,17 @@ function finish(state, events) {
   if (state.over) events.push({ type: "end", winner: state.winner });
 }
 
+// Giving up (a room's "Give up this game"): the game ends now and the other side wins whatever the score — at a real
+// board the one who concedes simply pushes the board across. The seeds stay where they lie; `resigned` says who gave up,
+// so the server, both boards and a reload all read the same result. Returns the new state and the one event to show.
+export function resign(state, player) {
+  if (state.over) throw new Error("game over");
+  if (player !== 0 && player !== 1) throw new Error("no such seat");
+  const winner = opponent(player);
+  const next = { ...state, pits: state.pits.slice(), stores: state.stores.slice(), moves: state.moves.slice(), over: true, winner, resigned: player };
+  return { state: next, events: [{ type: "end", winner, resigned: player }] };
+}
+
 // Who moved first in a move list: the owner of the first pit played (a move is always from the mover's own side).
 export function firstMover(moves, fallback = 0) { return moves && moves.length ? owner(moves[0]) : fallback; }
 
