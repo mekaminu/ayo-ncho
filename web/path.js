@@ -11,20 +11,27 @@ import { endedCircling, calledWords } from './circling.js';
 //   end       the pit the last seed lands in — where the turn ends (captured or not)
 //   relays    the pits picked up again along the way (relay sowing), in order
 //   captures  every pit the move empties into a store, in order, whoever gets the seeds (the last-8 sweep included)
+//   takes     those of them whose seeds go to the mover's own trough (copper rings)
+//   gives     those whose seeds go to the other side's trough — in Nchò a pit on their side that makes 4 before the last seed
+//             goes to its owner (pale rings: "whose 4 is it"); read from each capture event's `by`, never worked out here
 //   got/lost  seeds the mover's store gains, and the other side's
 //   sweep     the Nchò last-8 sweep, if the move makes one: { by, n, pits } (the engine marks it)
 //   over      whether the move ends the game, and who wins then
 export function sowPath(state, pit) {
   if (!state || state.over || !legalMoves(state).includes(pit)) return null;
   const { state: next, events } = applyMove(state, pit);
-  const me = state.turn, visits = Array(12).fill(0), order = [], relays = [], captures = []; let end = null, drops = 0;
+  const me = state.turn, visits = Array(12).fill(0), order = [], relays = [], captures = [], takes = [], gives = []; let end = null, drops = 0;
   for (const e of events) {
     if (e.type === 'drop') { if (!visits[e.pit]) order.push(e.pit); visits[e.pit]++; end = e.pit; drops++; }
     else if (e.type === 'pickup' && e.relay) relays.push(e.pit);
-    else if (e.type === 'capture') for (const p of e.pits) if (!captures.includes(p)) captures.push(p);
+    else if (e.type === 'capture') for (const p of e.pits) {
+      if (!captures.includes(p)) captures.push(p);
+      const mine = e.by === me, list = mine ? takes : gives; // a pit can be emptied twice in one relay turn: it goes to whoever got it last
+      if (!list.includes(p)) list.push(p); const other = mine ? gives : takes, k = other.indexOf(p); if (k >= 0) other.splice(k, 1);
+    }
   }
   return {
-    pit, order, visits, end, relays, captures, drops, sweep: sweepOf(events),
+    pit, order, visits, end, relays, captures, takes, gives, drops, sweep: sweepOf(events),
     got: next.stores[me] - state.stores[me], lost: next.stores[opponent(me)] - state.stores[opponent(me)],
     over: next.over, winner: next.over ? next.winner : null,
     called: endedCircling(next), // the game is called on this move: no capture for 60 moves, each keeps their side (web/circling.js)
@@ -108,4 +115,11 @@ export function pickedHint(path, { you = 0, keys = false, key = null, seeds = 0,
   if (!keys) return words ? `${words} — tap again to sow` : 'tap again to sow, or pick another';
   const lead = `pit ${key || '?'} · ${seeds === 1 ? '1 seed' : `${seeds} seeds`}`;
   return words ? `pit ${key || '?'} · ${words} — Enter to sow` : `${lead} — Enter to sow, or pick another`; // with the path shown the count badge says the seeds
+}
+
+// Whose 4 is it — said once on a phone, the first time a picked move would hand seeds to the other side (a pale ring):
+export function giftNoteWords(rules = {}) {
+  return rules.capture === 4
+    ? 'A pale ring: those seeds go to their trough, not yours — a pit on their side that makes 4 before your last seed is theirs. Only your last seed takes a 4 over there.'
+    : 'A pale ring: those seeds go to their trough, not yours.';
 }

@@ -48,6 +48,7 @@ button{font-family:inherit}
 .badge.barred{opacity:.45;color:var(--fg);text-decoration:line-through;text-decoration-color:rgba(230,183,111,.6)} /* feed them: a pit the feed rule bars */
 .handc{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:13px;font-weight:700;line-height:18px;min-width:18px;text-align:center;margin:-22px 0 0 -11px;padding:1px 6px;border-radius:11px;color:#1a120b;background:var(--brass);box-shadow:0 1px 4px rgba(0,0,0,.45),0 0 0 1px rgba(255,220,160,.5);font-variant-numeric:tabular-nums} /* the hand counts: the seeds still in the sowing hand */
 .handc.haul{margin:-12px 0 0 30px;background:#c46a3a;color:#fff3e4;box-shadow:0 1px 4px rgba(0,0,0,.45),0 0 0 1px rgba(255,190,150,.5)} /* the capture hand: copper, beside the heap (over the far trough, above it would sit on the names) */
+.handc.haul.gift{background:#efe2c4;color:#3a2a1a;box-shadow:0 1px 4px rgba(0,0,0,.45),0 0 0 1px rgba(120,90,60,.45)} /* whose 4 is it: a haul going to the other side's trough is pale, not copper */
 .handc.tick{animation:hcTick .18s ease-out}.handc.again{animation:hcAgain .45s ease-out}
 .handc.count{margin:-24px 0 0 -11px;font-size:15px;line-height:20px;min-width:22px;transition:opacity .25s}.handc.count.done{animation:hcAgain .45s ease-out}.handc.count.fade{opacity:0} /* count a pit by touch: the number over the pit a finger rests on */
 @keyframes hcTick{from{scale:1.18}to{scale:1}}@keyframes hcAgain{0%{scale:1.4;box-shadow:0 0 0 2px #fff3d0,0 0 16px rgba(255,214,140,.9)}100%{scale:1}}
@@ -297,6 +298,7 @@ button{font-family:inherit}
 #tip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);width:min(86vw,320px);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:pop .3s ease-out;z-index:3}
 #tip p{margin:0;font-size:13px;line-height:1.45;flex:1}
 #tip button{flex:none}
+.toast.long{max-width:min(92vw,520px);width:max-content;border-radius:14px;text-align:center;line-height:1.35}
 .toast{position:fixed;left:50%;transform:translateX(-50%);top:calc(env(safe-area-inset-top,0px) + 70px);background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 14px;font-size:13px;z-index:4;animation:pop .25s ease-out}
 
 /* Fold open and Mac: the board fills the height; the two player cards sit beside it, the toolbar down the right edge */

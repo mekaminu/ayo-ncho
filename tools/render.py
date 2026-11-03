@@ -58,6 +58,10 @@
 #                  it): Continue, the move is played, a ripple goes round the pits, the "Circling" line comes up with 12 and who keeps what
 #                  (picture <out>), it ticks down through his reply; then a saved game one move from the call: the first tap says the game
 #                  ends here, the move is played and the Game over card says "no capture in 60 moves" (<out>-called.png). --wide for the Mac
+#        --gives: whose 4 is it — a saved game where one of your pits fills a pit on their side to 4 before its last seed (tools/givespos.js
+#                  finds it): Continue, tap that pit: copper rings land on exactly the pits you would take and pale beaded rings on the pits
+#                  that go to them, and the one-time note says what the pale ring means (picture <out>); Esc clears them; a second tap shows
+#                  no note again; sowing it, the hand that carries their 4 wears a pale number (<out>-haul.png). --wide for the Mac
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 #        --local: two of us on one phone — Home → the "Two of us" pill → Play: Player 1 plays, the board swings half a turn round to face
@@ -74,7 +78,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; record = record or story
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -265,10 +269,14 @@ with sync_playwright() as p:
         opos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "feedpos.js"), "only"]).decode())
         mk = lambda m: json.dumps(json.dumps({"moves": m, "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "easy", "stats": {"biggest": 4, "captures": 2, "started": int(time.time() * 1000) - 3 * 60 * 1000}}))
         pg.add_init_script("localStorage.setItem('ayo.game', sessionStorage.getItem('only') ? %s : %s); localStorage.setItem('ayo.level', 'easy'); localStorage.setItem('ayo.tutorial', '3');" % (mk(opos["moves"]), mk(fpos["moves"])))
+    if givesc:  # a saved game against Adaeze where one of your pits hands a 4 to the other side
+        gpos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "givespos.js")]).decode())
+        gsave = json.dumps(json.dumps({"moves": gpos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "easy", "stats": {"biggest": 4, "captures": 1, "started": int(time.time() * 1000) - 2 * 60 * 1000}}))
+        pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'easy'); localStorage.setItem('ayo.tutorial', '3');" % gsave)
     if startsc: pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.starts', JSON.stringify({ hard: { first: 0, winner: 0 }, local: { first: 0, winner: 0 } })); }")  # you beat her last time; Player 1 won the last two-of-us game
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or last8 or startsc or feedc or circ else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -349,6 +357,34 @@ with sync_playwright() as p:
         pg.click("#undo"); pg.wait_for_function("window.__ayo.state.moves.length === 0 && !window.__ayo.busy && window.__ayo.seat === 1", timeout=20000)
         assert pg.evaluate("window.__ayo.state.turn") == 1, "undoing Player 2's opening gives Player 2 the move again"
         print("starts: two of us — Player 2 starts, the board faces them, Undo of the opening gives it back to them")
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
+    if givesc:
+        def shot(path):
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=path, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        marks = lambda: pg.evaluate("window.__ayo.marks")
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+        assert pg.evaluate("window.__ayo.state.moves") == gpos["moves"], "the saved game did not come back"
+        assert pg.evaluate("localStorage.getItem('ayo.gives.told')") is None
+        x, y = pg.evaluate("window.__ayo.pitAt(%d)" % gpos["pit"]); pg.mouse.click(x, y)
+        pg.wait_for_function("window.__ayo.marks.gifts.length===%d" % len(gpos["gives"]), timeout=20000)
+        mk = marks(); assert sorted(mk["caps"]) == sorted(gpos["takes"]) and sorted(mk["gifts"]) == sorted(gpos["gives"]), (mk, gpos)
+        toast = pg.evaluate("[...document.querySelectorAll('.toast')].map(t=>t.textContent).join('|')"); assert "A pale ring: those seeds go to their trough" in toast, toast
+        h = pg.evaluate("document.querySelector('#hint').textContent"); assert "gives 4" in h and "takes" in h, h
+        print("gives: pit", gpos["pit"], "· copper on", mk["caps"], "· pale on", mk["gifts"], "·", h)
+        pg.wait_for_timeout(700); shot(out)
+        pg.keyboard.press("Escape"); assert marks()["gifts"] == [] and marks()["caps"] == [], "Esc clears the rings"
+        pg.wait_for_timeout(4500)  # the note goes
+        pg.mouse.click(x, y); pg.wait_for_function("window.__ayo.marks.gifts.length===%d" % len(gpos["gives"]), timeout=20000); pg.wait_for_timeout(300)
+        assert pg.evaluate("document.querySelectorAll('.toast.long').length") == 0, "the note is said once"
+        pg.evaluate("window.__haulPause = 1"); pg.mouse.click(x, y)  # sow it: the first capture is their 4
+        pg.wait_for_function("!!window.__handGo", timeout=240000)
+        hc = pg.evaluate("[document.querySelector('.handc.haul').className, document.querySelector('.handc.haul').textContent, document.querySelector('.handc.haul').hidden]")
+        assert "gift" in hc[0] and hc[1] == "+4" and not hc[2], hc
+        print("gives: the hand carrying their 4 is pale:", hc)
+        shot(out[:-4] + "-haul.png"); pg.evaluate("window.__haulPause = 0; window.__handGo(); window.__handGo = null")
+        pg.wait_for_function("!window.__ayo.busy && (window.__ayo.state.turn === 0 || window.__ayo.state.over)", timeout=240000)
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)
@@ -640,20 +676,20 @@ with sync_playwright() as p:
                 pth = pg.evaluate("window.__ayo.path"); assert pth and pth["pit"] == m, "no path for a legal pit"
                 score = len(pth["order"]) + 4 * len(pth["captures"])  # a relay turn with a capture makes the best picture
                 if score > bestN: best, bestN = m, score
-                pg.keyboard.press("Escape"); assert sel() is None and marks() == {"steps": [], "caps": [], "risk": [], "end": False}, "Esc should clear every mark"
+                pg.keyboard.press("Escape"); assert sel() is None and marks() == {"steps": [], "caps": [], "gifts": [], "risk": [], "end": False}, "Esc should clear every mark"
             if os.environ.get("PATH_BEFORE"): pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=os.environ["PATH_BEFORE"], timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
             x, y = pg.evaluate("window.__ayo.pitAt(%d)" % best); pg.mouse.click(x, y)
             pth = pg.evaluate("window.__ayo.path"); n = len(pth["order"])
-            pg.wait_for_function("window.__ayo.marks.steps.length===%d && window.__ayo.marks.end===%s && window.__ayo.marks.caps.length===%d" % (n, "true" if pth["end"] is not None else "false", len(pth["captures"])), timeout=20000)
-            mk = marks(); assert sorted(mk["steps"]) == sorted(pth["order"]) and sorted(mk["caps"]) == sorted(pth["captures"]), (mk, pth)
+            pg.wait_for_function("window.__ayo.marks.steps.length===%d && window.__ayo.marks.end===%s && (window.__ayo.marks.caps.length+window.__ayo.marks.gifts.length)===%d" % (n, "true" if pth["end"] is not None else "false", len(pth["captures"])), timeout=20000)
+            mk = marks(); assert sorted(mk["steps"]) == sorted(pth["order"]) and sorted(mk["caps"] + mk["gifts"]) == sorted(pth["captures"]), (mk, pth)
             assert "ends in" in hint() and (hint().endswith("— Enter to sow") or hint().endswith("— tap again to sow")), hint()
             assert pg.evaluate("document.querySelector('.badge').textContent") != "", "badges still there"
             print("path: pit", best, "→", n, "pits, relays", len(pth["relays"]), "captures", pth["captures"], "ends", pth["end"], "·", hint())
             pg.wait_for_timeout(400); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
-            pg.keyboard.press("Escape"); assert marks() == {"steps": [], "caps": [], "risk": [], "end": False}
+            pg.keyboard.press("Escape"); assert marks() == {"steps": [], "caps": [], "gifts": [], "risk": [], "end": False}
             # the setting off: a tap lights the pit as before, no marks, the old words
             pg.evaluate("localStorage.setItem('ayo.path','0')"); pg.mouse.click(x, y); pg.wait_for_function("window.__ayo.selected===%d" % best, timeout=5000); pg.wait_for_timeout(600)
-            assert marks() == {"steps": [], "caps": [], "risk": [], "end": False} and pg.evaluate("window.__ayo.path") is None, "the setting off should show no marks"
+            assert marks() == {"steps": [], "caps": [], "gifts": [], "risk": [], "end": False} and pg.evaluate("window.__ayo.path") is None, "the setting off should show no marks"
             assert hint() in ("tap again to sow, or pick another",) or hint().endswith("— Enter to sow, or pick another"), hint()
             pg.evaluate("localStorage.setItem('ayo.path','1')"); pg.keyboard.press("Escape")
             print("path: setting off → no marks ·", hint())
@@ -701,9 +737,9 @@ with sync_playwright() as p:
             ex = pg.evaluate("window.__ayo.explain"); assert ex and ex["moves"] == 1 and ex["name"] == "Nnamdi", ex  # the opponent's reply to your first move
             assert not pg.evaluate("document.querySelector('#lastMove').hidden") and pg.evaluate("document.querySelector('#lastName').textContent") == "Nnamdi"
             words = pg.evaluate("document.querySelector('#lastWords').textContent"); assert words == ex["words"] and ("picked up again" in words or "took" in words or "gave" in words or words.startswith("ended in")), words
-            landed = "window.__ayo.marks.steps.length===%d && window.__ayo.marks.caps.length===%d && window.__ayo.marks.end===%s" % (len(ex["order"]), len(ex["captures"]), "true" if ex["end"] is not None else "false")
+            landed = "window.__ayo.marks.steps.length===%d && (window.__ayo.marks.caps.length+window.__ayo.marks.gifts.length)===%d && window.__ayo.marks.end===%s" % (len(ex["order"]), len(ex["captures"]), "true" if ex["end"] is not None else "false")
             pg.wait_for_function(landed, timeout=20000)  # the ghost of their path: every pit their hand reached, the captures ringed, the light where it ended
-            mk = pg.evaluate("window.__ayo.marks"); assert sorted(mk["steps"]) == sorted(ex["order"]) and sorted(mk["caps"]) == sorted(ex["captures"]) and mk["end"] == (ex["end"] is not None), (mk, ex)
+            mk = pg.evaluate("window.__ayo.marks"); assert sorted(mk["steps"]) == sorted(ex["order"]) and sorted(mk["caps"] + mk["gifts"]) == sorted(ex["captures"]) and mk["end"] == (ex["end"] is not None), (mk, ex)
             print("explain:", ex["name"], "·", words, "· ghost marks on", len(mk["steps"]), "pits, captures", ex["captures"])
             pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
             pg.wait_for_function("window.__ayo.marks.steps.length===0", timeout=30000)  # they fade by themselves
@@ -739,7 +775,7 @@ with sync_playwright() as p:
             moves = pg.evaluate("window.__ayo.state.moves.length"); badges = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
             pg.click("#take"); pg.wait_for_function("window.__ayo.replaying && window.__ayo.busy", timeout=5000)
             assert pg.evaluate("document.querySelector('#turn').textContent") == "watching" and pg.evaluate("document.querySelector('#hint').textContent") == "Mama Ngozi's move, slowly", pg.evaluate("document.querySelector('#hint').textContent")
-            pg.wait_for_function("window.__ayo.marks.steps.length===%d && window.__ayo.marks.caps.length===%d" % (len(tk["order"]), len(tk["captures"])), timeout=20000)
+            pg.wait_for_function("window.__ayo.marks.steps.length===%d && (window.__ayo.marks.caps.length+window.__ayo.marks.gifts.length)===%d" % (len(tk["order"]), len(tk["captures"])), timeout=20000)
             out2 = out[:-4] + "-show.png" if out.endswith(".png") else out + "-show.png"
             pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out2, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
             pg.wait_for_function("!window.__ayo.replaying && !window.__ayo.busy", timeout=240000)

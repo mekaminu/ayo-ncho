@@ -104,18 +104,23 @@ function buildPathMarks(group) {
   // a broken ring (16 dashes) so it never reads as one of the copper capture rings: a warning, drawn as one
   const riskG = new THREE.RingGeometry(PIT_R * 1.07, PIT_R * 1.15, 64, 1); { const idx = riskG.index.array, keep = [];
     for (let k = 0; k < 64; k++) if (k % 4 < 2) for (let j = 0; j < 6; j++) keep.push(idx[k * 6 + j]); riskG.setIndex(keep); }
-  const steps = [], dots = [], caps = [], risk = [];
+  // whose 4 is it: a pit the move fills to 4 that goes to the OTHER side's trough gets a pale, beaded ring at the capture
+  // ring's place (24 short beads, bone-coloured) — the seeds leave the pit, but they are not yours
+  const giftG = new THREE.RingGeometry(PIT_R * 0.98, PIT_R * 1.05, 72, 1); { const idx = giftG.index.array, keep = [];
+    for (let k = 0; k < 72; k++) if (k % 3 < 2) for (let j = 0; j < 6; j++) keep.push(idx[k * 6 + j]); giftG.setIndex(keep); }
+  const steps = [], dots = [], caps = [], risk = [], gifts = [];
   for (const [x, z] of pitCenters) {
     steps.push(mk(ringG, new THREE.MeshBasicMaterial({ color: 0xe6b76f, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0025, z));
     // the mark itself: a brass dot on the bowl's inner slope, at the edge nearest the board's centre line, where seeds seldom sit
     const dx = x - Math.sign(x) * PIT_R * 0.74, dz = z + PIT_R * 0.42;
     dots.push(mk(dotG, new THREE.MeshBasicMaterial({ color: 0xf2c57c, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), dx, surfaceY(dx, dz) + 0.0015, dz));
     caps.push(mk(capG, new THREE.MeshBasicMaterial({ color: 0xff6e3a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z));
+    gifts.push(mk(giftG, new THREE.MeshBasicMaterial({ color: 0xf3e6c8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z));
     // what the move leaves open: a deep ember ring just outside the rim of a pit their best answer would take
     risk.push(mk(riskG, new THREE.MeshBasicMaterial({ color: 0xff3b2b, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0035, z));
   }
   const end = mk(endG, new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0xffc877, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0, BT + 0.002, 0);
-  return { steps, dots, caps, risk, end };
+  return { steps, dots, caps, risk, gifts, end };
 }
 
 export function buildTable(scene, q = {}) {

@@ -24,3 +24,11 @@ export function handText(n, kind = 'sow') { return n > 0 ? (kind === 'haul' ? `+
 // it rides with the seed counts on the pits (Settings → Board → Seed counts on pits), and never in the clip (the
 // clip records the canvas only, so the number is never in the video anyway)
 export function handShown(badgesOn, clipping) { return !!badgesOn && !clipping; }
+
+// whose seeds the capture hand carries: 'gift' when they go to the other side's trough (Nchò: a pit on their side that
+// makes 4 before the sower's last seed goes to its owner), so the "+4" is drawn pale rather than copper; the mover is
+// whoever's pit the turn was picked up from (the first event)
+export function haulKind(events, capture) {
+  const first = events && events.find((e) => e.type === 'pickup');
+  return first && capture && capture.by !== (first.pit < 6 ? 0 : 1) ? 'gift' : 'mine';
+}
