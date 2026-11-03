@@ -5,11 +5,13 @@
 //   your pit you can play        a hand cursor and a faint brass ring on its rim; with nothing picked yet the hint line says
 //                                "pit 3 · 5 seeds — click to see where they go"
 //   your pit the feed rule bars  a not-allowed cursor: "pit 3 would leave them nothing — you must give the other side seeds"
+//                                (their side empty: "pit 2 doesn't reach them — they have no seeds: play pit 6")
 //   your empty pit               "pit 3 is empty"
 //   their pit                    "their pit 2 · 6 seeds" (handy with the count badges off), no ring, an ordinary cursor
 //   the wood around the pits     a grab hand: drag to turn the board (grabbing while you drag)
 //   a turn playing               a hand cursor while a click would hurry it, otherwise the wait cursor
-import { legalMoves, owner } from '../engine/ayo.js';
+import { legalMoves, owner, seedsOnSide } from '../engine/ayo.js';
+import { pitList } from './feed.js';
 import { pitName } from './path.js';
 import { seedsWord } from './keys.js';
 
@@ -25,7 +27,9 @@ export function hoverAt({ state, pit = null, you = 0, press = false, hurry = fal
   if (owner(pit) !== you) return { cursor: 'default', ring: false, words: talk && !state.over ? `${name} · ${seedsWord(n)}` : null };
   if (!press) return { cursor: 'default', ring: false, words: null };
   if (n === 0) return { cursor: 'not-allowed', ring: false, words: talk ? `${short} is empty` : null };
-  if (!legalMoves(state).includes(pit)) return { cursor: 'not-allowed', ring: false, words: `${short} would leave them nothing — you must give the other side seeds` };
+  const legal = legalMoves(state);
+  if (!legal.includes(pit)) return { cursor: 'not-allowed', ring: false, words: seedsOnSide(state, 1 - you) === 0 // their side empty (web/feed.js says the same on the board)
+    ? `${short} doesn't reach them — they have no seeds: play ${pitList(legal, you)}` : `${short} would leave them nothing — you must give the other side seeds` };
   if (pit === selected) return { cursor: 'pointer', ring: false, words: null };
   return { cursor: 'pointer', ring: true, words: talk ? `${short} · ${seedsWord(n)} — click to see where they go` : null };
 }

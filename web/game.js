@@ -27,6 +27,7 @@ import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
 import { HOLD_MS, COUNT_STAY_MS, countPlan, canCount, stillHolding, countWords } from './count.js';
 import { mayAsk as mayAskBack, backWords, planReturn } from './takeback.js';
+import { narrowOf, feedWords, onlyLead } from './feed.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
 const $ = (s) => document.querySelector(s);
@@ -287,7 +288,7 @@ function paintPits() { // labels and reach from the position: only your own pits
   if (pitLayer.firstChild !== pitBtns[order[0]]) order.forEach((i) => pitLayer.appendChild(pitBtns[i])); // a screen reader reads them in this order
   badges.forEach((b, i) => { const k = pitKey(i, you); if (k) b.dataset.key = k; else delete b.dataset.key; }); // once a key is pressed, the count badge on your pits shows its key too
   order.forEach((i) => { const b = pitBtns[i]; b.setAttribute('aria-label', pitLabel(i, state.pits[i], { you, selected, legal: mine ? legal : null })); b.disabled = !pitEnabled(i, state.pits[i], { you, mine }); b.setAttribute('aria-pressed', String(selected === i)); });
-  paintLast8();
+  paintLast8(); paintFeed();
 }
 // ---------- the last 8 (Nchò): once 8 seeds or fewer are left on the board, whoever captures next takes them all ----------
 // web/last8.js counts and words it; the engine does the sweep. While it holds, a brass line sits under the board and the count badges of the
@@ -479,9 +480,36 @@ function showTurnOnline() {
 // the chips under the board sit just above the hint line (on the Mac just below it), however many lines the hint wraps to
 try { const h = $('#hint'); new ResizeObserver(() => document.body.style.setProperty('--hint-h', h.offsetHeight + 'px')).observe(h); } catch {}
 function pickHint(phase) {
-  if (selected === null) return hintText(phase, { keys: keysLikely() });
+  const n = phase === 'pick' ? narrowNow() : null;
+  if (selected === null) return feedWords(n, { you }) || hintText(phase, { keys: keysLikely() });
   const line = pickedHint(path, { you, keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected], answer });
-  return hinted && hinted.pit === selected && hinted.at === state.moves.length ? hintedHint(line, CHARACTERS.hard.name, { keys: keysLikely(), key: pitKey(selected, you) }) : line;
+  if (hinted && hinted.pit === selected && hinted.at === state.moves.length) return hintedHint(line, CHARACTERS.hard.name, { keys: keysLikely(), key: pitKey(selected, you) });
+  if (!n || n.only !== selected) return line;
+  const lead = onlyLead(n, { you }), dup = `pit ${pitKey(selected, you)} · `; // on the keys the line starts with the pit: say it once
+  return `${lead} · ${lead.includes(dup.slice(0, -3)) && line.startsWith(dup) ? line.slice(dup.length) : line}`;
+}
+// ---------- feed them: when the rules narrow your move (web/feed.js), the board says so before you tap ----------
+// their side empty, or a pit that would leave them nothing: a brass ring lands on each pit you may play, the barred pits' badges go dim and
+// the hint line says why ("They have no seeds — you must feed them: pits 2 or 5"); with only one move it is picked for you (its path shows)
+// and one more tap sows it. Offline, two of us and rooms; not in the puzzle, a replay, or on Home.
+const feed = { key: null, auto: null, on: false, rings: [] };
+function narrowNow() { return canPress() && !puzzle.on && !replaying ? narrowOf(state, you) : null; }
+function paintFeed() {
+  const n = narrowNow(), key = n ? `${state.moves.length}:${you}:${state.pits.join(',')}` : null;
+  badges.forEach((b, i) => b.classList.toggle('barred', !!n && n.barred.includes(i)));
+  const want = n && n.kind === 'feed' && n.legal.length > 1 && selected === null ? n.legal : [];
+  feed.on = want.length > 0; feed.rings = want;
+  board.may.forEach((m, i) => { if (!want.includes(i)) { m.visible = false; m.material.opacity = 0; } });
+  if (want.length && key !== feed.key) { // a new position: the rings land one after another, near to far, with two soft knocks
+    feed.key = key; const token = key; want.slice().sort((a, b) => (a - you * 6) - (b - you * 6)).forEach((pit, k) => {
+      const m = board.may[pit]; m.visible = true; m.material.opacity = 0;
+      setTimeout(() => { if (feed.key !== token || !feed.rings.includes(pit)) return; tween(320, (t) => { if (feed.key !== token || !feed.rings.includes(pit)) return; m.material.opacity = 0.75 * t; const sc = 1.25 - 0.25 * t; m.scale.set(sc, sc, 1); }, easeOut); }, reduceMotion ? 0 : 90 * k);
+    });
+    click(1.05, 0.04); setTimeout(() => click(1.25, 0.03), 140); buzz(12);
+  } else for (const pit of want) { const m = board.may[pit]; if (!m.visible) { m.visible = true; m.material.opacity = 0.75; m.scale.set(1, 1, 1); } }
+  if (!n) feed.key = null;
+  // only one move: picked for you once per position (Esc puts it back and it stays back)
+  if (n && n.only !== null && selected === null && feed.auto !== key) { feed.auto = key; select(n.only); }
 }
 // ---------- shouts: a fixed phrase sent by id to both boards; theirs pops by their face with a knock, yours sits by your name ----------
 const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
@@ -978,6 +1006,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle
   if (which !== 'play' && !shoutMenu.hidden) toggleShoutMenu(false);
   if (which !== 'play') { hideExplain(); if (selected === null) clearPath(); } // their last move stays on the board only while you are at it
   if (which === 'play') blinkLoop(); else { clearTimeout(blinkTimer); if (mood !== 'calm' && mood !== 'think') react('calm'); }
+  if (which === 'play' && !busy && !state.over && state.turn === you && selected === null) showTurn(); else if (!board3d) paintFeed(); // feed them: said once the board is in front of you, gone behind a screen
 }
 let idle = true; // the home screen slowly turns the board
 function paintHome() {
@@ -1353,7 +1382,7 @@ function canPress() { return !(busy || state.over || state.turn !== you || body.
 function pressPit(pit) {
   if (!canPress()) return false;
   const legal = legalMoves(state);
-  if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) $('#hint').textContent = 'you must give the other side seeds'; else shake(pit); return false; }
+  if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) { $('#hint').textContent = feedWords(narrowOf(state, you), { you }) || 'you must give the other side seeds'; shake(pit); } else shake(pit); return false; }
   if (selected === pit) sow(pit); else select(pit);
   return true;
 }
@@ -1402,12 +1431,12 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
 function loop(now) {
-  runTweens(now); hoverStep(now, (now - last) / 1000); sim.step((now - last) / 1000, now); if (pathGlow && !reduceMotion) board.marks.end.material.opacity = 0.34 + 0.1 * Math.sin(now / 240); if (riskGlow && !reduceMotion) for (const r of board.marks.risk) if (r.visible) r.material.opacity = 0.56 + 0.14 * Math.sin(now / 320); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); placeHands(); renderer.render(scene, camera); frames++;
+  runTweens(now); hoverStep(now, (now - last) / 1000); sim.step((now - last) / 1000, now); if (pathGlow && !reduceMotion) board.marks.end.material.opacity = 0.34 + 0.1 * Math.sin(now / 240); if (feed.on && !reduceMotion) for (const pit of feed.rings) { const m = board.may[pit]; if (m.visible && m.scale.x <= 1.001) m.material.opacity = 0.6 + 0.15 * Math.sin(now / 320); } if (riskGlow && !reduceMotion) for (const r of board.marks.risk) if (r.visible) r.material.opacity = 0.56 + 0.14 * Math.sin(now / 320); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); placeHands(); renderer.render(scene, camera); frames++;
   if (frames === 3) { window.__done = true; if (params.get('still')) { running = false; return; } }
   if (window.__freeze || document.hidden) { running = false; return; }
   requestAnimationFrame(loop);

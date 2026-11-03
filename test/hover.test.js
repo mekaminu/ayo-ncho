@@ -25,7 +25,9 @@ test("their pits, empty pits and the feed rule", () => {
   assert.deepEqual(legalMoves(e), [5], "only the pit that reaches them is legal");
   assert.deepEqual(hoverAt({ state: e, pit: 0, press: true }), { cursor: "not-allowed", ring: false, words: "pit 1 is empty" });
   const fed = hoverAt({ state: e, pit: 1, press: true });
-  assert.equal(fed.cursor, "not-allowed"); assert.equal(fed.ring, false); assert.match(fed.words, /^pit 2 would leave them nothing/);
+  assert.equal(fed.cursor, "not-allowed"); assert.equal(fed.ring, false); assert.equal(fed.words, "pit 2 doesn't reach them — they have no seeds: play pit 6");
+  const cut = { ...newGame("ncho"), pits: [0, 1, 0, 0, 0, 6, 1, 0, 0, 0, 0, 0] }; // they have seeds, but a pit would take their last
+  for (const p of [1, 5]) { const h = hoverAt({ state: cut, pit: p, press: true }); if (!legalMoves(cut).includes(p)) assert.match(h.words, /would leave them nothing/); }
   assert.equal(hoverAt({ state: e, pit: 5, press: true }).ring, true);
 });
 
