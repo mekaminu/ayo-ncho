@@ -150,3 +150,16 @@ test("what it leaves open, in words, at the end of the hint line", () => {
   assert.equal(pickedHint(p, { answer: { got: 0, wins: false } }), "ends in their pit 3 · takes 4 — tap again to sow");
   assert.equal(pickedHint(p, { keys: true, key: 2, seeds: 5, answer: { got: 4, wins: true } }), "pit 2 · ends in their pit 3 · takes 4 · then they can win — Enter to sow");
 });
+
+import { hintedHint } from "../web/path.js";
+test("a hint that teaches: the hinted pit's line says whose move it is, for a finger and for the keys", () => {
+  const s = newGame("ncho"), p = sowPath(s, 3);
+  const finger = pickedHint(p, { you: 0 }), keys = pickedHint(p, { you: 0, keys: true, key: "4", seeds: 4 });
+  assert.equal(hintedHint(finger, "Mama Ngozi"), `Mama Ngozi would play this one · ${finger}`);
+  assert.ok(hintedHint(finger, "Mama Ngozi").endsWith("— tap again to sow"));
+  assert.equal(hintedHint(keys, "Mama Ngozi", { keys: true, key: "4" }), `Mama Ngozi would play ${keys}`);
+  // the path setting off: the bare lines
+  assert.equal(hintedHint(pickedHint(null), "Mama Ngozi"), "Mama Ngozi would play this one — tap again to sow");
+  assert.equal(hintedHint(pickedHint(null, { keys: true, key: "2", seeds: 5 }), "Mama Ngozi", { keys: true, key: "2" }), "Mama Ngozi would play pit 2 · 5 seeds — Enter to sow");
+  assert.equal(hintedHint("", "Mama Ngozi"), ""); assert.equal(hintedHint("something else", "Mama Ngozi", { keys: true, key: "1" }), "something else");
+});

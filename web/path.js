@@ -86,6 +86,18 @@ export function answerWords(ans) {
   return ans.got ? `then they can take ${ans.got}` : '';
 }
 
+// A hint that teaches: Hint picks Mama Ngozi's pit for you, so the line says whose move it is before the usual path words:
+// "Mama Ngozi would play this one · picks up again ×2 · takes 8 — tap again to sow"; on the keys "Mama Ngozi would play pit 3 · … — Enter to sow".
+// `line` is what pickedHint said for that pit; a line it does not recognise is left as it is.
+export function hintedHint(line, name, { keys = false, key = null } = {}) {
+  if (!line || !name) return line;
+  if (keys) {
+    const lead = `pit ${key || '?'} · `; if (!line.startsWith(lead)) return line;
+    return `${name} would play ${lead}${line.slice(lead.length)}`.replace(/, or pick another$/, '');
+  }
+  if (line === 'tap again to sow, or pick another') return `${name} would play this one — tap again to sow`;
+  return `${name} would play this one · ${line}`;
+}
 // The whole hint while a pit is picked: the path, then how to sow it (a finger, or the keys).
 export function pickedHint(path, { you = 0, keys = false, key = null, seeds = 0, answer = null } = {}) {
   const words = [pathWords(path, { you }), answerWords(answer)].filter(Boolean).join(' · ');

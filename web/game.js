@@ -13,7 +13,7 @@ import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } fr
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
-import { sowPath, pickedHint, playedWords, answerOf } from './path.js';
+import { sowPath, pickedHint, hintedHint, playedWords, answerOf } from './path.js';
 import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach.js';
 import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare } from './local.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT, BT, BW, BL, R as CORNER } from './board.js';
@@ -452,7 +452,11 @@ function showTurnOnline() {
 // the line under the board on your move: for a finger, or for the keys once a mouse or a key press says there is a keyboard
 // the chips under the board sit just above the hint line (on the Mac just below it), however many lines the hint wraps to
 try { const h = $('#hint'); new ResizeObserver(() => document.body.style.setProperty('--hint-h', h.offsetHeight + 'px')).observe(h); } catch {}
-function pickHint(phase) { return selected === null ? hintText(phase, { keys: keysLikely() }) : pickedHint(path, { you, keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected], answer }); }
+function pickHint(phase) {
+  if (selected === null) return hintText(phase, { keys: keysLikely() });
+  const line = pickedHint(path, { you, keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected], answer });
+  return hinted && hinted.pit === selected && hinted.at === state.moves.length ? hintedHint(line, CHARACTERS.hard.name, { keys: keysLikely(), key: pitKey(selected, you) }) : line;
+}
 // ---------- shouts: a fixed phrase sent by id to both boards; theirs pops by their face with a knock, yours sits by your name ----------
 const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
 for (const s of SHOUTS) { const b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.text; b.dataset.id = s.id; b.addEventListener('click', () => sendShout(s.id)); shoutMenu.appendChild(b); }
@@ -562,14 +566,15 @@ worker.onmessage = (e) => { const r = asks.get(e.data.id); if (r) { asks.delete(
 function ask(msg) { return new Promise((res) => { const id = ++askId; asks.set(id, res); worker.postMessage({ id, ...msg }); }); }
 function aiMove(s, lvl = level) { return ask({ state: s, level: lvl }); }
 function aiRate(s, lvl = 'hard') { return ask({ state: s, level: lvl, rate: true }); }
-let hintedAt = -1;
+let hintedAt = -1, hinted = null; // hinted: the pit Hint picked for you, and on which move
 async function hint() {
   if (busy || online || state.over || state.turn !== you || hintedAt === state.moves.length) return;
   hintedAt = state.moves.length; $('#hintBtn').disabled = true;
-  const m = await aiMove(state, 'hard'); if (m === null || state.turn !== you) return;
-  const [x, z] = pitCenters[m]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; board.glow.position.set(x, BT + 0.08, z); board.glow.visible = true; click(1.6, 0.05);
-  $('#hint').textContent = `${CHARACTERS.hard.name} would play that one`;
-  await wait(1500); if (selected === null) { board.ring.visible = false; board.glow.visible = false; } showTurn();
+  const at = state.moves.length, m = await aiMove(state, 'hard');
+  if (m === null || busy || state.over || state.turn !== you || state.moves.length !== at) return;
+  // a hint that teaches: her pit is picked for you, as if you had tapped it once — the path marks land and the line says why;
+  // one more tap (or Enter) sows it, any other pit picks that one instead
+  hinted = { pit: m, at }; select(m); click(1.6, 0.05);
 }
 
 function paintFaces() {
