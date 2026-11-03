@@ -30,12 +30,16 @@ import { mayAsk as mayAskBack, backWords, planReturn, undoPlan, undoWords } from
 import { narrowOf, feedWords, onlyLead } from './feed.js';
 import { circling as circlingOf, began as beganCircling, circlingRest, circlingWords, beganWords as circlingBegan, endedCircling, endedWords as circlingEnded, CALLING } from './circling.js';
 import { makeWake, wakeNote } from './wake.js';
+import { STEPS as LESSON, DONE as LESSON_DONE, startState as lessonStart, eyebrow as lessonEyebrow, SKIP as LESSON_SKIP, replyWords as lessonReply, wrongPit as LESSON_WRONG, isNewPhone, lessonDue, firstLevel, nextUp } from './lesson.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem('ayo.' + k, v); } catch {} } };
+// a new phone (nothing of the game kept on it): its first Play opens the lesson and it starts against Adaeze (web/lesson.js);
+// the scripted renders (?capture) are never one unless they ask with ?lesson=1
+const newPhone = params.get('lesson') === '1' || (!params.get('capture') && isNewPhone((k) => prefs.get(k, null)));
 
 // ---------- renderer / scene ----------
 const canvas = $('#c');
@@ -149,6 +153,7 @@ function layoutFromState(s) { // rebuild every seed's home from an engine state 
   s.pits.forEach((c, i) => { for (let j = 0; j < c; j++) settle(take(), i); });
   for (let j = 0; j < s.stores[0]; j++) settle(take(), 'S0');
   for (let j = 0; j < s.stores[1]; j++) settle(take(), 'S1');
+  seeds.forEach((m, k) => { m.visible = k < n; }); // a board with fewer than 48 seeds (the lesson's) puts the rest away
 }
 
 // ---------- tweens ----------
@@ -350,7 +355,7 @@ const settings = {
     const cap = prefs.get('rules.capture', ''); const relay = prefs.get('rules.relay', ''); const last8 = prefs.get('rules.last8', '');
     return { capture: cap ? +cap : base.capture, relay: relay ? relay === '1' : base.relay, last8: last8 ? last8 === '1' : base.last8 };
   },
-  get level() { return prefs.get('level', 'medium'); },
+  get level() { return prefs.get('level', firstLevel(newPhone)); },
   get speed() { return prefs.get('speed', 'normal'); },
   get mode() { return prefs.get('mode', 'ai'); }, // 'ai': the chosen opponent · 'local': two of us on this phone
 };
@@ -1045,8 +1050,69 @@ async function sharePuzzle() {
 $('#puzzleCard').addEventListener('click', () => { openPuzzle(); click(1.3, 0.08); });
 $('#pzAgain').addEventListener('click', puzzleAgain);
 $('#pzShow').addEventListener('click', () => { puzzleShow(); click(1.3, 0.06); });
-$('#pzHome').addEventListener('click', () => { closePuzzle(); click(1, 0.05); });
+$('#pzHome').addEventListener('click', () => { if (lesson.on) endLesson(false); else closePuzzle(); click(1, 0.05); });
 $('#pzShare').addEventListener('click', () => { sharePuzzle(); click(1.3, 0.06); });
+
+// ---------- the first game's lesson (Launch L2, web/lesson.js): a new phone's first Play, or Settings → Rules → Learn to play ----------
+// three of your moves from a set position on the live board — sowing, a capture of 4, a relay — with Adaeze's own move between them;
+// each step's pit is lit and picked for you (its path marks land), one tap sows it, the words say what just happened, Next goes on;
+// Skip at any time. Played in the puzzle's frame (the ask at the top, the HUD stepped aside), so no record, take or warning joins in.
+const lesson = { on: false, k: 0, phase: 'idle', then: 'play' };
+const lessonDueNow = () => lessonDue({ newPhone, mode: settings.mode, lesson: prefs.get('lesson', null) });
+function lessonTop(title, words) { $('#pzDay').textContent = lesson.phase === 'done' ? 'Learn Nchò · done' : lessonEyebrow(lesson.k); $('#pzRules').textContent = lesson.phase === 'done' ? '' : 'about a minute'; $('#pzAsk').textContent = title; $('#pzHow').textContent = words; }
+function openLesson(then = 'play') {
+  if (online || busy) return;
+  lesson.on = true; lesson.k = 0; lesson.then = then; lesson.phase = 'ask'; puzzle.on = true; puzzle.played = true; seat(0); hideExplain(); hideTake();
+  state = lessonStart(); layoutFromState(state); refreshStatic(); deselect(); hintedAt = -1; body.classList.add('lesson');
+  $('#pzCard').hidden = true; $('#lsCard').hidden = true; $('#pzHome').textContent = LESSON_SKIP; $('#puzzle').classList.remove('open'); $('#puzzle').setAttribute('aria-label', 'Learn to play');
+  showScreen('puzzle'); lessonStep();
+}
+async function lessonStep() { // the ask, then the lit pit is picked for you: its marks land, one tap sows
+  const st = LESSON[lesson.k]; lesson.phase = 'ask'; lessonTop(st.title, st.ask);
+  await wait(reduceMotion ? 50 : 650); if (!lesson.on || lesson.phase !== 'ask') return;
+  puzzle.played = false; select(st.pit);
+}
+async function lessonPlay(pit) {
+  const st = LESSON[lesson.k]; if (!lesson.on || pit !== st.pit || lesson.phase !== 'ask') return;
+  const { state: next, events } = applyMove(state, pit); const prev = state.stores; state = next; busy = true; puzzle.played = true; lesson.phase = 'move'; deselect();
+  await animate(events, prev, Math.max(PACE, 190)); // a touch slower than a game, so it can be followed
+  busy = false; if (!lesson.on) return; refreshStatic();
+  lesson.phase = 'after'; $('#lsWords').textContent = st.after; $('#lsNext').textContent = lesson.k === LESSON.length - 1 ? 'Finish' : 'Next';
+  $('#lsCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
+  if (st.kind === 'capture') { click(1.5, 0.12); setTimeout(() => click(2, 0.12), 120); buzz([15, 30, 15]); } else click(1.2, 0.06);
+}
+async function lessonNext() {
+  if (busy || !lesson.on) return;
+  if (lesson.phase === 'done') return endLesson(true);
+  if (lesson.phase !== 'after') return;
+  $('#lsCard').hidden = true; $('#puzzle').classList.remove('open'); const st = LESSON[lesson.k];
+  if (lesson.k === LESSON.length - 1) return lessonDone();
+  lesson.phase = 'reply'; busy = true; lessonTop(`${names.easy}'s move`, lessonReply(names.easy));
+  await wait(reduceMotion ? 50 : 500); if (!lesson.on) { busy = false; return; }
+  select(st.reply, false); await wait(reduceMotion ? 100 : 600);
+  const { state: next, events } = applyMove(state, st.reply); const prev = state.stores; state = next; board.ring.visible = false; board.glow.visible = false; selected = null;
+  await animate(events, prev, Math.max(PACE, 190));
+  busy = false; if (!lesson.on) return; refreshStatic(); lesson.k += 1; lessonStep();
+}
+function lessonDone() { // the end: kept as done (the first-game tips are then not needed), and the game against the chosen opponent offered
+  lesson.phase = 'done'; prefs.set('lesson', 'done'); tipStep = 3; prefs.set('tutorial', '3');
+  const name = names[level]; lessonTop(LESSON_DONE.title, LESSON_DONE.words(name));
+  $('#lsWords').textContent = 'Sowing, a capture of 4 and a relay: that is most of the game.'; $('#lsNext').textContent = `Play ${name}`; $('#pzHome').textContent = 'Back to home';
+  $('#lsCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
+  click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); buzz([20, 40, 20]);
+}
+function endLesson(playNow) { // Skip, Back to home, or Play: the board goes to the game (from Home's Play) or back home (from Settings)
+  if (busy || !lesson.on) return; const was = lesson.phase;
+  lesson.on = false; lesson.phase = 'idle'; puzzle.on = false; puzzle.played = false; body.classList.remove('lesson');
+  if (!prefs.get('lesson', null)) prefs.set('lesson', 'skipped');
+  if (prefs.get('level', null) === null) prefs.set('level', level); // a new phone keeps Easy from now on (it is no longer new)
+  $('#lsCard').hidden = true; $('#pzHome').textContent = 'Back to home'; $('#puzzle').setAttribute('aria-label', 'Daily puzzle'); deselect();
+  if (playNow || (lesson.then === 'play' && was !== 'done')) { newRound(); showScreen('play'); if (tipStep === 0) showTip(TIPS[0]); return; }
+  if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
+}
+$('#lsNext').addEventListener('click', () => { lessonNext(); click(1.2, 0.05); });
+$('#lessonBtn').addEventListener('click', () => { if (!online) { openLesson('home'); click(1.3, 0.08); } });
+$('#goNext').addEventListener('click', () => { const lv = $('#goNext').dataset.level; if (!lv || online) return; level = lv; prefs.set('level', lv); prefs.set('mode', 'ai'); mood = 'calm'; newRound(); showScreen('play'); click(1.3, 0.08); });
 
 // ---------- screens ----------
 const body = document.body;
@@ -1144,7 +1210,7 @@ document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('clic
 document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); paintHome(); click(1.2, 0.05); }));
 $('.pill[data-mode="local"]').addEventListener('click', () => { prefs.set('mode', 'local'); paintHome(); click(1.2, 0.05); }); // two of us on this phone: no computer plays
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
-$('#playBtn').addEventListener('click', () => { newRound(); showScreen('play'); click(1.3, 0.08); });
+$('#playBtn').addEventListener('click', () => { if (lessonDueNow()) { openLesson('play'); click(1.3, 0.08); return; } newRound(); showScreen('play'); click(1.3, 0.08); }); // a new phone's first Play: the lesson first
 $('#continueBtn').addEventListener('click', () => { if (resume()) { hideExplain(); layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
 $('#homeBtn').addEventListener('click', () => { if (online) return leaveRoom(); if (!busy) { save(); showScreen('home'); } });
 $('#goHome').addEventListener('click', () => { if (online) return leaveRoom(); $('#gameover').hidden = true; showScreen('home'); });
@@ -1173,8 +1239,10 @@ function gameOver() {
 // your record against this opponent, counted once per game (the game's start time is its id) and shown on the card with their face;
 // when the result is worth a word (your first win against them, a run of 3, 5, 10…) they say it, on the card and in the bubble
 function paintRecord(a, b) {
-  const box = $('#goRecord'); if (online || puzzle.on || local) { box.hidden = true; return null; } // two of us keeps no record: the phone cannot tell who sat where
+  const box = $('#goRecord'); $('#goNext').hidden = true; if (online || puzzle.on || local) { box.hidden = true; return null; } // two of us keeps no record: the phone cannot tell who sat where
   const r = recordGame(records, level, a, b, stats.started); records = r.data; if (r.counted) prefs.set('record', JSON.stringify(records));
+  const nx = r.counted ? nextUp(level, r.moment, names) : null; // your first win over them: the next one up is offered
+  if (nx) { $('#goNext').textContent = nx.text; $('#goNext').dataset.level = nx.level; $('#goNext').hidden = false; }
   const text = recordLine(r.entry, r.counted && r.newBest); if (!text) { box.hidden = true; return null; }
   $('#goRecLine').innerHTML = text.split(' · ').map((p) => p.startsWith('new best') ? `<em>${p}</em>` : p).join(' · '); // our own numbers and words, nothing typed
   const word = r.counted ? (r.moment === 'firstWin' ? line(level, 'firstWin') : r.moment === 'run' ? runWord(level, r.entry.run) : '') : '';
@@ -1316,7 +1384,7 @@ const TIPS = [
 ];
 let tipStep = +prefs.get('tutorial', '0');
 function showTip(text) {
-  if (!text || params.get('still') || params.get('capture')) return;
+  if (!text || params.get('still') || params.get('capture') || puzzle.on) return;
   let t = $('#tip'); if (!t) { t = document.createElement('div'); t.id = 'tip'; t.innerHTML = '<p></p><button class="btn ghost" style="padding:8px 12px;font-size:13px">Got it</button>'; body.appendChild(t); t.querySelector('button').addEventListener('click', () => { t.remove(); }); }
   t.querySelector('p').textContent = text;
 }
@@ -1444,12 +1512,13 @@ function canPress() { return !(busy || state.over || state.turn !== you || body.
 // a press on a pit — a tap, a click, a digit, or Enter on its hidden button: first press picks it, the second sows it
 function pressPit(pit) {
   if (!canPress()) return false;
+  if (lesson.on && pit !== LESSON[lesson.k].pit) { shake(pit); $('#hint').textContent = LESSON_WRONG; return false; } // the lesson plays its own pit
   const legal = legalMoves(state);
   if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) { $('#hint').textContent = feedWords(narrowOf(state, you), { you }) || 'you must give the other side seeds'; shake(pit); } else shake(pit); return false; }
   if (selected === pit) sow(pit); else select(pit);
   return true;
 }
-function sow(pit) { if (puzzle.on) puzzlePlay(pit); else if (online) sendMove(pit); else play(pit); }
+function sow(pit) { if (lesson.on) lessonPlay(pit); else if (puzzle.on) puzzlePlay(pit); else if (online) sendMove(pit); else play(pit); }
 // the keyboard (the Mac, or a Fold with one): 1–6 pick your pits near to far, Enter sows, U undoes, H hints, Esc puts the pit back or closes a card
 addEventListener('keydown', (e) => {
   if (e.defaultPrevented) return;
@@ -1486,6 +1555,8 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   if (params.get('still') === 'late') { state.pits = [0, 1, 0, 2, 1, 0, 0, 1, 1, 0, 1, 1]; state.stores = [18, 22]; }
   else { state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; }
   layoutFromState(state); refreshStatic(); select(3); showScreen('play');
+} else if (params.get('lesson') && !params.get('stay')) { // ?lesson=1: the lesson straight away, as a new phone (with ?stay=home: Home, as a new phone, so Play opens it)
+  openLesson('play');
 } else if (params.get('puzzle')) { // the shared link, and the render: straight to today's puzzle
   openPuzzle(); if (location.search && !params.get('capture')) history.replaceState(null, '', location.pathname);
 } else if (params.get('capture') && !params.get('stay')) { // the smoke test starts straight into a game
@@ -1494,7 +1565,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get lesson() { return { on: lesson.on, k: lesson.k, phase: lesson.phase, pit: lesson.on && lesson.k < LESSON.length ? LESSON[lesson.k].pit : null, title: $('#pzAsk').textContent, top: $('#pzHow').textContent, card: $('#lsCard').hidden ? null : $('#lsWords').textContent, next: $('#lsNext').textContent, skip: $('#pzHome').textContent, kept: prefs.get('lesson', null), tutorial: prefs.get('tutorial', null) }; }, get nextUp() { return $('#goNext').hidden ? null : { text: $('#goNext').textContent, level: $('#goNext').dataset.level }; }, get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

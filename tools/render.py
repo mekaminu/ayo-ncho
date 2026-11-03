@@ -77,11 +77,16 @@ from playwright.sync_api import sync_playwright
 #        --hand (with --smoke): the hand counts — sows the biggest opening pit, stops the hand with two seeds sown and checks the brass
 #                  number over it says what is left in it (<out>), stops the first capture's hand for the copper "+N" (<out>-haul.png), and
 #                  checks the turn's numbers start at the seeds picked up, every capture showed one, and both go when the turn ends
+#        --lesson: the first game's lesson (web/lesson.js) on a new phone: Home says Adaeze · Easy; Play opens the lesson; each step's pit is
+#                  picked for you with its path marks, a tap on another pit plays nothing, one tap sows; the card says what happened, Next plays
+#                  Adaeze's move; every position is checked against node (stateAt); the end keeps it done and Play Adaeze starts the game; then
+#                  Settings → Learn to play opens it again and Skip goes home. Pictures: <out> (step 2 asking, the capture ring), <out>-after.png
+#                  (the 4 in your trough and the card), <out>-done.png. --wide for the Mac
 #        --record: your record against each opponent — a phone with games already played against all three and a saved game one move from a
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; record = record or story
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -293,7 +298,7 @@ with sync_playwright() as p:
     if wakec: pg.add_init_script("""(() => { const log = []; window.__wakeLog = log; Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request(kind) { const ls = []; const s = { released: false, type: kind, addEventListener: (e, f) => { if (e === 'release') ls.push(f); }, release() { if (!s.released) { s.released = true; log.push('release'); ls.forEach((f) => f()); } return Promise.resolve(); } }; log.push('request:' + kind); return Promise.resolve(s); } } }); })()""")
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -552,6 +557,46 @@ with sync_playwright() as p:
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
+    if lessonc:  # the first game's lesson on a new phone
+        LS = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", "import { STEPS, stateAt } from './web/lesson.js'; import { applyMove } from './engine/ayo.js'; console.log(JSON.stringify(STEPS.map((s, k) => ({ ...s, before: stateAt(k), end: applyMove(stateAt(k), s.pit).state }))))"]).decode())
+        assert pg.evaluate("window.__ayo.level") == "easy" and "Adaeze" in pg.evaluate("document.querySelector('#playSub').textContent"), ("a new phone starts against Adaeze", pg.evaluate("document.querySelector('#playSub').textContent"))
+        pg.click("#playBtn"); pg.wait_for_function("window.__ayo.lesson.on && window.__ayo.lesson.phase==='ask' && window.__ayo.selected===%d" % LS[0]["pit"], timeout=20000)
+        def pt(i): return pg.evaluate("window.__ayo.pitAt(%d)" % i)
+        def lshot(path): pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=path, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        for k, st in enumerate(LS):
+            pg.wait_for_function("window.__ayo.lesson.k===%d && window.__ayo.lesson.phase==='ask' && window.__ayo.selected===%d && !window.__ayo.busy" % (k, st["pit"]), timeout=60000)
+            L = pg.evaluate("window.__ayo.lesson"); assert L["title"] == st["title"] and L["top"] == st["ask"] and L["skip"] == "Skip the lesson", L
+            assert pg.evaluate("window.__ayo.state.pits") == st["before"]["pits"] and pg.evaluate("window.__ayo.state.stores") == st["before"]["stores"], ("step %d: the board is the lesson's position" % (k + 1))
+            assert len(pg.evaluate("window.__ayo.marks.steps")) > 0, "the lit pit's path marks land"
+            if st["kind"] == "capture": assert len(pg.evaluate("window.__ayo.marks.caps")) == 1, "the copper ring on their pit of 3"
+            if k == 1: pg.mouse.move(5, 5); lshot(out)
+            other = next(i for i in range(6) if i != st["pit"] and st["before"]["pits"][i] > 0)
+            x, y = pt(other); pg.mouse.click(x, y); pg.wait_for_timeout(400)
+            assert pg.evaluate("window.__ayo.lesson.phase") == "ask" and pg.evaluate("window.__ayo.state.pits") == st["before"]["pits"] and pg.evaluate("document.querySelector('#hint').textContent") == "In the lesson, play the lit pit", "another pit plays nothing"
+            pg.wait_for_timeout(400)
+            x, y = pt(st["pit"]); pg.mouse.click(x, y)
+            if pg.evaluate("window.__ayo.selected") == st["pit"] and pg.evaluate("window.__ayo.lesson.phase") == "ask": pg.mouse.click(x, y)  # the shake took the pick away: pick, then sow
+            pg.wait_for_function("window.__ayo.lesson.phase==='after' && !window.__ayo.busy", timeout=120000)
+            L = pg.evaluate("window.__ayo.lesson"); assert L["card"] == st["after"], L
+            assert pg.evaluate("window.__ayo.state.pits") == st["end"]["pits"] and pg.evaluate("window.__ayo.state.stores") == st["end"]["stores"], "the move ends as the engine says"
+            assert pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent)") == st["end"]["pits"] if pg.evaluate("document.querySelectorAll('.badge').length") == 12 else True
+            if k == 1: pg.mouse.move(5, 5); lshot(out[:-4] + "-after.png")
+            print("lesson: step %d %s ok · %s" % (k + 1, st["kind"], L["next"]))
+            pg.click("#lsNext")
+        pg.wait_for_function("window.__ayo.lesson.phase==='done'", timeout=20000)
+        L = pg.evaluate("window.__ayo.lesson"); assert L["next"] == "Play Adaeze" and L["kept"] == "done" and L["tutorial"] == "3" and L["skip"] == "Back to home", L
+        lshot(out[:-4] + "-done.png")
+        pg.click("#lsNext"); pg.wait_for_function("!window.__ayo.lesson.on && document.body.classList.contains('playing') && !document.body.classList.contains('puzzle')", timeout=20000)
+        st = pg.evaluate("window.__ayo.state"); assert st["pits"] == [4] * 12 or len(st["moves"]) <= 1, st
+        assert pg.evaluate("window.__ayo.level") == "easy" and pg.evaluate("localStorage.getItem('ayo.level')") == "easy" and "Adaeze" in pg.evaluate("document.querySelector('#oppName').textContent")
+        pg.wait_for_function("!window.__ayo.busy", timeout=60000); pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])"); pg.click("#lessonBtn")
+        pg.wait_for_function("window.__ayo.lesson.on && window.__ayo.lesson.phase==='ask'", timeout=20000); pg.click("#pzHome")
+        pg.wait_for_selector("#home:not([hidden])", timeout=10000); assert not pg.evaluate("window.__ayo.lesson.on") and pg.evaluate("localStorage.getItem('ayo.lesson')") == "done"
+        pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden", timeout=20000); assert not pg.evaluate("window.__ayo.lesson.on"), "once: Play is a game now"
+        print("lesson: done, the game against Adaeze, Settings → Learn to play and Skip, Play once more is a game")
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
     if local:  # two of us on one phone: no computer, the near seat passes after every move and the board turns to face it
         pg.click('.pill[data-mode="local"]'); pg.wait_for_function("document.querySelector('#playSub').textContent==='Two of us · pass the phone'", timeout=5000)
         assert pg.evaluate("document.querySelector('.pill[data-mode=\"local\"]').getAttribute('aria-pressed')") == "true" and pg.evaluate("[...document.querySelectorAll('.pill[data-level]')].every(b=>b.getAttribute('aria-pressed')==='false')"), "the pill should be the one chosen"

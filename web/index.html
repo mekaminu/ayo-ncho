@@ -158,6 +158,13 @@ button{font-family:inherit}
 .puzzle .hud,.puzzle .bar{opacity:0;pointer-events:none}
 .puzzle #badges,.puzzle #hint{opacity:1}
 @media (prefers-reduced-motion:reduce){.pzCard,.pzRow span{animation:none}}
+/* the first game's lesson, in the puzzle's frame */
+.lsCard{gap:12px}
+.lsWords{margin:0;font-size:15px;line-height:1.45}
+.lesson #pzAsk{font-size:26px}
+html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);z-index:3} /* the path words under the board, clear of the lit pit; the card covers them once it rises */
+.lesson #puzzle.open ~ #hint, .lesson:has(#puzzle.open) #hint{opacity:0}
+.goNext{color:var(--brass);border-color:rgba(230,183,111,.45);animation:pop .3s ease-out .45s backwards}
 
 /* With friends (the Rooms screen): the same overlay as Home, a little darker at the top for the title */
 #rooms{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none;overflow:auto}
@@ -417,6 +424,8 @@ button{font-family:inherit}
       <div class="two"><button class="btn" id="pzShare" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button><button class="btn ghost" id="pzAgain" type="button">Try again</button></div>
       <button class="btn quiet pzShow" id="pzShow" type="button" hidden><span class="face s" data-face="hard"></span>Show me the move</button>
     </div>
+    <!-- the first game's lesson (web/lesson.js) plays in this frame: what just happened, and Next -->
+    <div class="roomCard pzCard lsCard" id="lsCard" hidden role="status"><p class="lsWords" id="lsWords">One seed in each pit.</p><button class="btn" id="lsNext" type="button">Next</button></div>
     <button class="btn quiet" id="pzHome" type="button">Back to home</button>
   </div>
 </section>
@@ -431,6 +440,7 @@ button{font-family:inherit}
         <div class="row"><div class="t"><b>Capture on</b><span>4 only, or 2 and 3 (Oware)</span></div><div class="seg" data-set="capture"><button class="segbtn" data-v="4">4</button><button class="segbtn" data-v="23">2 &amp; 3</button></div></div>
         <div class="row"><div class="t"><b>Sowing</b><span>relay keeps going; single lap stops</span></div><div class="seg" data-set="relay"><button class="segbtn" data-v="1">Relay</button><button class="segbtn" data-v="0">Single lap</button></div></div>
         <div class="row"><div class="t"><b>Last 8 seeds</b><span>next capture takes them all</span></div><button class="sw" role="switch" data-set="last8" aria-checked="true" aria-label="Last 8 seeds to the next capturer"><i></i></button></div>
+        <div class="row"><div class="t"><b>Learn to play</b><span>a one-minute lesson on the board: sowing, a capture of 4, a relay</span></div><div class="seg"><button class="segbtn" id="lessonBtn" type="button">Start</button></div></div>
         <div class="row"><div class="t"><b>Who starts</b><span>the loser of the last game, as at a real board; or always you, or always them (two of us: Player 1 or Player 2) · from the next game</span></div><div class="seg" data-set="starts"><button class="segbtn" data-v="loser">Loser</button><button class="segbtn" data-v="you">You</button><button class="segbtn" data-v="them">Them</button></div></div>
       </div>
       <span class="note">Changing rules starts a new game.</span>
@@ -477,6 +487,7 @@ button{font-family:inherit}
   <button class="story" id="goStory" type="button" hidden><span class="head"><span class="eyebrow">How it went</span><span class="key"><i class="k up"></i><span id="goStoryMe">you</span><i class="k dn"></i><span id="goStoryThem">Nnamdi</span></span></span><svg id="goStorySvg" viewBox="0 0 300 64" aria-hidden="true"></svg><span class="words"><span id="goStoryWords">You led for good from move 31</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></span></button>
   <!-- your record against this opponent, kept on this phone; their word when you are on a run or have beaten them for the first time -->
   <div class="record" id="goRecord" hidden><span class="face s" id="goRecFace"></span><span class="col"><b id="goRecLine">you lead 4–2 · best win 30–18</b><i id="goRecSay" hidden>“Three in a row? Mama Ngozi is watching.”</i></span></div>
+  <button class="btn ghost goNext" id="goNext" type="button" hidden>Ready for Nnamdi? Play him next · Medium</button>
   <div class="col" style="gap:8px">
     <button class="btn" id="rematch">Play again</button>
     <div class="two" style="gap:8px"><button class="btn ghost" id="replayBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 3l14 9-14 9V3z"/></svg>Replay</button><button class="btn ghost" id="clipBtn" style="flex:1;padding-left:10px;padding-right:10px" title="Record your best turn as a 10-second clip to share"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3z"/></svg>Clip</button><button class="btn ghost" id="shareBtn" style="flex:1;padding-left:10px;padding-right:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button></div>
