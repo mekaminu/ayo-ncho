@@ -64,6 +64,9 @@
 #                  no note again; sowing it, the hand that carries their 4 wears a pale number (<out>-haul.png). --wide for the Mac
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
+#        add --wake (with --smoke) to check keeping the screen on: a stand-in for the browser's wake lock records each request; during the
+#                  game the screen is held, 3 minutes with nobody touching it lets it go, a key takes it back, Home lets it go, Play takes it
+#                  again, and Settings → Feel → Keep the screen on off lets it go
 #        --local: two of us on one phone — Home → the "Two of us" pill → Play: Player 1 plays, the board swings half a turn round to face
 #                  Player 2 (the HUD names them, the move just played is explained for them; picture <out>), Player 2 plays and it swings on,
 #                  Undo takes one move back and turns back to whoever played it; Home says "Two of us · …" under Continue; with Settings →
@@ -78,7 +81,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; record = record or story
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -274,6 +277,7 @@ with sync_playwright() as p:
         gsave = json.dumps(json.dumps({"moves": gpos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "easy", "stats": {"biggest": 4, "captures": 1, "started": int(time.time() * 1000) - 2 * 60 * 1000}}))
         pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'easy'); localStorage.setItem('ayo.tutorial', '3');" % gsave)
     if startsc: pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.starts', JSON.stringify({ hard: { first: 0, winner: 0 }, local: { first: 0, winner: 0 } })); }")  # you beat her last time; Player 1 won the last two-of-us game
+    if wakec: pg.add_init_script("""(() => { const log = []; window.__wakeLog = log; Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request(kind) { const ls = []; const s = { released: false, type: kind, addEventListener: (e, f) => { if (e === 'release') ls.push(f); }, release() { if (!s.released) { s.released = true; log.push('release'); ls.forEach((f) => f()); } return Promise.resolve(); } }; log.push('request:' + kind); return Promise.resolve(s); } } }); })()""")
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
     pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
@@ -865,6 +869,24 @@ with sync_playwright() as p:
             homes = pg.evaluate("(()=>{const s=window.__ayo.seeds;return s.length})()"); assert homes == 48, homes
             assert pg.evaluate("document.querySelector('#hint').textContent") != words, "the hint line goes back to your move"
             print("undo:", words, "· the seeds flew back; moves", n, "→", len(st2["moves"]), "· badges", counts)
+        if wakec:  # keep the screen on: held during the game, let go when it is not wanted
+            pg.wait_for_function("!window.__ayo.busy", timeout=240000); pg.wait_for_timeout(200)
+            w = pg.evaluate("window.__ayo.wake"); assert w["supported"] and w["wanted"] and w["held"], ("the screen should be held while the game is in play", w)
+            pg.evaluate("window.__ayo.wakeIdle(181000)"); pg.wait_for_timeout(100)
+            w = pg.evaluate("window.__ayo.wake"); assert not w["wanted"] and not w["held"], ("3 minutes with nobody touching it: let go", w)
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(100)
+            w = pg.evaluate("window.__ayo.wake"); assert w["held"], ("a key takes it back", w)
+            pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])"); pg.wait_for_timeout(100)
+            w = pg.evaluate("window.__ayo.wake"); assert not w["held"], ("Home lets it go", w)
+            pg.click("#continueBtn" if not pg.evaluate("document.querySelector('#continueBtn').disabled") else "#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden", timeout=20000); pg.wait_for_timeout(100)
+            assert pg.evaluate("window.__ayo.wake")["held"], "back at the board: held again"
+            pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])")
+            assert pg.evaluate("document.querySelector('[data-set=wake]').getAttribute('aria-checked')") == "true" and pg.evaluate("document.querySelector('#wakeNow').textContent") == ""
+            pg.click("[data-set=wake]"); assert pg.evaluate("localStorage.getItem('ayo.wake')") == "0"
+            pg.click("#settingsBack"); pg.wait_for_timeout(300)
+            w = pg.evaluate("window.__ayo.wake"); assert not w["held"] and not w["wanted"], ("the setting off lets it go", w)
+            pg.click("#settingsBtn"); pg.click("[data-set=wake]"); pg.click("#settingsBack"); pg.wait_for_timeout(300)
+            print("wake: log", w["log"], "· browser", pg.evaluate("window.__wakeLog"))
         if clip:  # record the best turn so far as a short video, the way the Game over card's Clip button does
             pg.set_default_timeout(300000)
             r = pg.evaluate("window.__ayo.clip()")
