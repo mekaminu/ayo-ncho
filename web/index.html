@@ -262,7 +262,9 @@ button{font-family:inherit}
 .wide #bubble{left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 100px)}
 /* shouts across the board (online only): a chip opens a row of phrases; yours shows by your name, theirs by their face */
 #shoutBtn{display:none}
-.online #shoutBtn{display:flex}.online #undo,.online #hintBtn{display:none}
+.online #shoutBtn{display:flex}.online #hintBtn{display:none}
+#undo.asking{border-color:var(--brass);color:var(--brass);animation:askPulse 1.4s ease-in-out infinite}
+@keyframes askPulse{50%{box-shadow:0 0 0 6px rgba(230,183,111,.18)}}
 #shoutBtn[aria-expanded="true"]{border-color:var(--brass);color:var(--brass)}
 #shoutMenu{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 124px);display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(92vw,370px);z-index:3;animation:pop .25s ease-out}
 #shoutMenu .pill{background:var(--card);color:var(--fg);border-color:rgba(230,183,111,.35);font-size:13px;padding:9px 14px;box-shadow:0 8px 24px rgba(0,0,0,.45)}
@@ -284,9 +286,9 @@ button{font-family:inherit}
 @keyframes knockRing{0%{box-shadow:0 0 0 0 rgba(230,183,111,.45)}70%{box-shadow:0 0 0 12px rgba(230,183,111,0)}100%{box-shadow:0 0 0 12px rgba(230,183,111,0)}}
 .door h2{font-size:24px}
 .door .two .btn{flex:1;flex-direction:row;gap:8px;text-align:center;border-radius:999px;padding:13px 10px;font:600 15px Inter,system-ui,sans-serif}
-.door .two #knockYes{background:var(--brass);color:#1a0f07;border:0}
-.door .two #knockNo{background:none;color:var(--brass);border:1px solid rgba(230,183,111,.5)}
-@media (prefers-reduced-motion:reduce){.door .face.m{animation:none}}
+.door .two #knockYes,.door .two #backYes{background:var(--brass);color:#1a0f07;border:0}
+.door .two #backNo,.door .two #knockNo{background:none;color:var(--brass);border:1px solid rgba(230,183,111,.5)}
+@media (prefers-reduced-motion:reduce){.door .face.m,#undo.asking{animation:none}}
 /* tutorial */
 #tip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 150px);width:min(86vw,320px);background:var(--card);border:1px solid rgba(230,183,111,.35);border-radius:14px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 12px 40px rgba(0,0,0,.5);animation:pop .3s ease-out;z-index:3}
 #tip p{margin:0;font-size:13px;line-height:1.45;flex:1}
@@ -487,6 +489,13 @@ button{font-family:inherit}
   <div class="col"><span class="eyebrow">At the door</span><div class="who"><span class="face m" id="knockFace"></span><h2 id="knockTitle">Tete wants to play</h2></div></div>
   <p id="knockSub">Let them in and they take the far seat. Nobody else can join once they do.</p>
   <div class="two" style="gap:8px"><button class="btn ghost" id="knockNo" type="button" style="flex:1">Not now</button><button class="btn" id="knockYes" type="button" style="flex:1">Let in</button></div>
+</div>
+
+<!-- Take it back?: the friend asks to take back the move they just played; you let them, or play on -->
+<div class="card door" id="backCard" hidden role="dialog" aria-labelledby="backTitle">
+  <div class="col"><span class="eyebrow">Take it back?</span><div class="who"><span class="face m" id="backFace"></span><h2 id="backTitle">Tete asks to take back their move</h2></div></div>
+  <p id="backSub">Their seeds go back where they were and it is their move again. Or play on and the move stands.</p>
+  <div class="two" style="gap:8px"><button class="btn ghost" id="backNo" type="button" style="flex:1">Play on</button><button class="btn" id="backYes" type="button" style="flex:1">Let them</button></div>
 </div>
 
 <!-- Rules -->

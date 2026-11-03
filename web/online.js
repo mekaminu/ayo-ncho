@@ -9,22 +9,25 @@
 //   net.on('room',   ({ room, started, resync }) => …) // presence, a knock, a rematch asked for, a new game started; resync: the whole room after this board fell behind
 //   net.on('resync', ({ why }) => …)           // this board could not rebuild a move and has asked for the room (a 'room' with resync follows)
 //   net.on('resign', ({ seat, events, state }) => …) // that seat gave up the game: the other seat wins (events: one 'end')
+//   net.on('askback', ({ seat, n }) => …)     // that seat asks to take back the move it just played (n: moves played); the other seat answers
+//   net.on('takeback', ({ seat, state, undone, before }) => …) // yes: that seat's last move (pit `undone`) is gone, state is the position before it
+//   net.on('backno', ({ seat }) => …)          // no: the move stands
 //   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
-//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.resign() / net.leave()
+//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.resign() / net.askBack() / net.answerBack(yes) / net.leave()
 
-import { applyMove, resign } from '../engine/ayo.js';
+import { applyMove, resign, takeBack, mayTakeBack, firstMover } from '../engine/ayo.js';
 
 export const BACKOFF_MS = [800, 1600, 3200, 6400, 10000]; // between reconnect attempts, then every 10 s
 
 // The game as the server shows it, made into an engine-shaped state the board can read (legalMoves, replay for undo-less play).
 export function stateFrom(pub) {
-  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null, resigned: pub.resigned ?? null };
+  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null, resigned: pub.resigned ?? null, first: pub.first ?? firstMover(pub.moves, pub.moves.length ? 0 : pub.turn) };
 }
 // The other way round: an engine state as the server would show it (what a 'move' carries once rebuilt).
 export function publicFrom(s) {
-  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, resigned: s.resigned ?? null, variant: s.variant, rules: { ...s.rules } };
+  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, resigned: s.resigned ?? null, first: s.first ?? 0, variant: s.variant, rules: { ...s.rules } };
 }
 
 // A move arrives small — {seat, pit, n, stores} — because every board has the same engine as the server. Rebuild the
@@ -46,6 +49,15 @@ export function rebuildResign(pub, m) {
   return { events: r.events, state: publicFrom(r.state) };
 }
 
+// "Take it back?" said yes arrives as {seat, n}: the same engine takes that seat's last move back on this board; n (the
+// moves left once it is gone) must match, or the whole room is fetched instead.
+export function rebuildTakeBack(pub, m) {
+  if (!pub || !Array.isArray(pub.moves) || pub.moves.length !== m.n + 1) return null;
+  const s = stateFrom(pub); if (!mayTakeBack(s, m.seat)) return null;
+  let back; try { back = takeBack(s, m.seat); } catch { return null; }
+  return { state: publicFrom(back), undone: pub.moves[pub.moves.length - 1] };
+}
+
 // The invite link for a room: the app's own address with ?room=CODE.
 export function inviteLink(code, base = typeof location !== 'undefined' ? location.origin + location.pathname : '/') {
   return `${base}?room=${encodeURIComponent(String(code || '').toUpperCase())}`;
@@ -65,6 +77,8 @@ export const ERROR_TEXT = {
   hush: 'Easy — one shout at a time', bad: 'Something went wrong',
   notlet: 'Not let in this time', knocking: 'Already at the door', busy: 'Too many people at the door — try again in a minute',
   host: 'Only the host decides who comes in', noknock: 'They have gone from the door',
+  noback: 'Only the move you just played can be taken back', asked: 'Already asked — waiting for an answer', askedonce: 'You have asked once for this move',
+  noask: 'Too late — they played on', ownask: 'Your friend answers this one',
 };
 
 export class Online {
@@ -89,6 +103,8 @@ export class Online {
   move(pit) { return this.send({ t: 'move', pit }); }
   rematch() { return this.send({ t: 'rematch' }); }
   resign() { return this.send({ t: 'resign' }); } // give up the game in play
+  askBack() { return this.send({ t: 'askback' }); } // ask to take back the move just played
+  answerBack(yes) { return this.send({ t: 'backanswer', yes: !!yes }); }
   shout(id) { return this.send({ t: 'shout', id }); }
   leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; this.knock = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
 
@@ -139,7 +155,7 @@ export class Online {
           if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'move' }); } // behind, somehow: ask for the whole room rather than guess
           events = r.events; state = r.state;
         }
-        if (this.room) this.room.state = state;
+        if (this.room) { this.room.state = state; this.room.ask = null; } // playing on ends any "take it back?"
         return this.emit('move', { seat: m.seat, pit: m.pit, events, state });
       }
       case 'resign': {
@@ -147,6 +163,14 @@ export class Online {
         if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'resign' }); }
         if (this.room) this.room.state = r.state;
         return this.emit('resign', { seat: m.seat, events: r.events, state: r.state });
+      }
+      case 'askback': if (this.room) this.room.ask = { seat: m.seat, n: m.n }; return this.emit('askback', { seat: m.seat, n: m.n });
+      case 'backno': if (this.room) this.room.ask = null; return this.emit('backno', { seat: m.seat, n: m.n });
+      case 'takeback': {
+        const before = this.room && this.room.state; const r = rebuildTakeBack(before, m);
+        if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'takeback' }); }
+        if (this.room) { this.room.state = r.state; this.room.ask = null; }
+        return this.emit('takeback', { seat: m.seat, state: r.state, undone: r.undone, before });
       }
       case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
       case 'error':

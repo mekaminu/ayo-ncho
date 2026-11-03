@@ -10,7 +10,7 @@
 // token never knocks again: rejoin() is theirs. Knocks that are not answered are held until the knocker goes
 // away (withdraw) or the room is swept.
 import { randomUUID } from "node:crypto";
-import { newGame, applyMove, legalMoves, replay, resign, RULES } from "../engine/ayo.js";
+import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, RULES } from "../engine/ayo.js";
 import { isShout, mayShout } from "../web/shouts.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
@@ -134,7 +134,8 @@ export class Rooms {
       fail("illegal", own ? "you must give the other side seeds" : "that pit cannot be played");
     }
     const { state, events } = applyMove(g, pit);
-    room.game = state; room.touchedAt = this.now();
+    room.game = state; room.touchedAt = this.now(); room.ask = null; // playing on is a no to any "take it back?" still asked
+
     return { seat, pit, events, state: publicState(state) };
   }
 
@@ -146,8 +147,35 @@ export class Rooms {
     if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
     if (room.game.over) fail("over", "the game is over");
     const { state } = resign(room.game, seat);
-    room.game = state; room.touchedAt = this.now();
+    room.game = state; room.touchedAt = this.now(); room.ask = null;
     return { seat, state: publicState(state) };
+  }
+
+  // "Take it back?": the seat that has just moved asks to take that move back; the friend says yes (the move is undone
+  // with the engine, and it is the asker's move again) or no. Once per move: a no, or the friend playing on, ends it.
+  askBack(code, token) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
+    const g = room.game;
+    if (g.over) fail("over", "the game is over");
+    if (!mayTakeBack(g, seat)) fail("noback", "only the move you just played can be taken back");
+    if (room.ask) fail("asked", "already asked — waiting for an answer");
+    const n = g.moves.length;
+    if (room.seats[seat].backN === n) fail("askedonce", "you have asked once for this move");
+    room.ask = { seat, n }; room.seats[seat].backN = n; room.touchedAt = this.now();
+    return { seat, n };
+  }
+  answerBack(code, token, yes) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    const ask = room.ask;
+    if (!ask || ask.n !== room.game.moves.length || room.game.over) { room.ask = null; fail("noask", "nothing to answer — they played on"); }
+    if (ask.seat === seat) fail("ownask", "your friend answers this one");
+    room.ask = null; room.touchedAt = this.now();
+    if (!yes) return { seat: ask.seat, yes: false, n: ask.n };
+    room.game = takeBack(room.game, ask.seat);
+    return { seat: ask.seat, yes: true, n: room.game.moves.length, state: publicState(room.game) };
   }
 
   // A shout across the board: one of the fixed phrases (web/shouts.js), by id only, one at a time per seat.
@@ -171,8 +199,8 @@ export class Rooms {
     if (!both) return { started: false, room: this.snapshot(code) };
     const g = newGame(room.variant, room.rules);
     g.turn = g.first = room.game.winner === 0 ? 1 : room.game.winner === 1 ? 0 : (room.games % 2); // the loser starts; after a draw, alternate
-    room.game = g; room.games += 1;
-    for (const s of room.seats) if (s) s.wantsRematch = false;
+    room.game = g; room.games += 1; room.ask = null;
+    for (const s of room.seats) if (s) { s.wantsRematch = false; s.backN = null; }
     return { started: true, room: this.snapshot(code) };
   }
 
@@ -183,6 +211,7 @@ export class Rooms {
       code: room.code, variant: room.variant, rules: { ...room.rules }, games: room.games,
       players: room.seats.map((s, i) => s ? { seat: i, name: s.name, online: s.online, wantsRematch: s.wantsRematch } : null),
       knocks: room.knocks.map((k) => ({ id: k.id, name: k.name })), // who is at the door (the host's board shows them; never shown to the knockers)
+      ask: room.ask ? { seat: room.ask.seat, n: room.ask.n } : null, // a "take it back?" waiting for its answer (a rejoin sees it)
       state: publicState(room.game),
     };
   }
@@ -205,7 +234,7 @@ export class Rooms {
 // The game as the clients see it. moves lets a client rebuild the position with the shared engine (replay) and check it matches;
 // quiet (moves since the last capture) is sent too, so a board that applies the next move itself ends a stalemate on the same move the server does.
 export function publicState(g) {
-  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, resigned: g.resigned ?? null, variant: g.variant, rules: { ...g.rules } };
+  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, resigned: g.resigned ?? null, first: g.first ?? 0, variant: g.variant, rules: { ...g.rules } };
 }
 
 // What travels for a move: the seat, the pit, how many moves have been played and both scores — a few dozen bytes.
@@ -218,4 +247,6 @@ export function moveMessage({ seat, pit, state }) {
 export function resignMessage({ seat, state }) {
   return { t: "resign", seat, n: state.moves.length };
 }
+// "Take it back?" travels as small: who asked (or whose move went back) and the move count.
+export function backMessage({ seat, yes, n }) { return yes === undefined ? { t: "askback", seat, n } : yes ? { t: "takeback", seat, n } : { t: "backno", seat, n }; }
 export { replay };

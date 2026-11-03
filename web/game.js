@@ -26,6 +26,7 @@ import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
 import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
 import { HOLD_MS, COUNT_STAY_MS, countPlan, canCount, stillHolding, countWords } from './count.js';
+import { mayAsk as mayAskBack, backWords, planReturn } from './takeback.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
 const $ = (s) => document.querySelector(s);
@@ -416,7 +417,7 @@ function paintRoomStatus() { // what the room card says, from the connection and
 }
 function stopOnline() { // leave before anyone joined (Back on the Rooms screen, or a knock the host refused): the board is yours again, no reload
   away.back(); if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
-  $('#knockCard').hidden = true; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
+  $('#knockCard').hidden = true; hideBackCard(); backAsk.pending = false; backAsk.askedN = -1; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
   hideExplain(); if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
 }
 function joinByCode(code) { // Got a code? Join their room: your own room closes and you knock on theirs
@@ -454,6 +455,7 @@ function initialFace(name) { // a friend has no drawn character yet: their initi
   const ch = (String(name || '?').trim()[0] || '?').toUpperCase();
   return `<svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true"><circle cx="22" cy="22" r="22" fill="#3a2718"/><circle cx="22" cy="22" r="19" fill="none" stroke="#e6b76f" stroke-opacity=".55"/><text x="22" y="29" text-anchor="middle" font-size="20" font-weight="700" fill="#e6b76f" font-family="inherit">${ch}</text></svg>`;
 }
+function undoLabel(room) { const u = $('#undo'); const l = room ? backWords().chip : 'Undo'; if (u.getAttribute('aria-label') !== l) { u.setAttribute('aria-label', l); u.title = room ? l + ' · U' : 'Undo · U'; } if (!room) u.classList.remove('asking'); }
 function showTurnOnline() {
   $('#undo').disabled = true; $('#hintBtn').disabled = true;
   if (!net || net.seat === null) { // not seated yet: the joining message stays, or the door's
@@ -469,8 +471,9 @@ function showTurnOnline() {
   $('#turn').textContent = state.over ? 'game over' : waiting ? 'waiting' : mine ? 'your move' : '…';
   $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : net.status === 'connecting' ? 'connecting…' : 'no connection')
     : waiting ? `room ${net.code || ''}` : !friend.online ? 'away — their seat is held' : state.over ? '' : mine ? 'waiting' : 'their move';
-  $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine ? pickHint('pick') : '';
-  $('#undo').disabled = true; $('#hintBtn').disabled = true; $('#shoutBtn').disabled = waiting || link;
+  $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine ? pickHint('pick') : backAsk.pending && backAsk.n === state.moves.length ? backWords(friend.name).asked : '';
+  $('#undo').disabled = link || !mayAskBack({ online, friend, seated: true, over: state.over, busy, moves: state.moves, turn: state.turn, you, pending: !!backAsk.pending, askedN: backAsk.askedN });
+  $('#undo').classList.toggle('asking', !!backAsk.pending); undoLabel(true); $('#hintBtn').disabled = true; $('#shoutBtn').disabled = waiting || link;
 }
 // the line under the board on your move: for a finger, or for the keys once a mouse or a key press says there is a keyboard
 // the chips under the board sit just above the hint line (on the Mac just below it), however many lines the hint wraps to
@@ -520,11 +523,15 @@ function syncRoom(room) { // the room as the server shows it: the friend's seat 
   const s = stateFrom(room.state);
   const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
   state = s; if (!same) layoutFromState(state);
+  const ask = room.ask || null; backAsk.pending = !!(ask && ask.seat === you); if (ask && ask.seat === you) backAsk.n = backAsk.askedN = ask.n; // a rejoin sees a "take it back?" still out
+  if (ask && ask.seat === them && !state.over) showBackCard(); else hideBackCard();
   refreshStatic(); paintRules(); paintDoor(); paintRoomStatus();
 }
 let moveQueue = Promise.resolve();
 function sendMove(pit) { if (busy || !net || !net.move(pit)) return; busy = true; deselect(); }
 async function showMove({ seat, pit, events, state: pub }) {
+  if (backAsk.pending && seat === them) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).gone); } // playing on is a no
+  hideBackCard();
   const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; deselect(); $('#undo').disabled = true;
   if (seat === them) { select(pit); await wait(550); deselect(); }
   else { hideExplain(); const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
@@ -548,6 +555,41 @@ async function showResign({ seat, state: pub }) {
   }
   await wait(380); busy = false; refreshStatic(); gameOver();
 }
+// ---------- "take it back?": the Undo chip in a room asks the friend; a yes flies the seeds back (web/takeback.js) ----------
+const backAsk = { pending: false, n: -1, askedN: -1 }; // this board's ask; askedN: the move count it last asked about (once a move)
+function askBack() {
+  if (!net || !friend || net.seat === null) return;
+  if (!mayAskBack({ online, friend, seated: true, over: state.over, busy, moves: state.moves, turn: state.turn, you, pending: backAsk.pending, askedN: backAsk.askedN })) { shake(state.moves[state.moves.length - 1] ?? you * 6); return; }
+  if (net.askBack()) { backAsk.pending = true; backAsk.n = backAsk.askedN = state.moves.length; click(1.1, 0.07); setTimeout(() => click(1.4, 0.07), 120); buzz(12); showTurn(); }
+}
+function showBackCard() {
+  const w = backWords(friend ? friend.name : undefined); $('#backTitle').textContent = w.title; $('#backSub').textContent = w.sub;
+  $('#backFace').innerHTML = initialFace(friend ? friend.name : '?'); $('#backYes').textContent = w.yes; $('#backNo').textContent = w.no;
+  $('#backYes').disabled = false; $('#backNo').disabled = false; $('#backCard').hidden = false;
+}
+function hideBackCard() { $('#backCard').hidden = true; }
+function answerBack(yes) { if (!net) return; if (net.answerBack(yes)) { $('#backYes').disabled = true; $('#backNo').disabled = true; click(yes ? 1.5 : 0.7, 0.08); } }
+$('#backYes').addEventListener('click', () => answerBack(true));
+$('#backNo').addEventListener('click', () => answerBack(false));
+// a yes: every seed the move moved flies back to where it lay — out of the troughs first, then back round the board into the pit played
+async function showTakeBack({ seat, state: pub, undone, before }) {
+  const b = stateFrom(before), a = stateFrom(pub); hideBackCard(); hideExplain(); deselect(); busy = true; $('#undo').disabled = true;
+  if (seat === you) backAsk.pending = false;
+  const w = backWords(friend ? friend.name : undefined); toast(seat === you ? w.yesMine : w.yesTheirs);
+  sim.finish(); layoutFromState(b); // from the position the boards agree on
+  const plan = planReturn(b, a, undone); const meshes = plan.map((p) => homes[p.from][p.fromSlot]);
+  const c = {}; for (const h in homes) c[h] = homes[h].length;
+  for (const h in homes) { const keep = h[0] === 'S' ? a.stores[+h[1]] : a.pits[+h]; if (homes[h].length > keep) homes[h].length = keep; }
+  const paint = (h) => { if (typeof h === 'number') setBadge(h, c[h]); else { const p = +h[1]; $(p === you ? '#myScore' : '#oppScore').textContent = c[h]; } };
+  if (undone !== undefined) { select(undone, false); click(0.9, 0.07); }
+  rattle(Math.min(plan.length, 6), at(undone ?? 0));
+  const gap = plan.length ? Math.min(55, 1100 / plan.length) : 0;
+  await Promise.all(plan.map((p, i) => wait(i * gap).then(() => {
+    c[p.from] -= 1; paint(p.from);
+    return fly(meshes[i], p.to, 340, 0.08, (k, onSeed) => { if (k > 0.5) { c[p.to] += 1; paint(p.to); } land(k, onSeed, meshes[i].position, p.to); });
+  })));
+  await wait(200); state = a; layoutFromState(state); busy = false; deselect(); refreshStatic(); buzz([15, 30, 15]);
+}
 function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
 function startOnline(code, { stay = false } = {}) {
   // code: 'new' opens a room, a four-letter code knocks on one. stay: asked from the Rooms screen, which stays up (the door card over it)
@@ -570,11 +612,14 @@ function startOnline(code, { stay = false } = {}) {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
     if (!had && friend) { if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
-    if (started) { hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
+    if (started) { backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); awayNote('rematch'); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
   on('move', (m) => { if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
   on('resign', (m) => { if (m.seat === them) { const s = stateFrom(m.state); awayNote('over', { result: s.winner === you ? 'won' : 'lost', gaveUp: true }); } moveQueue = moveQueue.then(() => showResign(m)).catch((e) => console.error(e)); });
+  on('askback', ({ seat }) => { if (seat === them) { showBackCard(); knockSound(); awayNote('askback'); } else showTurn(); });
+  on('backno', ({ seat }) => { hideBackCard(); if (seat === you) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).noMine); click(0.7, 0.08); } else toast(backWords().noTheirs); showTurn(); });
+  on('takeback', (m) => { moveQueue = moveQueue.then(() => showTakeBack(m)).catch((e) => console.error(e)); });
   on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
   on('shout', ({ seat, id }) => showShout(seat, id));
   // the door: this phone knocked and waits for the host; or (as host) someone is knocking on ours
@@ -649,7 +694,7 @@ function showTurn() {
   if (local) { const w = localTurn(state); $('#turn').textContent = mine || state.over ? w.turn : '…'; $('#oppSub').textContent = mine ? w.sub : state.over ? '' : 'passing the phone…'; }
   else { $('#turn').textContent = state.over ? 'game over' : mine ? 'your move' : '…'; $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…'; }
   $('#hint').textContent = state.over ? '' : mine ? pickHint('pick') : '';
-  $('#undo').disabled = busy || state.moves.length < (local ? 1 : 2);
+  $('#undo').disabled = busy || state.moves.length < (local ? 1 : 2); undoLabel(false);
   $('#hintBtn').disabled = !mine || busy || hintedAt === state.moves.length;
   paintPits();
 }
@@ -1163,7 +1208,8 @@ function faceSeat() { // a new game from the Game over card: the board turns rou
 }
 function kickAi() { if (!local && state.turn === them && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 async function undo() {
-  if (busy || online || state.moves.length < (local ? 1 : 2)) return;
+  if (online) return askBack();
+  if (busy || state.moves.length < (local ? 1 : 2)) return;
   const moves = local ? localUndo(state.moves) : state.moves.slice(0, state.turn === you ? -2 : -1); // two of us: one move back, and the board turns back to whoever played it
   hideExplain(); state = replay(moves, state.variant, state.rules, state.first); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
   if (local) await passTurn(); else say('undo');
@@ -1322,7 +1368,7 @@ addEventListener('keydown', (e) => {
     return e.preventDefault();
   }
   if (a.type === 'sow' && hurry.depth > 0 && hurryNow()) return e.preventDefault(); // Space / Enter while a turn plays hurries it
-  if (body.classList.contains('screen') || !$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden) return; // keys play the board, not the screens or a card
+  if (body.classList.contains('screen') || !$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden || !$('#backCard').hidden) return; // keys play the board, not the screens or a card
   if (!keysUsed) { keysUsed = true; body.classList.add('keys'); showTurn(); } // from now on the hint line talks keys and your pits' badges show their key
   e.preventDefault();
   if (a.type === 'pit') { if (canPress()) pressPit(a.pit); else click(0.5, 0.04); }

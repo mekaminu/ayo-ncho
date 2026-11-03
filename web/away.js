@@ -7,7 +7,7 @@
 
 export const BASE = 'Ayo & Nchò';
 
-// What one thing that happened while you were away says. kind: 'move' | 'knock' | 'joined' | 'rematch' | 'over' | 'shout'
+// What one thing that happened while you were away says. kind: 'move' | 'knock' | 'joined' | 'rematch' | 'over' | 'shout' | 'askback'
 // d: { name, mine (true when it is now your move), text (a shout's words), result ('won' | 'lost' | 'draw'), score: [yours, theirs], gaveUp (someone gave the game up) }
 export function awayWords(kind, d = {}) {
   const name = d.name || 'Your friend';
@@ -22,6 +22,7 @@ export function awayWords(kind, d = {}) {
       return d.result === 'won' ? `You won${s}` : d.result === 'lost' ? `${name} won${s ? ` ${d.score[1]}–${d.score[0]}` : ''}` : `A draw${s}`;
     }
     case 'shout': return `${name}: ${d.text || '…'}`;
+    case 'askback': return `${name} asks to take back a move`;
     default: return '';
   }
 }

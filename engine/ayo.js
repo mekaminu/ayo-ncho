@@ -208,6 +208,20 @@ export function resign(state, player) {
   return { state: next, events: [{ type: "end", winner, resigned: player }] };
 }
 
+// Taking a move back (a room's "Take it back?", once the friend says yes): only the move just played can go, and only by
+// whoever played it, while the game is still in play. The position is rebuilt from the move list without it, so the seeds,
+// the scores, the quiet count and whose move it is all come back exactly as they were. Returns the earlier state.
+export function mayTakeBack(state, player) {
+  return !!state && !state.over && (player === 0 || player === 1) && state.moves.length > 0 && owner(state.moves[state.moves.length - 1]) === player && state.turn !== player;
+}
+export function takeBack(state, player) {
+  if (state.over) throw new Error("game over");
+  if (!mayTakeBack(state, player)) throw new Error("not your move to take back");
+  const first = state.first ?? firstMover(state.moves, 0);
+  const back = replay(state.moves.slice(0, -1), state.variant, state.rules, first);
+  return { ...back, first };
+}
+
 // Who moved first in a move list: the owner of the first pit played (a move is always from the mover's own side).
 export function firstMover(moves, fallback = 0) { return moves && moves.length ? owner(moves[0]) : fallback; }
 

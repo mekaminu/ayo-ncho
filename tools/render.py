@@ -37,7 +37,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online (also checks the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -175,7 +175,7 @@ if online:
         # a shout: the host taps the shout chip and a phrase; it pops up by the host's face on the friend's phone (and by the host's own name)
         for pg in (host, friend):
             assert pg.evaluate("getComputedStyle(document.querySelector('#shoutBtn')).display") != "none", "the shout chip should show online"
-            assert pg.evaluate("getComputedStyle(document.querySelector('#undo')).display") == "none", "undo has no place online"
+            assert pg.evaluate("getComputedStyle(document.querySelector('#undo')).display") != "none", "the Undo chip asks to take a move back online"
         host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
         host.click("#shoutMenu .pill[data-id=oya]")
         friend.wait_for_function("!document.querySelector('#bubble').hidden && document.querySelector('#bubble').textContent==='Oya, your move!'", timeout=10000)
@@ -187,6 +187,23 @@ if online:
         out2 = out[:-4] + "-friend.png" if out.endswith(".png") else out + "-friend.png"
         friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out2, timeout=120000, animations="disabled")
         friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        # take it back?: the host plays, then asks with the Undo chip; Tete's board shows the card; "Let them" flies the seeds back on both boards
+        badges = "[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')"
+        pre = host.evaluate(badges); assert host.evaluate("document.querySelector('#undo').disabled"), "nothing of the host's to take back on his own move"
+        hp = host.evaluate("window.__ayo.legal")[-1]; tap(host, hp)
+        for pg in (host, friend): pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===3", timeout=240000)
+        host.wait_for_function("!document.querySelector('#undo').disabled", timeout=10000)
+        assert host.evaluate("document.querySelector('#undo').getAttribute('aria-label')") == "Ask to take back your move"
+        host.click("#undo"); friend.wait_for_selector("#backCard:not([hidden])", timeout=10000)
+        assert friend.evaluate("document.querySelector('#backTitle').textContent") == "Meka asks to take back their move"
+        assert host.evaluate("document.querySelector('#undo').classList.contains('asking') && document.querySelector('#hint').textContent") == "Asked Tete to take back your move — waiting"
+        out6 = out[:-4] + "-takeback.png" if out.endswith(".png") else out + "-takeback.png"
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out6, timeout=120000, animations="disabled"); friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        friend.click("#backYes")
+        for pg in (host, friend): pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===2 && document.querySelector('#backCard').hidden", timeout=240000)
+        assert host.evaluate(badges) == pre == friend.evaluate(badges), (pre, host.evaluate(badges), friend.evaluate(badges))
+        assert host.evaluate("document.querySelector('#turn').textContent") == "your move" and host.evaluate("document.querySelector('#undo').disabled")
+        print("take back: Tete said yes, both boards back to", pre)
         # giving up: the last button in the host's shout row asks once more, then the game ends on both boards for Tete
         host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
         assert host.evaluate("!document.querySelector('#giveUpBtn').hidden && document.querySelector('#giveUpBtn').textContent") == "Give up this game"
@@ -209,7 +226,7 @@ if online:
         friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out5, timeout=120000, animations="disabled")
         b.close(); node.terminate()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
-    srv.shutdown(); print("wrote", out, out3, out2, out4, "and", out5); sys.exit(0)
+    srv.shutdown(); print("wrote", out, out3, out2, out4, out6, "and", out5); sys.exit(0)
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
     pg = b.new_page(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2 if not (wide or home) else 1, has_touch=countc)
