@@ -20,6 +20,7 @@ import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, 
 import { pour, place, reach } from './slots.js';
 import { boardAudio } from './sound.js';
 import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './last8.js';
+import { gameStory, storyWords, storyPath } from './story.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -941,7 +942,7 @@ function gameOver() {
   $('#goMe').classList.toggle('win', a >= b); $('#goOpp').classList.toggle('win', b > a);
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
-  const word = paintRecord(a, b);
+  const word = paintRecord(a, b); paintStory();
   $('#gameover').hidden = false; if (!online) prefs.set('game', 'null');
   if (word) sayText(word.text, word.mood); else say(win ? 'lose' : 'win'); // a run or a first win is worth their word more than the usual line
   if (win || (local && !draw)) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
@@ -960,6 +961,41 @@ function paintRecord(a, b) {
   if (word) setTimeout(() => { click(1.6, 0.06); buzz(10); }, 450); // the line lands a beat after the card
   return word ? { text: word, mood } : null;
 }
+// how the game went (web/story.js): the lead move by move as a line drawn in on the card — brass above the middle while
+// the near player leads, ember below while the other side does — a brass dot on the move that won it, an ember ring on
+// the biggest turn; tap it and that turn plays again on the board, a touch slower, then the card comes back
+let story = null;
+function paintStory() {
+  const box = $('#goStory'); story = null;
+  if (puzzle.on || state.moves.length < 4) { box.hidden = true; return; }
+  const reader = you; // from the near seat's side, as the scores on the card read (two of us: whoever holds the near card)
+  const st = gameStory(state.moves, state.variant, state.rules, reader); const p = storyPath(st, 300, 64, 4);
+  const me = local ? LNAMES[you] : 'You', other = local ? LNAMES[them] : (online ? oppLabel() : names[level]);
+  $('#goStorySvg').innerHTML = `<defs><clipPath id="stUp"><rect x="0" y="-8" width="300" height="${p.zero + 8}"/></clipPath><clipPath id="stDn"><rect x="0" y="${p.zero}" width="300" height="${p.h - p.zero + 8}"/></clipPath></defs>`
+    + `<line class="zero" x1="4" x2="296" y1="${p.zero}" y2="${p.zero}"/>`
+    + `<path class="up" clip-path="url(#stUp)" d="${p.area}"/><path class="dn" clip-path="url(#stDn)" d="${p.area}"/>`
+    + `<path class="ln" pathLength="1" d="${p.line}"/>`
+    + (p.big ? `<circle class="big pop" style="animation-delay:1.35s" cx="${p.big.x}" cy="${p.big.y}" r="5"/>` : '')
+    + (p.mark ? `<circle class="good pop" style="animation-delay:1.55s" cx="${p.mark.x}" cy="${p.mark.y}" r="3.4"/>` : '');
+  const words = storyWords(st, { me, them: other }); $('#goStoryWords').textContent = words; $('#goStoryMe').textContent = me === 'You' ? 'you' : me; $('#goStoryThem').textContent = other;
+  box.querySelector('.words svg').style.display = st.biggest ? '' : 'none'; box.disabled = !st.biggest;
+  box.setAttribute('aria-label', `How the game went: ${words}${st.biggest ? '. Tap to watch that move again' : ''}`);
+  box.hidden = false; story = st;
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) { if (p.big) setTimeout(() => click(1.2, 0.05), 1350); if (p.mark) setTimeout(() => click(1.8, 0.05), 1550); }
+}
+async function watchBigTurn(index) {
+  if (busy || clipping || index == null || index >= state.moves.length) return;
+  const moves = state.moves.slice(); const before = replay(moves.slice(0, index), state.variant, state.rules); const pit = moves[index];
+  const { events } = applyMove(before, pit);
+  $('#gameover').hidden = true; busy = true; hideExplain(); deselect();
+  layoutFromState(before); refreshStaticFrom(before);
+  await wait(350); select(pit, false); await wait(650); board.ring.visible = false; board.glow.visible = false;
+  await animate(events, before.stores, Math.round(PACE * 1.25));
+  await wait(900);
+  if (state.moves.length !== moves.length) { busy = false; return; } // a rematch started while it played: leave the new board be
+  layoutFromState(state); refreshStatic(); deselect(); busy = false; $('#gameover').hidden = false;
+}
+$('#goStory').addEventListener('click', () => { if (story && story.biggest) { click(1.3, 0.08); watchBigTurn(story.biggest.index); } });
 $('#replayBtn').addEventListener('click', async () => {
   if (busy) return; const moves = state.moves.slice(); const variant = state.variant, rules = state.rules;
   $('#gameover').hidden = true; busy = true; hideExplain();
@@ -1138,7 +1174,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

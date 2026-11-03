@@ -41,11 +41,14 @@ from playwright.sync_api import sync_playwright
 #                  Player 2 (the HUD names them, the move just played is explained for them; picture <out>), Player 2 plays and it swings on,
 #                  Undo takes one move back and turns back to whoever played it; Home says "Two of us · …" under Continue; with Settings →
 #                  Feel → Pass the phone off the seat still passes but the board stays. --wide for the Fold open / the Mac
+#        --story: as --record, then "how the game went" on the Game over card: the line and its words must be there and match
+#                  web/story.js run in node over the same moves; a tap on it plays the biggest turn on the board and the card comes
+#                  back with the board as the game ended (<out> is the card with the line drawn in). --wide for the Mac
 #        --record: your record against each opponent — a phone with games already played against all three and a saved game one move from a
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -206,6 +209,23 @@ with sync_playwright() as p:
         kept = json.loads(pg.evaluate("localStorage.getItem('ayo.record')"))
         assert kept["hard"] == {"w": 3, "l": 1, "d": 0, "best": end["scores"], "run": 3} and kept["easy"] == before["easy"] and kept["last"] == saved["stats"]["started"], kept
         print("record: card says", line, say)
+        if story:
+            pg.wait_for_timeout(2200)  # the line draws in, the marks pop
+            js = "import('%s').then(async (m) => { const s = m.gameStory(%s, 'ncho', {}, 0); console.log(JSON.stringify({ words: m.storyWords(s, { me: 'You', them: 'Mama Ngozi' }), biggest: s.biggest })); })" % (os.path.join(root, "web", "story.js"), json.dumps(end["moves"] + [end["pit"]]))
+            want = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", js]).decode())
+            got = pg.evaluate("window.__ayo.story"); assert got and not got["hidden"], "the story line is missing from the card"
+            assert got["words"] == want["words"], (got["words"], want["words"]); assert got["biggest"] == want["biggest"], (got, want)
+            assert pg.evaluate("document.querySelectorAll('#goStorySvg path').length") == 3 and pg.evaluate("document.querySelector('#goStorySvg .good') !== null"), "the line, its two areas and the winning mark"
+            print("story:", got["words"])
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(500); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            stores = pg.evaluate("window.__ayo.state.stores")
+            pg.click("#goStory"); pg.wait_for_function("window.__ayo.busy && document.querySelector('#gameover').hidden", timeout=5000)
+            pg.wait_for_function("!window.__ayo.busy && !document.querySelector('#gameover').hidden", timeout=120000)
+            assert pg.evaluate("window.__ayo.state.stores") == stores and pg.evaluate("document.querySelector('#myScore').textContent") == str(stores[0]), "the board did not come back to the end of the game"
+            print("story: the biggest turn played and the card came back")
+            b.close()
+            if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+            srv.shutdown(); print("wrote", out); sys.exit(0)
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(500); pg.screenshot(path=out, timeout=120000, animations="disabled")
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
