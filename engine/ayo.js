@@ -29,13 +29,15 @@ export const RULES = {
   ncho: { capture: 4, relay: true, last8: true },   // capture on 4 (to the side's owner; last seed on their side to the sower), relay sowing, last 8 to the next capturer
   ayo:  { capture: 23, relay: false, last8: false }, // capture on 2 or 3 by the last seed, sweeping back; grand slam; single lap
 };
-export function newGame(variant = "ncho", overrides = {}) {
+// `first`: the seat that moves first (0 unless said; at a real board the loser of the last game starts).
+export function newGame(variant = "ncho", overrides = {}, first = 0) {
   return {
     variant,
     rules: { ...(RULES[variant] || RULES.ncho), ...overrides },
     pits: Array(PITS).fill(4),
     stores: [0, 0],
-    turn: 0,            // player to move
+    turn: first,        // player to move
+    first,              // who moved first, so a move list can be replayed
     moves: [],          // history of pit indices
     quiet: 0,           // moves since the last capture (stalemate rule)
     over: false,
@@ -195,9 +197,13 @@ function finish(state, events) {
   if (state.over) events.push({ type: "end", winner: state.winner });
 }
 
-// Replay a move list from the start (used for undo, replay and server verification).
-export function replay(moves, variant = "ncho", overrides = {}) {
-  let s = newGame(variant, overrides);
+// Who moved first in a move list: the owner of the first pit played (a move is always from the mover's own side).
+export function firstMover(moves, fallback = 0) { return moves && moves.length ? owner(moves[0]) : fallback; }
+
+// Replay a move list from the start (used for undo, replay and server verification). `first` is read from the
+// moves when there are any; pass it for an empty list whose first mover was not seat 0.
+export function replay(moves, variant = "ncho", overrides = {}, first) {
+  let s = newGame(variant, overrides, firstMover(moves, first || 0));
   for (const m of moves) s = applyMove(s, m).state;
   return s;
 }

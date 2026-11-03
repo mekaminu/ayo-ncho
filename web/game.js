@@ -1,6 +1,6 @@
 // The game: engine state → 3D seeds, animated move by move. Every move the picture shows comes from engine events.
 import * as THREE from 'three';
-import { newGame, applyMove, legalMoves, replay, owner, RULES } from '/engine/ayo.js';
+import { newGame, applyMove, legalMoves, replay, owner, firstMover, RULES } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
 import { CHARACTERS, line, faceFor, MOOD_FOR, runLine as runWord, RUN_MOOD } from './characters.js';
 import { parse as parseRecord, record as recordGame, standing, cardLine as recordLine } from './record.js';
@@ -22,6 +22,7 @@ import { boardAudio } from './sound.js';
 import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './last8.js';
 import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown } from './handcount.js';
+import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -335,6 +336,12 @@ let state = newGame(settings.game, settings.rules()); let busy = false; let sele
 let stats = { biggest: 0, captures: 0, started: Date.now() };
 // your record against each opponent, kept on this phone (web/record.js): wins–losses and your best win, on their Home pill and the Game over card
 let records = parseRecord(prefs.get('record', null));
+// who starts (web/starts.js): as at a real board the loser of the last game against this opponent (or between the two of you) moves first;
+// Settings → Rules → Who starts can make it always you or always them. A room's server already starts the loser.
+let starts = parseStarts(prefs.get('starts', null));
+const startsPref = () => prefs.get('starts.pref', 'loser');
+const startKey = (two) => two ? 'local' : level;
+const comingStart = (two = settings.mode === 'local') => nextStart(startsPref(), starts[startKey(two)]);
 function paintRecordPills() { document.querySelectorAll('.pill[data-level] small.rec').forEach((s) => { s.textContent = standing(records[s.closest('.pill').dataset.level]); }); }
 
 // ---------- a friend online: the board joins a room (?room=CODE from the invite link) and animates the moves the server sends ----------
@@ -886,14 +893,14 @@ function paintHome() {
   document.querySelectorAll('[data-game]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.game === g));
   document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', settings.mode !== 'local' && b.dataset.level === level));
   const two = settings.mode === 'local'; $('.pill[data-mode="local"]').setAttribute('aria-pressed', two);
-  $('#playSub').textContent = two ? LOCAL_SUB : 'vs ' + levelLabel(level); $('#streakLine').textContent = homeLine(streak); paintPuzzleCard(); paintRecordPills();
+  const st = comingStart(two); $('#playSub').textContent = two ? (st.first === 1 ? `${LNAMES[1]} starts · on this phone` : LOCAL_SUB) : 'vs ' + levelLabel(level) + (st.first === 1 ? ` · ${names[level]} starts` : ''); $('#streakLine').textContent = homeLine(streak); paintPuzzleCard(); paintRecordPills();
   const saved = savedGame();
   $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? saved.local ? localContinue(saved) : `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
 }
 function paintSettings() {
   const r = settings.rules();
   const set = (name, v) => document.querySelectorAll(`[data-set="${name}"] .segbtn, [data-set="${name}"] .swatch`).forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === String(v)));
-  set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', seedSetId()); set('speed', settings.speed);
+  set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', seedSetId()); set('speed', settings.speed); set('starts', startsPref());
   const stones = unlocked(streak, 'stones'); $('[data-set="seeds"] [data-v="stones"]').disabled = !stones;
   $('#seedsSub').textContent = stones ? "Job's tears · river stones (yours: 7 days played)" : `Job's tears · river stones unlock at ${MILESTONES[0].days} days played (${streak.days.length} so far)`;
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
@@ -945,6 +952,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
       else if (name === 'finish') { prefs.set('finish', v); toast('New wood on the next game'); }
       else if (name === 'seeds') { if (v === 'stones' && !unlocked(streak, 'stones')) return; prefs.set('seeds', v); applySeedSet(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
+      else if (name === 'starts') { prefs.set('starts.pref', v); toast(v === 'loser' ? 'From the next game: the loser goes first' : v === 'you' ? 'From the next game: you always start' : 'From the next game: they always start'); }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto')) { prefs.set('quality', v); save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
       else if (name === 'physics') { prefs.set('physics', v); PHYS = decidePhysics({ pref: v, lite: quality.lite, param: params.get('physics') }); toast(PHYS.physics ? 'Seeds bounce and roll again' : 'Seeds fly straight to their pit'); } // applies to the next seed, no new game
       paintSettings(); click(1.2, 0.05);
@@ -977,6 +985,7 @@ function gameOver() {
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   const word = paintRecord(a, b); paintStory();
+  if (!online && !puzzle.on) { starts = recordStart(starts, startKey(local), firstMover(state.moves, state.first || 0), state.winner); prefs.set('starts', JSON.stringify(starts)); }
   $('#gameover').hidden = false; if (!online) prefs.set('game', 'null');
   if (word) sayText(word.text, word.mood); else say(win ? 'lose' : 'win'); // a run or a first win is worth their word more than the usual line
   if (win || (local && !draw)) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); }
@@ -1019,7 +1028,7 @@ function paintStory() {
 }
 async function watchBigTurn(index) {
   if (busy || clipping || index == null || index >= state.moves.length) return;
-  const moves = state.moves.slice(); const before = replay(moves.slice(0, index), state.variant, state.rules); const pit = moves[index];
+  const moves = state.moves.slice(); const before = replay(moves.slice(0, index), state.variant, state.rules, firstMover(moves)); const pit = moves[index];
   const { events } = applyMove(before, pit);
   $('#gameover').hidden = true; busy = true; hideExplain(); deselect();
   layoutFromState(before); refreshStaticFrom(before);
@@ -1033,7 +1042,7 @@ $('#goStory').addEventListener('click', () => { if (story && story.biggest) { cl
 $('#replayBtn').addEventListener('click', async () => {
   if (busy) return; const moves = state.moves.slice(); const variant = state.variant, rules = state.rules;
   $('#gameover').hidden = true; busy = true; hideExplain();
-  let s = newGame(variant, rules); layoutFromState(s); refreshStaticFrom(s);
+  let s = newGame(variant, rules, firstMover(moves)); layoutFromState(s); refreshStaticFrom(s);
   for (const m of moves) { const r = applyMove(s, m); if (r.state.turn === them) { select(m); await wait(250); } deselect(); await animate(r.events, s.stores, 70); s = r.state; refreshStaticFrom(s); }
   busy = false; $('#gameover').hidden = false;
 });
@@ -1093,12 +1102,22 @@ function resume() {
   try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; local = !!g.local; seat(local ? seatOf(state) : 0); return !state.over; } } catch {}
   local = false; seat(0); return false;
 }
-function newRound() { hideExplain(); takeSaid = false; local = settings.mode === 'local'; seat(0); state = newGame(settings.game, settings.rules()); stats = { biggest: 0, captures: 0, started: Date.now() }; layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); if (local) setTimeout(() => toast(`${LNAMES[0]} starts — pass the phone after each move`), 600); else setTimeout(() => say('start'), 600); }
+function newRound() {
+  hideExplain(); takeSaid = false; local = settings.mode === 'local'; const st = comingStart(local);
+  seat(local ? st.first : 0); state = newGame(settings.game, settings.rules(), st.first); stats = { biggest: 0, captures: 0, started: Date.now() };
+  layoutFromState(state); refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); faceSeat();
+  if (local) setTimeout(() => toast(`${startWords(st, LNAMES, false)} · pass the phone after each move`), 600);
+  else { setTimeout(() => say('start'), 600); if (st.first === them || st.why !== 'first') setTimeout(() => toast(startWords(st, ['You', names[level]])), 600); kickAi(); } // the computer opens when it is their start
+}
+function faceSeat() { // a new game from the Game over card: the board turns round to face whoever now holds the near seat (Home's swing does this itself)
+  if (idle) return; const from = theta, to = baseTheta + Math.round((theta - baseTheta) / (2 * Math.PI)) * 2 * Math.PI;
+  if (Math.abs(to - from) > 0.01) tween(650, (t) => { theta = from + (to - from) * t; }, easeInOut);
+}
 function kickAi() { if (!local && state.turn === them && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 async function undo() {
   if (busy || online || state.moves.length < (local ? 1 : 2)) return;
   const moves = local ? localUndo(state.moves) : state.moves.slice(0, state.turn === you ? -2 : -1); // two of us: one move back, and the board turns back to whoever played it
-  hideExplain(); state = replay(moves, state.variant, state.rules); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
+  hideExplain(); state = replay(moves, state.variant, state.rules, state.first); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
   if (local) await passTurn(); else say('undo');
 }
 function paintRules() { $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }

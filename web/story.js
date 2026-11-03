@@ -1,7 +1,7 @@
 // How the game went: the lead move by move, for the line on the Game over card.
 // Pure functions (no DOM), tested in node (test/story.test.js). Every number comes from replaying the moves through
 // engine/ayo.js, so the line says only what the engine says happened (end-of-game sweeps included).
-import { newGame, applyMove } from '../engine/ayo.js';
+import { newGame, applyMove, firstMover } from '../engine/ayo.js';
 
 // Replay `moves` and read the lead after every move, from `player`'s side (their store minus the other's).
 // Returns { leads: [0, after move 1, …], turns: [{ index, mover, swing }], biggest, forGood, maxLead, minLead, final }.
@@ -9,7 +9,7 @@ import { newGame, applyMove } from '../engine/ayo.js';
 //  - biggest: the move that moved the lead most (either player; the earlier one on a tie), or null if nothing was ever won
 //  - forGood: the move after which the final leader was ahead and stayed ahead to the end (null for a draw)
 export function gameStory(moves, variant = 'ncho', rules = {}, player = 0) {
-  let s = newGame(variant, rules); const leads = [0]; const turns = [];
+  let s = newGame(variant, rules, firstMover(moves)); const leads = [0]; const turns = [];
   const lead = (st) => st.stores[player] - st.stores[1 - player];
   moves.forEach((pit, index) => {
     const mover = s.turn; const before = lead(s); s = applyMove(s, pit).state; const after = lead(s);

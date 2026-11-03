@@ -158,7 +158,7 @@ export class Rooms {
     const both = room.seats[0] && room.seats[1] && room.seats[0].wantsRematch && room.seats[1].wantsRematch;
     if (!both) return { started: false, room: this.snapshot(code) };
     const g = newGame(room.variant, room.rules);
-    g.turn = room.game.winner === 0 ? 1 : room.game.winner === 1 ? 0 : (room.games % 2); // the loser starts; after a draw, alternate
+    g.turn = g.first = room.game.winner === 0 ? 1 : room.game.winner === 1 ? 0 : (room.games % 2); // the loser starts; after a draw, alternate
     room.game = g; room.games += 1;
     for (const s of room.seats) if (s) s.wantsRematch = false;
     return { started: true, room: this.snapshot(code) };

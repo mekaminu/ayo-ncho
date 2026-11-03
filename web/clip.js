@@ -1,6 +1,6 @@
 // The replay clip: find the best turn of a game and size it to a ~10-second recording.
 // Pure functions (no DOM) so they can be unit-tested in node; game.js does the recording with MediaRecorder.
-import { newGame, applyMove } from '../engine/ayo.js';
+import { newGame, applyMove, firstMover } from '../engine/ayo.js';
 
 export const CLIP_MS = 10000;      // the whole clip, pit lit to last seed settled
 const LEAD_MS = 900;               // the lit pit before the hand moves
@@ -23,7 +23,7 @@ export function scoreTurn(events, mover) {
 // Walk a finished (or unfinished) game and pick the player's best turn: { index, pit, before, events, ...score }.
 // With no capture and no relay anywhere, the busiest turn (most seeds sown) is the clip. Null only for no moves at all.
 export function bestTurn(moves, variant = 'ncho', rules = {}, player = 0) {
-  let s = newGame(variant, rules); let best = null;
+  let s = newGame(variant, rules, firstMover(moves)); let best = null;
   moves.forEach((pit, index) => {
     const before = s; const { state, events } = applyMove(s, pit); s = state;
     if (before.turn !== player) return;
