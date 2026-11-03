@@ -35,9 +35,9 @@ test("the move message is tiny and every board rebuilds exactly what the server 
     assert.ok(rooms.get(code).game.over, "game should end");
   }
   assert.ok(moves > 1000);
-  assert.ok(worstSmall < 70, `a move message should stay under 70 bytes, worst was ${worstSmall}`);
+  assert.ok(worstSmall < 90, `a move message (with its 12-character seal, so the room survives a restart) should stay under 90 bytes, worst was ${worstSmall}`);
   console.log(`traffic: ${moves} moves over 40 games — small ${(small / moves).toFixed(0)} B a move (worst ${worstSmall}), before ${(full / moves).toFixed(0)} B a move (worst ${longestFull}), ${(full / small).toFixed(1)}× lighter`);
-  assert.ok(full / small > 8, `the old message was ${(full / small).toFixed(1)}× the size; expected 8× or more`);
+  assert.ok(full / small > 7, `the old message was ${(full / small).toFixed(1)}× the size; expected 7× or more (8× before each move carried its 12-character seal)`);
   assert.ok(longestFull > 1000, `a relay turn's events alone should run past a kilobyte (longest was ${longestFull})`);
 });
 

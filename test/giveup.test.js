@@ -42,7 +42,7 @@ test("the room: either seat gives up on either move; the other wins; the one who
   assert.throws(() => rooms.resign(host.code, "nope"), (e) => e.code === "token");
   const r = rooms.resign(host.code, host.token); // the host gives up on the friend's move
   assert.equal(r.seat, 0); assert.equal(r.state.over, true); assert.equal(r.state.winner, 1); assert.equal(r.state.resigned, 0);
-  assert.deepEqual(resignMessage(r), { t: "resign", seat: 0, n: 1 });
+  assert.deepEqual(resignMessage(r), { t: "resign", seat: 0, n: 1, sig: r.sig }); assert.equal(r.sig.length, 12); // the room's new seal rides along (test/restart.test.js)
   assert.equal(rooms.snapshot(host.code).state.resigned, 0, "a reload sees who gave up");
   assert.throws(() => rooms.resign(host.code, friend.token), (e) => e.code === "over");
   assert.throws(() => rooms.move(host.code, friend.token, 6), (e) => e.code === "over");

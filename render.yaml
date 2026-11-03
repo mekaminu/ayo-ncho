@@ -6,3 +6,6 @@ services:
     buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /healthz
+    envVars:
+      - key: ROOM_SECRET # seals online rooms so a game survives a restart or deploy; Render makes it once (free, no plan change)
+        generateValue: true

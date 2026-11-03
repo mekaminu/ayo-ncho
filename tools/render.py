@@ -39,7 +39,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online (also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -91,11 +91,13 @@ srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8766), functools.partial(Qui
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 node = None
 if online:  # the real server on its own port, so two pages can meet at one board
-    node = subprocess.Popen(["node", os.path.join(root, "server", "index.js")], env={**os.environ, "PORT": "8767"}, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    for _ in range(100):
-        try: urllib.request.urlopen("http://127.0.0.1:8767/healthz", timeout=1); break
-        except Exception: time.sleep(0.1)
-    else: print("server did not start:", node.stderr.read().decode()); sys.exit(1)
+    def start_node():  # with a fixed ROOM_SECRET, so a restart mid-game can be checked (the rooms come back from the boards' tickets)
+        n = subprocess.Popen(["node", os.path.join(root, "server", "index.js")], env={**os.environ, "PORT": "8767", "ROOM_SECRET": "render-check-secret"}, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        for _ in range(100):
+            try: urllib.request.urlopen("http://127.0.0.1:8767/healthz", timeout=1); return n
+            except Exception: time.sleep(0.1)
+        print("server did not start:", n.stderr.read().decode()); sys.exit(1)
+    node = start_node()
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 def watch(pg, errors, tag=""):
     pg.on("pageerror", lambda e: errors.append(tag + str(e)))
@@ -107,7 +109,7 @@ def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
 if online:
-    import atexit; atexit.register(node.terminate)  # the server never outlives a failed check
+    import atexit; atexit.register(lambda: node.terminate())  # the server never outlives a failed check (whichever one is running)
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []
         # two phones = two browser contexts, so neither sees the other's saved seat
@@ -221,6 +223,17 @@ if online:
         assert host.evaluate(badges) == pre == friend.evaluate(badges), (pre, host.evaluate(badges), friend.evaluate(badges))
         assert host.evaluate("document.querySelector('#turn').textContent") == "your move" and host.evaluate("document.querySelector('#undo').disabled")
         print("take back: Tete said yes, both boards back to", pre)
+        # the server restarts mid-game (a deploy, or the free plan waking up): both boards reconnect by themselves, the first one
+        # back rebuilds the room from its ticket, and the game goes on from the same position
+        node.terminate(); node.wait(10); node = start_node()
+        for pg in (host, friend): pg.wait_for_function("window.__ayo.room && window.__ayo.room.status==='open' && window.__ayo.room.seat!==null && window.__ayo.state.moves.length===2", timeout=60000)
+        assert host.evaluate(badges) == pre == friend.evaluate(badges), ("after the restart", pre, host.evaluate(badges), friend.evaluate(badges))
+        assert json.loads(urllib.request.urlopen("http://127.0.0.1:8767/healthz", timeout=2).read())["rooms"] == 1, "the room was not rebuilt"
+        host.wait_for_function("document.querySelector('#turn').textContent==='your move'", timeout=20000)
+        rp = host.evaluate("window.__ayo.legal")[0]; tap(host, rp)
+        for pg in (host, friend): pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===3", timeout=240000)
+        assert host.evaluate(badges) == friend.evaluate(badges), "the boards disagree after a move played across the restart"
+        print("restart: the server restarted mid-game; both boards came back to the same position and played on")
         # giving up: the last button in the host's shout row asks once more, then the game ends on both boards for Tete
         host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
         assert host.evaluate("!document.querySelector('#giveUpBtn').hidden && document.querySelector('#giveUpBtn').textContent") == "Give up this game"

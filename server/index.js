@@ -1,6 +1,6 @@
 // Ayo & Nchò server: serves the web app and runs the online rooms (WebSockets at /ws, the same rules engine as the board).
 // Protocol (JSON, one object per message):
-//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"shout", id} | {t:"ping"}
+//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"shout", id} | {t:"ping"}
 //   server → {t:"joined", code, token, seat, room} | {t:"knocked", code, id, host, hostOnline} | {t:"knock", id, name} | {t:"room", room} (presence, a knock, rematch, new game; resync:true when asked for)
 //            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n} (that seat gave up) | {t:"askback", seat, n} (that seat asks to take its move back) | {t:"takeback", seat, n} (yes: that move is gone, n moves remain) | {t:"backno", seat, n} | {t:"shout", seat, id} | {t:"error", code, msg} | {t:"pong"}
 // The door: {t:"join"} does not seat anyone. It KNOCKS: the knocker gets {t:"knocked"} and waits; the host's board gets {t:"knock"} (and a
@@ -9,6 +9,9 @@
 // without knocking. A move travels small (see moveMessage in rooms.js): both boards run the same engine and rebuild the seeds' path themselves;
 // n (moves played) and stores let a board check it agrees, and {t:"sync"} fetches the whole room when it does not.
 // A shout is one of the fixed phrases in web/shouts.js, sent by id to both boards (the sender's too, so it sees it went).
+// Restarts: every room snapshot carries rid and sig, and move / resign / takeback carry the new sig; a board keeps them with the
+// moves as its ticket (ticketOf in rooms.js) and sends it with a rejoin. A room the server has forgotten is rebuilt from it
+// (see rooms.js); the secret is ROOM_SECRET.
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
 import express from "express";
 import http from "node:http";
@@ -19,7 +22,7 @@ import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage, backMessag
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function createServer({ rooms = new Rooms(), sweepEvery = 60 * 1000 } = {}) {
+export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000 } = {}) {
   const app = express();
   app.use("/engine", express.static(path.join(__dirname, "..", "engine")));
   app.use(express.static(path.join(__dirname, "..", "web")));
@@ -38,12 +41,12 @@ export function createServer({ rooms = new Rooms(), sweepEvery = 60 * 1000 } = {
 
   const send = (ws, msg) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)); };
   const broadcast = (code, msg) => { for (const s of sockets.get(code) || []) send(s, msg); };
-  const seatSocket = (ws, { code, token, seat, room }) => {
+  const seatSocket = (ws, { code, token, seat, room, upgraded }) => {
     ws.room = code; ws.token = token; ws.seat = seat; ws.knock = null;
     if (!sockets.has(code)) sockets.set(code, new Set());
     sockets.get(code).add(ws);
     send(ws, { t: "joined", code, token, seat, room });
-    for (const s of sockets.get(code)) if (s !== ws) send(s, { t: "room", room });
+    for (const s of sockets.get(code)) if (s !== ws) send(s, upgraded ? { t: "room", room, resync: true } : { t: "room", room }); // a newer ticket moved the game on: the other board catches up
   };
   // someone at the door: they wait on their own socket; the host's board hears the knock and sees the door list
   const knockSocket = (ws, k) => {
@@ -79,7 +82,7 @@ export function createServer({ rooms = new Rooms(), sweepEvery = 60 * 1000 } = {
           case "ping": return send(ws, { t: "pong" });
           case "create": if (ws.room) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name }));
           case "join": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return knockSocket(ws, rooms.knock(m.code, { name: m.name }));
-          case "rejoin": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token));
+          case "rejoin": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token, m.ticket && typeof m.ticket === "object" ? m.ticket : null));
           case "let": return answerDoor(ws, m);
           case "move": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.move(ws.room, ws.token, m.pit); return broadcast(ws.room, moveMessage(r)); }
           case "resign": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.resign(ws.room, ws.token); return broadcast(ws.room, resignMessage(r)); }
@@ -124,5 +127,6 @@ export function createServer({ rooms = new Rooms(), sweepEvery = 60 * 1000 } = {
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = process.env.PORT || 3000;
+  if (!process.env.ROOM_SECRET) console.warn("ROOM_SECRET is not set: online games will not survive a restart of this server");
   createServer().server.listen(port, () => console.log(`ayo-ncho listening on ${port}`));
 }

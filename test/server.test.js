@@ -63,8 +63,8 @@ test("host creates, friend joins by code, moves go to both, an out-of-turn move 
   // a move travels small: seat, pit, how many moves have been played and both scores — no events, no history; the boards rebuild the rest
   a.send({ t: "move", pit: 2 });
   const ma = await a.next("move"), mb = await b.next("move");
-  assert.deepEqual(ma, mb); assert.deepEqual(ma, { t: "move", seat: 0, pit: 2, n: 1, stores: [0, 0] });
-  assert.ok(JSON.stringify(ma).length < 60);
+  assert.deepEqual(ma, mb); const { sig, ...rest } = ma; assert.deepEqual(rest, { t: "move", seat: 0, pit: 2, n: 1, stores: [0, 0] }); assert.equal(sig.length, 12); // plus the room's seal, kept for a restart
+  assert.ok(JSON.stringify(ma).length < 80);
   const g = replay([2], "ncho");
   assert.deepEqual(ma.stores, g.stores);
 

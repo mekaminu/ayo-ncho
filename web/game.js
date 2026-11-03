@@ -692,6 +692,7 @@ function startOnline(code, { stay = false } = {}) {
   on('backno', ({ seat }) => { hideBackCard(); if (seat === you) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).noMine); click(0.7, 0.08); } else toast(backWords().noTheirs); showTurn(); });
   on('takeback', (m) => { moveQueue = moveQueue.then(() => showTakeBack(m)).catch((e) => console.error(e)); });
   on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
+  on('ticket', ({ code, token, ticket }) => { if (code && token) prefs.set('room', JSON.stringify({ code, token, ticket })); }); // kept with the seat, so even after a reload the room can be rebuilt if the server restarted
   on('shout', ({ seat, id }) => showShout(seat, id));
   // the door: this phone knocked and waits for the host; or (as host) someone is knocking on ours
   on('knocked', ({ host }) => { const again = knocking; knocking = true; if (roomsShowing()) { showScreen('play'); $('#oppFace').innerHTML = initialFace(host); } showTurn(); if (!again) { toast(`Knocked — ${host} decides`); click(1.1, 0.08); } });
@@ -722,7 +723,7 @@ function startOnline(code, { stay = false } = {}) {
   const rejoining = held && roomWanted !== 'NEW' && held.code === roomWanted;
   const go = () => {
     if (roomWanted === 'NEW') net.create({ variant: settings.game, rules: settings.rules(), name: myName() });
-    else if (rejoining) net.rejoin(held.code, held.token);
+    else if (rejoining) net.rejoin(held.code, held.token, held.ticket || null);
     else { net.join(roomWanted, myName()); $('#oppName').textContent = 'Knocking…'; }
   };
   if (!rejoining && !prefs.get('name', '')) askName(roomWanted === 'NEW' ? 'Open the room' : 'Knock').then(go); // an invite link opened before a name was ever given: asked here, once

@@ -57,7 +57,7 @@ test("the room: ask once a move, the friend says yes or no, playing on says no, 
   const before = rooms.snapshot(host.code).state; rooms.move(host.code, host.token, legalMoves(rooms.get(host.code).game)[0]);
   const fpit = legalMoves(rooms.get(host.code).game)[0]; const mid = rooms.snapshot(host.code).state; rooms.move(host.code, friend.token, fpit);
   rooms.askBack(host.code, friend.token); const yes = rooms.answerBack(host.code, host.token, true);
-  assert.deepEqual(backMessage(yes), { t: "takeback", seat: 1, n: mid.moves.length });
+  assert.deepEqual(backMessage(yes), { t: "takeback", seat: 1, n: mid.moves.length, sig: yes.sig }); assert.equal(yes.sig.length, 12);
   assert.deepEqual(yes.state, mid, "exactly as it was before their move"); assert.equal(yes.state.turn, 1);
   assert.ok(before.moves.length < mid.moves.length);
   assert.throws(() => rooms.askBack(host.code, friend.token), (e) => e.code === "noback", "it is their move again: nothing of theirs to take back");
