@@ -28,6 +28,8 @@
 #        add --hover (with --smoke, best with --wide) to check the mouse on the Mac: over a pit you can play the cursor is a hand, a faint
 #                  brass ring lands on its rim and the hint line says "pit 3 · 5 seeds — click to see where they go" (screenshot <out>);
 #                  over their pit it says "their pit 2 · …" with no ring; over the wood a grab hand; off the board everything goes back
+#        add --undo (with --smoke) to check Undo against the computer: the seeds of your move and the reply fly back (<out> is mid-flight),
+#                  the hint line says "Taking back your move and Mama Ngozi's reply", and the board ends exactly at the engine's position before
 #        add --count (with --smoke) to check counting a pit by touch: a real finger (touch events) rests on their richest pit, the number
 #                  over it counts up seed by seed to the engine's count and the hint line says "their pit 2 · 6 seeds" (screenshot <out>);
 #                  lifting the finger plays nothing; a hold on your own pit counts it and does not pick it; a finger that drags turns the
@@ -68,7 +70,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; record = record or story
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -765,6 +767,23 @@ with sync_playwright() as p:
             pg.evaluate("window.__holdMs=4000"); mx, my = pg.evaluate("window.__ayo.pitAt(%d)" % m); touch("touchStart", mx, my); pg.wait_for_timeout(60); touch("touchEnd")
             pg.wait_for_function("window.__ayo.selected===%d" % m, timeout=5000); assert not A()["shown"]; pg.evaluate("window.__holdMs=0")
             print("count: lifting plays nothing · own pit counted not picked · a drag turns the board · a quick tap still picks; log", A()["log"])
+        if undoc:  # Undo against the computer: the seeds of your move and the reply fly back to where they lay, the hint line says so
+            st = pg.evaluate("window.__ayo.state"); n = len(st["moves"]); assert n >= 2, st["moves"]
+            want = pg.evaluate("(()=>{const s=window.__ayo.state;return s.moves.slice(0, s.turn===window.__ayo.seat ? -2 : -1)})()")
+            pg.click("#undo")
+            pg.wait_for_function("window.__ayo.busy && document.querySelector('#hint').textContent.startsWith('Taking back')", timeout=5000)
+            words = pg.evaluate("document.querySelector('#hint').textContent"); assert words == "Taking back your move and %s's reply" % pg.evaluate("({easy:'Adaeze',medium:'Nnamdi',hard:'Mama Ngozi'})[window.__ayo.level]"), words
+            pg.wait_for_function("window.__ayo.tweens > 4", timeout=5000); pg.evaluate("window.__freeze=true")
+            assert pg.evaluate("window.__ayo.busy && window.__ayo.tweens > 0"), "the seeds should still be in the air"
+            air = pg.evaluate("window.__ayo.seeds.filter(s => s[1] > 0.06).length"); print("undo: seeds in the air at the picture:", air)
+            pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.wait_for_function("!window.__ayo.busy && document.querySelector('#turn').textContent==='your move'", timeout=30000)
+            st2 = pg.evaluate("window.__ayo.state"); assert st2["moves"] == want, (st2["moves"], want)
+            counts = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent)"); assert counts == st2["pits"], (counts, st2["pits"])
+            sc = pg.evaluate("[+document.querySelector('#myScore').textContent, +document.querySelector('#oppScore').textContent]"); assert sc == [st2["stores"][0], st2["stores"][1]], sc
+            homes = pg.evaluate("(()=>{const s=window.__ayo.seeds;return s.length})()"); assert homes == 48, homes
+            assert pg.evaluate("document.querySelector('#hint').textContent") != words, "the hint line goes back to your move"
+            print("undo:", words, "· the seeds flew back; moves", n, "→", len(st2["moves"]), "· badges", counts)
         if clip:  # record the best turn so far as a short video, the way the Game over card's Clip button does
             pg.set_default_timeout(300000)
             r = pg.evaluate("window.__ayo.clip()")
@@ -779,7 +798,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))

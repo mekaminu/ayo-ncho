@@ -46,3 +46,20 @@ export function planReturn(before, after, played = 0) {
   if (leaving.length !== landing.length) throw new Error('the seeds do not add up');
   return leaving.map((l, i) => ({ ...l, ...landing[i] }));
 }
+
+// Undo against the computer or two of us on one phone: the same seeds-fly-back as a friend's yes, not a jump. Which moves
+// go: two of us, one (the board turns back to whoever played it); against the computer, your move and their reply (or
+// just yours, if their reply is not on the board yet). Returns { keep, played, gone } — the moves kept, the pit of the
+// first move taken back (the seeds go back round the board into it) and how many moves go — or null if nothing can go.
+export function undoPlan({ moves = [], turn, you = 0, local = false }) {
+  const gone = local ? 1 : turn === you ? 2 : 1;
+  if (moves.length < (local ? 1 : 2)) return null;
+  const keep = moves.slice(0, moves.length - gone);
+  return { keep, played: moves[keep.length], gone };
+}
+
+// What the hint line says while the seeds go back. name: the computer opponent's name; mover: two of us, whose move goes.
+export function undoWords({ local = false, gone = 2, name = 'them', mover = 'Player 1' } = {}) {
+  if (local) return `Taking back ${mover}'s move`;
+  return gone === 2 ? `Taking back your move and ${name}'s reply` : 'Taking back your move';
+}

@@ -26,7 +26,7 @@ import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
 import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
 import { HOLD_MS, COUNT_STAY_MS, countPlan, canCount, stillHolding, countWords } from './count.js';
-import { mayAsk as mayAskBack, backWords, planReturn } from './takeback.js';
+import { mayAsk as mayAskBack, backWords, planReturn, undoPlan, undoWords } from './takeback.js';
 import { narrowOf, feedWords, onlyLead } from './feed.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
@@ -605,18 +605,26 @@ async function showTakeBack({ seat, state: pub, undone, before }) {
   if (seat === you) backAsk.pending = false;
   const w = backWords(friend ? friend.name : undefined); toast(seat === you ? w.yesMine : w.yesTheirs);
   sim.finish(); layoutFromState(b); // from the position the boards agree on
-  const plan = planReturn(b, a, undone); const meshes = plan.map((p) => homes[p.from][p.fromSlot]);
+  await flyBack(b, a, undone);
+  state = a; layoutFromState(state); busy = false; deselect(); refreshStatic(); buzz([15, 30, 15]);
+}
+// every seed that has to move flies from where it lies (b) back to where it lay (a): out of the troughs first, the scores
+// ticking down, then back round the board into the pit `played`, each landing with its knock and the counts ticking.
+// Used by a friend's yes and by Undo (web/takeback.js planReturn says which seed goes where).
+async function flyBack(b, a, played, words = null) {
+  const plan = planReturn(b, a, played); const meshes = plan.map((p) => homes[p.from][p.fromSlot]);
   const c = {}; for (const h in homes) c[h] = homes[h].length;
   for (const h in homes) { const keep = h[0] === 'S' ? a.stores[+h[1]] : a.pits[+h]; if (homes[h].length > keep) homes[h].length = keep; }
   const paint = (h) => { if (typeof h === 'number') setBadge(h, c[h]); else { const p = +h[1]; $(p === you ? '#myScore' : '#oppScore').textContent = c[h]; } };
-  if (undone !== undefined) { select(undone, false); click(0.9, 0.07); }
-  rattle(Math.min(plan.length, 6), at(undone ?? 0));
-  const gap = plan.length ? Math.min(55, 1100 / plan.length) : 0;
+  if (played !== undefined) { select(played, false); click(0.9, 0.07); }
+  if (words) $('#hint').textContent = words; // (after the pit lights: lighting it says the turn's words)
+  rattle(Math.min(plan.length, 6), at(played ?? 0));
+  const gap = plan.length && !reduceMotion ? Math.min(55, 1100 / plan.length) : 0;
   await Promise.all(plan.map((p, i) => wait(i * gap).then(() => {
     c[p.from] -= 1; paint(p.from);
-    return fly(meshes[i], p.to, 340, 0.08, (k, onSeed) => { if (k > 0.5) { c[p.to] += 1; paint(p.to); } land(k, onSeed, meshes[i].position, p.to); });
+    return fly(meshes[i], p.to, reduceMotion ? 60 : 340, 0.08, (k, onSeed) => { if (k > 0.5) { c[p.to] += 1; paint(p.to); } land(k, onSeed, meshes[i].position, p.to); });
   })));
-  await wait(200); state = a; layoutFromState(state); busy = false; deselect(); refreshStatic(); buzz([15, 30, 15]);
+  await wait(reduceMotion ? 0 : 200);
 }
 function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
 function startOnline(code, { stay = false } = {}) {
@@ -1238,10 +1246,15 @@ function faceSeat() { // a new game from the Game over card: the board turns rou
 function kickAi() { if (!local && state.turn === them && !state.over) (async () => { busy = true; await wait(400); busy = false; react('think'); const m = await aiMove(state); if (mood === 'think') react('calm'); if (m !== null) { select(m); await wait(500); await play(m); } })(); }
 async function undo() {
   if (online) return askBack();
-  if (busy || state.moves.length < (local ? 1 : 2)) return;
-  const moves = local ? localUndo(state.moves) : state.moves.slice(0, state.turn === you ? -2 : -1); // two of us: one move back, and the board turns back to whoever played it
-  hideExplain(); state = replay(moves, state.variant, state.rules, state.first); layoutFromState(state); refreshStatic(); deselect(); save(); click(0.7, 0.06);
-  if (local) await passTurn(); else say('undo');
+  if (busy) return;
+  const u = undoPlan({ moves: state.moves, turn: state.turn, you, local }); if (!u) return; // two of us: one move back, and the board turns back to whoever played it
+  const before = state, after = replay(u.keep, state.variant, state.rules, state.first);
+  hideExplain(); deselect(); busy = true; $('#undo').disabled = true; $('#hintBtn').disabled = true; if (!local) say('undo');
+  const words = undoWords({ local, gone: u.gone, name: names[level], mover: LNAMES[seatOf(after)] }); // (after.turn: whoever played the move that goes)
+  sim.finish(); layoutFromState(before); // the seeds go back from where they lie, not in a jump (web/takeback.js)
+  await flyBack(before, after, u.played, words);
+  state = after; layoutFromState(state); busy = false; refreshStatic(); deselect(); save(); click(0.7, 0.06);
+  if (local) await passTurn();
 }
 function paintRules() { $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
 
