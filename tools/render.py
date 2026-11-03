@@ -44,11 +44,14 @@ from playwright.sync_api import sync_playwright
 #        --story: as --record, then "how the game went" on the Game over card: the line and its words must be there and match
 #                  web/story.js run in node over the same moves; a tap on it plays the biggest turn on the board and the card comes
 #                  back with the board as the game ended (<out> is the card with the line drawn in). --wide for the Mac
+#        --hand (with --smoke): the hand counts — sows the biggest opening pit, stops the hand with two seeds sown and checks the brass
+#                  number over it says what is left in it (<out>), stops the first capture's hand for the copper "+N" (<out>-haul.png), and
+#                  checks the turn's numbers start at the seeds picked up, every capture showed one, and both go when the turn ends
 #        --record: your record against each opponent — a phone with games already played against all three and a saved game one move from a
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; record = record or story
+out = sys.argv[1]; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -358,6 +361,31 @@ with sync_playwright() as p:
             assert pg.evaluate("document.querySelector('#oppName').textContent") == "Mama Ngozi · Hard"
             print("take: opening rated", [(r["pit"], round(r["value"], 1)) for r in rated], "· playing the weakest, pit", worst)
             tap(pg, worst)
+        elif handc:  # the hand counts: sow the biggest opening pit and read the number over the hand as the turn plays
+            pg.evaluate("localStorage.setItem('ayo.tutorial', '3')")
+            best = max(pg.evaluate("window.__ayo.legal"), key=lambda i: pg.evaluate("window.__ayo.state.pits[%d]" % i))
+            first = pg.evaluate("window.__ayo.state.pits[%d]" % best)
+            pg.evaluate("window.__handPause = %d" % (first - 2))  # stop the hand with two seeds sown, for the picture
+            tap(pg, best)
+            try: pg.wait_for_function("!!window.__handGo", timeout=60000)
+            except Exception: print("hand: stuck", pg.evaluate("[window.__handPause, window.__ayo.handLog, window.__ayo.state.moves, window.__ayo.selected]")); raise
+            pg.wait_for_timeout(500)
+            h = pg.evaluate("window.__ayo.hand"); assert h["sow"] == str(first - 2), ("the number is the seeds still in the hand", h, first)
+            a = h["at"]; W = pg.evaluate("innerWidth"); assert 0 < a["x"] < W, ("the number sits over the board", a)
+            pg.screenshot(path=out, timeout=120000, animations="disabled")
+            pg.evaluate("window.__haulPause = 1; window.__handGo(); window.__handGo = null")
+            pg.wait_for_function("!!window.__handGo || (!window.__ayo.hurry.playing && window.__ayo.state.turn === 0)", timeout=240000)
+            if pg.evaluate("!!window.__handGo"):  # a capture: the copper number over the hand that sweeps it up
+                pg.wait_for_timeout(500); h = pg.evaluate("window.__ayo.hand"); assert h["haul"] and h["haul"].startswith("+"), h
+                pg.screenshot(path=out.replace(".png", "-haul.png"), timeout=120000, animations="disabled"); pg.evaluate("window.__haulPause = 0; window.__handGo(); window.__handGo = null")
+            pg.evaluate("window.__haulPause = 0")
+            pg.wait_for_function("!window.__ayo.hurry.playing && window.__ayo.state.turn === 0 || window.__ayo.state.over", timeout=240000)
+            log = pg.evaluate("window.__ayo.handLog"); print("hand: log", log[:70])
+            sows = [x for x in log if x.startswith("sow:") and x != "sow:-"]
+            assert sows[0] == "sow:%d" % first, ("the number starts at the seeds picked up", sows[0], first)
+            hauls = [x for x in log if x.startswith("haul:+")]
+            assert hauls or pg.evaluate("window.__ayo.state.stores[0]+window.__ayo.state.stores[1]") == 0, "a capture shows its copper number"
+            h = pg.evaluate("window.__ayo.hand"); assert h["sow"] is None and h["haul"] is None, ("the numbers go when the turn ends", h)
         elif hurry:  # the opening with the most drops (a relay in Nchò), hurried by a tap partway through
             pg.evaluate("localStorage.setItem('ayo.tutorial', '3')")
             best = max(pg.evaluate("window.__ayo.legal"), key=lambda i: pg.evaluate("window.__ayo.state.pits[%d]" % i))
@@ -533,7 +561,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or answer or explain or take or hurry: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or answer or explain or take or hurry or handc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))
