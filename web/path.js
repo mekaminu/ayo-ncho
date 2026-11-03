@@ -63,9 +63,32 @@ export function playedWords(path, { you = 0 } = {}) {
   return parts.join(' · ');
 }
 
+// What it leaves open: after this move, the best the other side could take with their very next move. Read from the engine
+// on copies of the position (this move, then each of their replies), so it can never disagree with the game. null when the
+// move cannot be played or ends the game; otherwise { pit, got, captures, wins } for their richest reply (more seeds, then
+// a reply that wins the game), got 0 when nothing of theirs takes anything. Only one move ahead: a warning, not a search.
+export function answerOf(state, pit) {
+  if (!state || state.over || !legalMoves(state).includes(pit)) return null;
+  const { state: next } = applyMove(state, pit);
+  if (next.over || next.turn === state.turn) return null;
+  let best = { pit: null, got: 0, captures: [], wins: false };
+  for (const m of legalMoves(next)) {
+    const p = sowPath(next, m); if (!p) continue;
+    const wins = p.over && p.winner === next.turn;
+    if (wins && !best.wins || wins === best.wins && p.got > best.got) best = { pit: m, got: p.got, captures: p.captures, wins };
+  }
+  return best;
+}
+// The answer in words, for the end of the hint line: "then they can take 8" / "then they can win"; '' when they take nothing.
+export function answerWords(ans) {
+  if (!ans) return '';
+  if (ans.wins) return 'then they can win';
+  return ans.got ? `then they can take ${ans.got}` : '';
+}
+
 // The whole hint while a pit is picked: the path, then how to sow it (a finger, or the keys).
-export function pickedHint(path, { you = 0, keys = false, key = null, seeds = 0 } = {}) {
-  const words = pathWords(path, { you });
+export function pickedHint(path, { you = 0, keys = false, key = null, seeds = 0, answer = null } = {}) {
+  const words = [pathWords(path, { you }), answerWords(answer)].filter(Boolean).join(' · ');
   if (!keys) return words ? `${words} — tap again to sow` : 'tap again to sow, or pick another';
   const lead = `pit ${key || '?'} · ${seeds === 1 ? '1 seed' : `${seeds} seeds`}`;
   return words ? `pit ${key || '?'} · ${words} — Enter to sow` : `${lead} — Enter to sow, or pick another`; // with the path shown the count badge says the seeds

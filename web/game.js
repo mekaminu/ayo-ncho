@@ -13,7 +13,7 @@ import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } fr
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
-import { sowPath, pickedHint, playedWords } from './path.js';
+import { sowPath, pickedHint, playedWords, answerOf } from './path.js';
 import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach.js';
 import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare } from './local.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT, BT, BW, BL, R as CORNER } from './board.js';
@@ -426,7 +426,9 @@ function showTurnOnline() {
   $('#undo').disabled = true; $('#hintBtn').disabled = true; $('#shoutBtn').disabled = waiting || link;
 }
 // the line under the board on your move: for a finger, or for the keys once a mouse or a key press says there is a keyboard
-function pickHint(phase) { return selected === null ? hintText(phase, { keys: keysLikely() }) : pickedHint(path, { you, keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected] }); }
+// the chips under the board sit just above the hint line (on the Mac just below it), however many lines the hint wraps to
+try { const h = $('#hint'); new ResizeObserver(() => document.body.style.setProperty('--hint-h', h.offsetHeight + 'px')).observe(h); } catch {}
+function pickHint(phase) { return selected === null ? hintText(phase, { keys: keysLikely() }) : pickedHint(path, { you, keys: keysLikely(), key: pitKey(selected, you), seeds: state.pits[selected], answer }); }
 // ---------- shouts: a fixed phrase sent by id to both boards; theirs pops by their face with a knock, yours sits by your name ----------
 const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
 for (const s of SHOUTS) { const b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.text; b.dataset.id = s.id; b.addEventListener('click', () => sendShout(s.id)); shoutMenu.appendChild(b); }
@@ -580,11 +582,22 @@ function deselect() { selected = null; board.ring.visible = false; board.glow.vi
 // a faint brass ring lands on each pit the hand would sow into, in sowing order (stronger where a relay passes twice), then a copper
 // ring round each pit the move captures and a pool of light on the pit where the turn ends. Settings → Feel → Show where seeds go.
 const pathOn = () => prefs.get('path', '1') === '1';
-let path = null, pathToken = 0, pathGlow = false;
+// What it leaves open (Settings → Feel, with the path): their richest answer to the picked move, one move ahead (web/path.js answerOf):
+// the hint line ends "then they can take 8" and a deep ember ring lands just outside each pit that answer would take, after the path.
+const answerOn = () => prefs.get('answer', '1') === '1';
+let path = null, answer = null, pathToken = 0, pathGlow = false, riskGlow = false;
 function showPath(i) {
   clearPath(); if (!pathOn() || state.turn !== you || owner(i) !== you) return;
   path = sowPath(state, i); if (!path) return;
-  landMarks(path, ++pathToken);
+  answer = answerOn() && !puzzle.on ? answerOf(state, i) : null;
+  const token = ++pathToken; landMarks(path, token).then(() => landRisk(answer, token));
+}
+async function landRisk(a, token) {
+  if (!a || !a.captures.length || token !== pathToken) return; const M = board.marks;
+  await wait(120); if (token !== pathToken) return;
+  for (const pit of a.captures) { const r = M.risk[pit]; r.visible = true; tween(360, (t) => { if (token !== pathToken) return; r.material.opacity = 0.7 * t; const sc = 1.18 - 0.18 * t; r.scale.set(sc, sc, 1); }, easeOut); }
+  click(0.8, 0.03); // a low knock: a warning, not a cheer
+  await wait(380); if (token === pathToken) riskGlow = true;
 }
 // land a path's marks on the board, in sowing order: a brass dot and ring on each pit reached, copper rings on the captures, the light where
 // the turn ends. `faint` (their move, explained) lands them quietly at half strength, without the counting ticks; `gap` is the beat between pits.
@@ -604,12 +617,12 @@ async function landMarks(p, token, { faint = false, gap = 55 } = {}) {
   if (p.captures.length && !faint) click(1.25, 0.035);
 }
 function clearPath() {
-  pathToken++; path = null; pathGlow = false; const M = board.marks;
-  for (const m of [...M.steps, ...M.dots, ...M.caps, M.end]) { m.visible = false; m.material.opacity = 0; m.scale.set(1, 1, 1); }
+  pathToken++; path = null; answer = null; pathGlow = false; riskGlow = false; const M = board.marks;
+  for (const m of [...M.steps, ...M.dots, ...M.caps, ...M.risk, M.end]) { m.visible = false; m.material.opacity = 0; m.scale.set(1, 1, 1); }
 }
 // fade every mark that is showing, over `ms`, unless something lands new ones first
 function fadeMarks(token, ms = 700) {
-  pathGlow = false; const M = board.marks, all = [...M.steps, ...M.dots, ...M.caps, M.end].filter((m) => m.visible).map((m) => [m, m.material.opacity]);
+  pathGlow = false; riskGlow = false; const M = board.marks, all = [...M.steps, ...M.dots, ...M.caps, ...M.risk, M.end].filter((m) => m.visible).map((m) => [m, m.material.opacity]);
   return tween(ms, (t) => { if (token !== pathToken) return; for (const [m, o] of all) m.material.opacity = o * (1 - t); }).then(() => { if (token === pathToken) clearPath(); });
 }
 
@@ -849,7 +862,7 @@ function paintSettings() {
   const stones = unlocked(streak, 'stones'); $('[data-set="seeds"] [data-v="stones"]').disabled = !stones;
   $('#seedsSub').textContent = stones ? "Job's tears · river stones (yours: 7 days played)" : `Job's tears · river stones unlock at ${MILESTONES[0].days} days played (${streak.days.length} so far)`;
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
-  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('swing', swingOn()); sw('take', takeOn());
+  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn());
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
@@ -1125,12 +1138,12 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
 function loop(now) {
-  runTweens(now); sim.step((now - last) / 1000, now); if (pathGlow && !reduceMotion) board.marks.end.material.opacity = 0.34 + 0.1 * Math.sin(now / 240); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
+  runTweens(now); sim.step((now - last) / 1000, now); if (pathGlow && !reduceMotion) board.marks.end.material.opacity = 0.34 + 0.1 * Math.sin(now / 240); if (riskGlow && !reduceMotion) for (const r of board.marks.risk) if (r.visible) r.material.opacity = 0.56 + 0.14 * Math.sin(now / 320); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); renderer.render(scene, camera); frames++;
   if (frames === 3) { window.__done = true; if (params.get('still')) { running = false; return; } }
   if (window.__freeze || document.hidden) { running = false; return; }
   requestAnimationFrame(loop);

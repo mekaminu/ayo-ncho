@@ -107,3 +107,46 @@ test("their move, explained: the words for a turn already played, from your seat
   if (p.lost) assert.ok(w.includes(`gave ${p.lost}`), w);
   if (!p.relays.length && !p.got && !p.lost) assert.equal(w, `ended in ${pitName(p.end, you)}`);
 });
+
+import { answerOf, answerWords } from "../web/path.js";
+
+test("what it leaves open: their richest reply, checked against every reply played by the engine, over random games in both games", () => {
+  let seed = 11; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+  let checked = 0, warned = 0, wins = 0;
+  for (const variant of ["ncho", "ayo"]) for (let g = 0; g < 25; g++) {
+    let s = newGame(variant);
+    while (!s.over) {
+      const moves = legalMoves(s);
+      for (const m of moves) {
+        const a = answerOf(s, m); const { state: next } = applyMove(s, m);
+        if (next.over) { assert.equal(a, null, "a move that ends the game leaves nothing to answer"); continue; }
+        let bestGot = 0, canWin = false;
+        for (const r of legalMoves(next)) {
+          const { state: after } = applyMove(next, r);
+          bestGot = Math.max(bestGot, after.stores[next.turn] - next.stores[next.turn]);
+          if (after.over && after.winner === next.turn) canWin = true;
+        }
+        assert.equal(a.wins, canWin);
+        if (!canWin) assert.equal(a.got, bestGot, "the richest reply");
+        if (a.pit !== null) { // the named reply really does take that much, and empties those pits
+          const { state: after, events } = applyMove(next, a.pit);
+          assert.equal(a.got, after.stores[next.turn] - next.stores[next.turn]);
+          assert.deepEqual(a.captures, [...new Set(events.filter((e) => e.type === "capture").flatMap((e) => e.pits))]);
+        } else assert.equal(a.got, 0);
+        if (a.got) warned++; if (a.wins) wins++; checked++;
+      }
+      s = applyMove(s, moves[Math.floor(rnd() * moves.length)]).state;
+    }
+  }
+  assert.ok(checked > 3000 && warned > 300, `${checked} moves checked, ${warned} leave a take, ${wins} leave a win`);
+  assert.equal(answerOf(newGame("ncho"), 7), null, "their pit"); assert.equal(answerOf(null, 0), null);
+});
+
+test("what it leaves open, in words, at the end of the hint line", () => {
+  assert.equal(answerWords(null), ""); assert.equal(answerWords({ got: 0, wins: false }), "");
+  assert.equal(answerWords({ got: 8, wins: false }), "then they can take 8"); assert.equal(answerWords({ got: 4, wins: true }), "then they can win");
+  const p = { end: 8, relays: [], captures: [8], got: 4, lost: 0, over: false, winner: null, order: [], visits: [] };
+  assert.equal(pickedHint(p, { answer: { got: 8, wins: false } }), "ends in their pit 3 · takes 4 · then they can take 8 — tap again to sow");
+  assert.equal(pickedHint(p, { answer: { got: 0, wins: false } }), "ends in their pit 3 · takes 4 — tap again to sow");
+  assert.equal(pickedHint(p, { keys: true, key: 2, seeds: 5, answer: { got: 4, wins: true } }), "pit 2 · ends in their pit 3 · takes 4 · then they can win — Enter to sow");
+});
