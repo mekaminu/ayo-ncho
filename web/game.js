@@ -25,6 +25,7 @@ import { handSteps, handText, handShown } from './handcount.js';
 import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
 import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
+import { HOLD_MS, COUNT_STAY_MS, countPlan, canCount, stillHolding, countWords } from './count.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
 const $ = (s) => document.querySelector(s);
@@ -248,6 +249,10 @@ function placeBadges() {
 const hands = { sow: { el: null, seeds: null }, haul: { el: null, seeds: null }, log: [] }; // the log is what the render check reads
 for (const k of ['sow', 'haul']) { const el = document.createElement('span'); el.className = 'handc ' + k; el.hidden = true; badgeLayer.appendChild(el); hands[k].el = el; }
 const hv = new THREE.Vector3();
+// count a pit by touch (below, by the input): its number rides over the pit, placed with the hands each frame
+const holding = { timer: null, x: 0, y: 0, done: false };
+const counting = { el: null, pit: null, run: 0, words: null, base: null, log: [] };
+{ const el = document.createElement('span'); el.className = 'handc count'; el.hidden = true; badgeLayer.appendChild(el); counting.el = el; }
 function setHand(k, seedsHeld, n, glint = false) {
   const H = hands[k]; const on = handShown(prefs.get('badges', '1') === '1', clipping) && n > 0 && seedsHeld && seedsHeld.length;
   H.seeds = on ? seedsHeld : null; H.el.hidden = !on; if (hands.log.length < 400) hands.log.push(k + ':' + (on ? handText(n, k) : '-')); if (!on) return;
@@ -257,7 +262,7 @@ function setHand(k, seedsHeld, n, glint = false) {
 }
 function hideHands() { setHand('sow', null, 0); setHand('haul', null, 0); }
 function placeHands() {
-  const w = canvas.clientWidth, h = canvas.clientHeight;
+  const w = canvas.clientWidth, h = canvas.clientHeight; if (counting.pit !== null) { if (body.classList.contains('screen')) endCount(); else placeCount(); }
   for (const k of ['sow', 'haul']) {
     const H = hands[k]; if (!H.seeds) continue;
     let x = 0, y = -1, z = 0; for (const m of H.seeds) { x += m.position.x; z += m.position.z; y = Math.max(y, m.position.y); }
@@ -762,6 +767,7 @@ takeBtn.addEventListener('click', playTake);
 
 // Play a move's events on the board, one seed at a time.
 async function animate(events, prevStores, pace = PACE) {
+  if (counting.pit !== null) endCount(); // a turn starting takes the count away: those seeds may be about to move
   if (hurry.depth++ === 0) { hurry.on = false; hurry.words = longTurn(events) && !clipping && !reduceMotion; hurry.base = $('#hint').textContent; if (hurry.words) $('#hint').textContent = hurryWords(hurry.base, { keys: keysLikely() }); }
   try { await sowEvents(events, prevStores, pace); } finally { if (hurry.depth === 1) hideHands(); if (--hurry.depth === 0) { if (hurry.words) $('#hint').textContent = hurry.base; hurry.on = false; hurry.words = false; } }
 }
@@ -1195,17 +1201,21 @@ canvas.addEventListener('pointerdown', (e) => {
   fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
   if (fingers.size === 2) { const [a, b] = [...fingers.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), dist0: dist }; down = null; dragged = true; return; }
   down = { x: e.clientX, y: e.clientY, t: theta, p: phi }; dragged = false;
+  holdStart(e);
 });
 canvas.addEventListener('pointermove', (e) => {
   if (fingers.has(e.pointerId)) fingers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (holding.timer && (fingers.size > 1 || !stillHolding(e.clientX - holding.x, e.clientY - holding.y))) holdStop(); // a pinch or a drag: not a count
+  if (holding.done && down) return; // a finger that has counted rests where it is: the board does not turn under it
   if (pinch && fingers.size === 2) { const [a, b] = [...fingers.values()]; const d = Math.hypot(a.x - b.x, a.y - b.y); dist = pinch.dist0 * (pinch.d0 / Math.max(d, 1)); clampDist(); return; }
   if (!down) return; const dx = e.clientX - down.x, dy = e.clientY - down.y; if (Math.hypot(dx, dy) > 8) dragged = true;
   if (dragged) { theta = down.t - dx * 0.006; phi = Math.min(1.3, Math.max(0.35, down.p - dy * 0.006)); }
 });
 const lift = (e) => { fingers.delete(e.pointerId); if (fingers.size < 2) pinch = null; };
-canvas.addEventListener('pointercancel', (e) => { lift(e); down = null; });
+canvas.addEventListener('pointercancel', (e) => { lift(e); down = null; holdStop(); holding.done = false; });
 canvas.addEventListener('pointerup', (e) => {
-  const wasPinch = !!pinch || fingers.size > 1; lift(e);
+  const wasPinch = !!pinch || fingers.size > 1; lift(e); holdStop();
+  if (holding.done) { holding.done = false; down = null; return; } // the press counted a pit: it was never a tap
   const wasDrag = dragged; down = null; if (wasPinch || wasDrag) return;
   if (hurry.depth > 0) { hurryNow(); return; } // a tap while a turn plays hurries it
   if (!canPress()) return;
@@ -1243,6 +1253,54 @@ canvas.addEventListener('pointermove', (e) => { if (e.pointerType !== 'mouse') r
 canvas.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'mouse') return; mouse.in = false; paintHover(); });
 canvas.addEventListener('pointerdown', (e) => { if (e.pointerType !== 'mouse') { mouse.in = false; paintHover(); } }); // a finger or a pen: no hover
 canvas.addEventListener('wheel', (e) => { dist += e.deltaY * 0.001; clampDist(); }, { passive: true });
+canvas.addEventListener('contextmenu', (e) => e.preventDefault()); // a long press counts a pit; it never opens the phone's menu
+// count a pit by touch (web/count.js): press and hold any pit and its seeds are counted one by one, as a finger does at a real
+// board — each seed hops a little with a tick and a tap, a brass number over the pit counts up with them, the hint line says it
+function holdStart(e) {
+  holdStop(); holding.done = false;
+  if (!canCount({ screen: body.classList.contains('screen'), clipping, playing: hurry.depth > 0, replaying, fingers: fingers.size })) return;
+  const pit = pitUnder(e.clientX, e.clientY); if (pit === null) return;
+  holding.x = e.clientX; holding.y = e.clientY;
+  holding.timer = setTimeout(() => { holding.timer = null; if (hurry.depth > 0 || replaying || clipping) return; holding.done = true; countPit(pit); }, window.__holdMs || HOLD_MS); // (the render check stretches it: a software-rendered page hands a finger's moves over late)
+}
+function holdStop() { if (holding.timer) { clearTimeout(holding.timer); holding.timer = null; } }
+function countSay(w) { // the hint line says the count, and goes back to what it said once the number has gone (unless the game moved it on)
+  const el = $('#hint');
+  if (counting.words && el.textContent === counting.words) el.textContent = counting.base;
+  counting.words = null; if (!w) return;
+  counting.base = el.textContent; counting.words = w; el.textContent = w;
+}
+async function countPit(pit) {
+  const run = ++counting.run; if (mouse.words) hoverWords(null);
+  const lying = homes[pit].slice(), n = state.pits[pit], plan = countPlan(n, { reduce: reduceMotion });
+  const words = countWords({ state, pit, you }); countSay(words);
+  const el = counting.el; counting.pit = pit; el.hidden = false; el.classList.remove('done', 'fade'); el.textContent = n === 0 ? '0' : '·';
+  if (counting.log.length < 200) counting.log.push(`${pit}:${n}`);
+  placeCount(); buzz(n === 0 ? 14 : 6);
+  if (n === 0) click(0.8, 0.05);
+  for (let k = 0; k < n; k++) {
+    if (run !== counting.run) return;
+    await wait(k === 0 ? 0 : plan[k] - plan[k - 1]); if (run !== counting.run) return;
+    const m = lying[k];
+    if (m && m.userData.home === pit && !sim.has(m) && !reduceMotion) { // the seed hops where it lies, as a finger touches it
+      const v = m.userData.v, y0 = m.position.y;
+      tween(170, (t) => { if (m.userData.v === v) m.position.y = y0 + Math.sin(t * Math.PI) * 0.009; }).then(() => { if (m.userData.v === v) m.position.y = y0; });
+    }
+    el.textContent = String(k + 1); if (!reduceMotion) { el.classList.remove('tick'); void el.offsetWidth; el.classList.add('tick'); }
+    click(1.25 + Math.min(k, 24) * 0.025, 0.035); buzz(4);
+  }
+  if (run !== counting.run) return;
+  el.classList.add('done'); if (n > 0) click(1.9, 0.05); // the last seed counted: a brighter tick, and the number glints
+  await wait(COUNT_STAY_MS); if (run !== counting.run) return;
+  el.classList.add('fade'); await wait(260); if (run !== counting.run) return;
+  endCount();
+}
+function endCount() { counting.run++; counting.pit = null; counting.el.hidden = true; counting.el.classList.remove('done', 'fade'); countSay(null); }
+const cv = new THREE.Vector3();
+function placeCount() {
+  if (counting.pit === null) return; const [x, z] = pitCenters[counting.pit];
+  cv.set(x, BT + 0.02, z).project(camera); counting.el.style.transform = `translate(${(cv.x * 0.5 + 0.5) * canvas.clientWidth}px, ${(-cv.y * 0.5 + 0.5) * canvas.clientHeight}px)`;
+}
 // may a pit be pressed right now? (your move, the board showing, nothing in flight, a friend across the board if online)
 function canPress() { return !(busy || state.over || state.turn !== you || body.classList.contains('screen') || (puzzle.on && puzzle.played) || (online && !friend)); }
 // a press on a pit — a tap, a click, a digit, or Enter on its hidden button: first press picks it, the second sows it
@@ -1298,7 +1356,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;

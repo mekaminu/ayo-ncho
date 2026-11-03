@@ -15,7 +15,7 @@
 <style>
 :root{--bg:#0d0906;--fg:#f1e6d2;--muted:#b9a58d;--brass:#e6b76f;--card:rgba(24,15,9,.92);--line:rgba(243,233,215,.14);--soft:rgba(243,233,215,.06);color-scheme:dark}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,sans-serif;overflow:hidden;-webkit-user-select:none;user-select:none}
-canvas{display:block;width:100vw;height:100vh;touch-action:none}
+canvas{display:block;width:100vw;height:100vh;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 button{font-family:inherit}
 [hidden]{display:none!important}
 .hud{position:fixed;left:0;right:0;padding:0 max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:center;pointer-events:none;transition:opacity .25s}
@@ -48,6 +48,7 @@ button{font-family:inherit}
 .handc{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:13px;font-weight:700;line-height:18px;min-width:18px;text-align:center;margin:-22px 0 0 -11px;padding:1px 6px;border-radius:11px;color:#1a120b;background:var(--brass);box-shadow:0 1px 4px rgba(0,0,0,.45),0 0 0 1px rgba(255,220,160,.5);font-variant-numeric:tabular-nums} /* the hand counts: the seeds still in the sowing hand */
 .handc.haul{margin:-12px 0 0 30px;background:#c46a3a;color:#fff3e4;box-shadow:0 1px 4px rgba(0,0,0,.45),0 0 0 1px rgba(255,190,150,.5)} /* the capture hand: copper, beside the heap (over the far trough, above it would sit on the names) */
 .handc.tick{animation:hcTick .18s ease-out}.handc.again{animation:hcAgain .45s ease-out}
+.handc.count{margin:-24px 0 0 -11px;font-size:15px;line-height:20px;min-width:22px;transition:opacity .25s}.handc.count.done{animation:hcAgain .45s ease-out}.handc.count.fade{opacity:0} /* count a pit by touch: the number over the pit a finger rests on */
 @keyframes hcTick{from{scale:1.18}to{scale:1}}@keyframes hcAgain{0%{scale:1.4;box-shadow:0 0 0 2px #fff3d0,0 0 16px rgba(255,214,140,.9)}100%{scale:1}}
 .badge.last{color:#1a120b;background:var(--brass);box-shadow:0 0 0 1px rgba(255,220,160,.6),0 0 10px rgba(230,183,111,.55)} /* the last 8: the pits still holding seeds */
 #last8{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.7);color:var(--fg);border-radius:999px;padding:5px 12px;font:500 12px Inter,system-ui,sans-serif;line-height:1.35;pointer-events:none}
