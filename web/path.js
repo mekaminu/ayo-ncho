@@ -3,6 +3,7 @@
 // so what is shown can never disagree with what applyMove will do; nothing about the rules lives here.
 import { applyMove, legalMoves, sideOf, opponent } from '../engine/ayo.js';
 import { sweepOf, sweepWords } from './last8.js';
+import { endedCircling, calledWords } from './circling.js';
 
 // The path of a move for the player to move, or null when the pit cannot be played:
 //   order     the pits the hand sows into, in the order they are first reached
@@ -26,6 +27,7 @@ export function sowPath(state, pit) {
     pit, order, visits, end, relays, captures, drops, sweep: sweepOf(events),
     got: next.stores[me] - state.stores[me], lost: next.stores[opponent(me)] - state.stores[opponent(me)],
     over: next.over, winner: next.over ? next.winner : null,
+    called: endedCircling(next), // the game is called on this move: no capture for 60 moves, each keeps their side (web/circling.js)
   };
 }
 
@@ -42,9 +44,10 @@ export function pathWords(path, { you = 0 } = {}) {
   const parts = [];
   if (path.relays.length) parts.push(path.relays.length === 1 ? 'picks up again once' : `picks up again ×${path.relays.length}`);
   parts.push(path.end === null ? 'nothing to sow' : `ends in ${pitName(path.end, you)}`);
-  if (path.got) parts.push(`takes ${path.got}`);
-  if (path.lost) parts.push(`gives ${path.lost}`);
+  if (path.got && !path.called) parts.push(`takes ${path.got}`); // a called game hands each side its own seeds: not a capture
+  if (path.lost && !path.called) parts.push(`gives ${path.lost}`);
   if (path.sweep) parts.push(sweepWords(path.sweep, { you }));
+  if (path.called) parts.push(calledWords());
   if (path.over) parts.push(path.winner === 'draw' ? 'ends the game level' : path.winner === you ? 'wins the game' : 'ends the game');
   return parts.join(' · ');
 }
@@ -55,10 +58,11 @@ export function playedWords(path, { you = 0 } = {}) {
   if (!path) return '';
   const parts = [];
   const r = path.relays.length; if (r) parts.push(r === 1 ? 'picked up again once' : r === 2 ? 'picked up again twice' : `picked up again ×${r}`);
-  if (path.got) parts.push(`took ${path.got}`);
-  if (path.lost) parts.push(`gave ${path.lost}`);
+  if (path.got && !path.called) parts.push(`took ${path.got}`);
+  if (path.lost && !path.called) parts.push(`gave ${path.lost}`);
   if (path.sweep) parts.push(sweepWords(path.sweep, { you, played: true }));
   if (!parts.length || path.over) parts.push(path.end === null ? 'sowed nothing' : `ended in ${pitName(path.end, you)}`);
+  if (path.called) parts.push(calledWords());
   if (path.over) parts.push(path.winner === 'draw' ? 'the game ends level' : path.winner === you ? 'you win' : 'they win');
   return parts.join(' · ');
 }
@@ -74,7 +78,7 @@ export function answerOf(state, pit) {
   let best = { pit: null, got: 0, captures: [], wins: false };
   for (const m of legalMoves(next)) {
     const p = sowPath(next, m); if (!p) continue;
-    const wins = p.over && p.winner === next.turn;
+    const wins = p.over && p.winner === next.turn; if (p.called) { p.got = 0; p.captures = []; } // a called game takes nothing: each keeps their side
     if (wins && !best.wins || wins === best.wins && p.got > best.got) best = { pit: m, got: p.got, captures: p.captures, wins };
   }
   return best;

@@ -52,10 +52,13 @@ button{font-family:inherit}
 .handc.count{margin:-24px 0 0 -11px;font-size:15px;line-height:20px;min-width:22px;transition:opacity .25s}.handc.count.done{animation:hcAgain .45s ease-out}.handc.count.fade{opacity:0} /* count a pit by touch: the number over the pit a finger rests on */
 @keyframes hcTick{from{scale:1.18}to{scale:1}}@keyframes hcAgain{0%{scale:1.4;box-shadow:0 0 0 2px #fff3d0,0 0 16px rgba(255,214,140,.9)}100%{scale:1}}
 .badge.last{color:#1a120b;background:var(--brass);box-shadow:0 0 0 1px rgba(255,220,160,.6),0 0 10px rgba(230,183,111,.55)} /* the last 8: the pits still holding seeds */
-#last8{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.7);color:var(--fg);border-radius:999px;padding:5px 12px;font:500 12px Inter,system-ui,sans-serif;line-height:1.35;pointer-events:none}
-#last8[hidden]{display:none}
-#last8 b{color:#1a120b;background:var(--brass);border-radius:999px;padding:0 7px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
-#last8.new{animation:rise .3s ease-out,glint 1.6s ease-out .3s}
+#last8,#circling{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.7);color:var(--fg);border-radius:999px;padding:5px 12px;font:500 12px Inter,system-ui,sans-serif;line-height:1.35;pointer-events:none}
+#last8[hidden],#circling[hidden]{display:none}
+#circling em{font-style:normal;font-weight:700;color:var(--brass);display:inline-block;min-width:1.1em;text-align:center}
+#circling em.bump{animation:bump .35s ease-out}
+#circling.calling{border-color:#e08a5a}#circling.calling em{color:#f0a070}
+#last8 b,#circling b{color:#1a120b;background:var(--brass);border-radius:999px;padding:0 7px;font-weight:700;white-space:nowrap;letter-spacing:.02em}
+#last8.new,#circling.new{animation:rise .3s ease-out,glint 1.6s ease-out .3s}
 @keyframes glint{0%{box-shadow:0 0 0 0 rgba(230,183,111,.0)}25%{box-shadow:0 0 0 6px rgba(230,183,111,.35),0 0 24px rgba(230,183,111,.5)}100%{box-shadow:0 0 0 0 rgba(230,183,111,0)}}
 .keys .badge[data-key]::before{content:attr(data-key);display:inline-block;margin-right:5px;padding-right:5px;border-right:1px solid rgba(230,183,111,.35);color:var(--fg);opacity:.7;font-weight:500} /* your pits' keys, once a key has been pressed */
 /* the pits for a screen reader and the Tab key: real buttons, out of sight (the board itself is the picture) */
@@ -318,7 +321,7 @@ button{font-family:inherit}
 .wide .puzzleTop{right:auto;width:min(38vw,360px);left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 34px)}
 .wide .puzzleBottom{right:auto;width:min(40vw,380px);left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
 .wide.puzzle #hint{top:calc(env(safe-area-inset-top,0px) + 24px)}
-@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#last8.new{animation:none}}
+@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#last8.new,#circling.new,#circling em.bump{animation:none}}
 </style>
 </head>
 <body class="screen">
@@ -329,7 +332,8 @@ button{font-family:inherit}
 <div id="hint" role="status"></div>
 <div id="words"><button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
 <button id="take" hidden type="button" title="Play Mama Ngozi's move through, slowly"><span class="face s" id="takeFace" aria-hidden="true"></span><b id="takeName">Mama Ngozi</b><span id="takeWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>show</i></button>
-<div id="last8" hidden role="status"><b>Last 8</b><span id="last8Words"></span></div></div>
+<div id="last8" hidden role="status"><b>Last 8</b><span id="last8Words"></span></div>
+<div id="circling" hidden role="status"><b>Circling</b><span><em id="circlingLeft"></em> <span id="circlingWords"></span></span></div></div>
 <div id="rec" hidden role="status"><i></i>Recording your best turn…</div>
 <div id="bubble" hidden role="status"></div>
 <div id="myBubble" hidden role="status"></div>
