@@ -13,6 +13,7 @@
 //   net.on('takeback', ({ seat, state, undone, before }) => …) // yes: that seat's last move (pit `undone`) is gone, state is the position before it
 //   net.on('backno', ({ seat }) => …)          // no: the move stands
 //   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
+//   net.on('call',   ({ seat, kind, data }) => …) // a call message from the friend (web/call.js): video and voice at the board
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
 //   net.on('ticket', ({ code, token, ticket }) => …) // the room as this board holds it, sealed by the server: keep it (with the token) so a reload can rebuild the room after a restart
@@ -83,7 +84,7 @@ export const ERROR_TEXT = {
   notfound: 'No room with that code — check the link', taken: 'That room already has two players', waiting: 'Your friend has not joined yet',
   turn: 'Not your move', illegal: 'That pit cannot be played', over: 'The game is over', token: 'That seat is not yours', swept: 'The room has closed',
   full: 'Too many rooms open right now — try again in a minute', seated: 'Already at a board', unseated: 'Join a room first', variant: 'Unknown game',
-  hush: 'Easy — one shout at a time', bad: 'Something went wrong',
+  hush: 'Easy — one shout at a time', bad: 'Something went wrong', away: 'Your friend is not at the board right now', slow: 'Slow down a moment',
   notlet: 'Not let in this time', knocking: 'Already at the door', busy: 'Too many people at the door — try again in a minute',
   host: 'Only the host decides who comes in', noknock: 'They have gone from the door',
   noback: 'Only the move you just played can be taken back', asked: 'Already asked — waiting for an answer', askedonce: 'You have asked once for this move',
@@ -121,6 +122,7 @@ export class Online {
   askBack() { return this.send({ t: 'askback' }); } // ask to take back the move just played
   answerBack(yes) { return this.send({ t: 'backanswer', yes: !!yes }); }
   shout(id) { return this.send({ t: 'shout', id }); }
+  call(kind, data = {}) { return this.send({ t: 'call', kind, data }); } // video and voice at the board (web/call.js): to the friend's seat only
   leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; this.knock = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
 
   send(msg) {
@@ -188,6 +190,7 @@ export class Online {
         return this.emit('takeback', { seat: m.seat, state: r.state, undone: r.undone, before });
       }
       case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
+      case 'call': return this.emit('call', { seat: m.seat, kind: m.kind, data: m.data || {} });
       case 'error':
         if (m.code === 'swept' || (m.code === 'notfound' && m.re === 'rejoin') || m.code === 'token') { this.token = null; this.intent = null; this.held = null; } // nothing left to come back to
         if (m.re === 'join' && m.code !== 'knocking') { this.knock = null; this.intent = null; } // turned away, or the door is gone: no knocking again by ourselves

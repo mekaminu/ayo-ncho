@@ -21,6 +21,7 @@
 import { randomUUID, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
 import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, RULES } from "../engine/ayo.js";
 import { isShout, mayShout } from "../web/shouts.js";
+import { callMessage, passGate } from "../web/call.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
 export const CODE_LENGTH = 4;
@@ -270,6 +271,23 @@ export class Rooms {
     if (!mayShout(room.seats[seat].shoutAt, t)) fail("hush", "one shout at a time");
     room.seats[seat].shoutAt = t; room.touchedAt = t;
     return { seat, id };
+  }
+
+  // Video and voice at the board (web/call.js): a call message from one seated player, passed to the OTHER seat only.
+  // The server checks its shape and size and rate-limits each seat; it keeps none of it (no picture or sound ever comes
+  // here — that goes phone to phone). Returns {seat, to, kind, data}; index.js sends it to the sockets of seat `to`.
+  call(code, token, kind, data) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
+    const clean = callMessage(kind, data);
+    if (!clean) fail("bad", "not a call message");
+    const to = 1 - seat;
+    if (kind === "ask" && !room.seats[to].online) fail("away", "your friend is not at the board right now");
+    const me = room.seats[seat]; if (!me.callGate) me.callGate = {};
+    if (!passGate(me.callGate, kind, this.now())) fail("slow", "slow down a moment");
+    if (kind === "ask") room.touchedAt = this.now();
+    return { seat, to, kind, data: clean };
   }
 
   // Play again at the same board: when both seats have asked, a fresh game starts (the loser of the last game moves first).

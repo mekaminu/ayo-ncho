@@ -1,6 +1,6 @@
 // Ayo & Nchò server: serves the web app and runs the online rooms (WebSockets at /ws, the same rules engine as the board).
 // Protocol (JSON, one object per message):
-//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"shout", id} | {t:"ping"}
+//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"shout", id} | {t:"call", kind, data} | {t:"ping"}
 //   server → {t:"joined", code, token, seat, room} | {t:"knocked", code, id, host, hostOnline} | {t:"knock", id, name} | {t:"room", room} (presence, a knock, rematch, new game; resync:true when asked for)
 //            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n} (that seat gave up) | {t:"askback", seat, n} (that seat asks to take its move back) | {t:"takeback", seat, n} (yes: that move is gone, n moves remain) | {t:"backno", seat, n} | {t:"shout", seat, id} | {t:"error", code, msg} | {t:"pong"}
 // The door: {t:"join"} does not seat anyone. It KNOCKS: the knocker gets {t:"knocked"} and waits; the host's board gets {t:"knock"} (and a
@@ -8,6 +8,8 @@
 // and the knocker is seated ({t:"joined"}), or in:false and the knocker gets {t:"error", code:"notlet"}. A member who holds a token rejoins
 // without knocking. A move travels small (see moveMessage in rooms.js): both boards run the same engine and rebuild the seeds' path themselves;
 // n (moves played) and stores let a board check it agrees, and {t:"sync"} fetches the whole room when it does not.
+// A call message (video and voice at the board, web/call.js) goes to the OTHER seat only, as {t:"call", seat, kind, data}: the consent
+// (ask / yes / no), the WebRTC handshake (offer / answer / ice), mic and camera state, end. The picture and sound go phone to phone.
 // A shout is one of the fixed phrases in web/shouts.js, sent by id to both boards (the sender's too, so it sees it went).
 // Restarts: every room snapshot carries rid and sig, and move / resign / takeback carry the new sig; a board keeps them with the
 // moves as its ticket (ticketOf in rooms.js) and sends it with a rejoin. A room the server has forgotten is rebuilt from it
@@ -92,6 +94,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
           case "askback": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.askBack(ws.room, ws.token); return broadcast(ws.room, backMessage(r)); }
           case "backanswer": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.answerBack(ws.room, ws.token, !!m.yes); return broadcast(ws.room, backMessage(r)); }
           case "sync": { if (!ws.room) throw new RoomError("unseated", "join a room first"); return send(ws, { t: "room", room: rooms.snapshot(ws.room), resync: true }); }
+          case "call": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.call(ws.room, ws.token, String(m.kind || ""), m.data); for (const s of sockets.get(ws.room) || []) if (s.seat === r.to) send(s, { t: "call", seat: r.seat, kind: r.kind, data: r.data }); return; }
           case "shout": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.shout(ws.room, ws.token, m.id); return broadcast(ws.room, { t: "shout", ...r }); }
           case "rematch": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.rematch(ws.room, ws.token); return broadcast(ws.room, { t: "room", room: r.room, started: r.started }); }
           default: return send(ws, { t: "error", code: "bad", msg: "unknown message" });

@@ -412,6 +412,40 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 .wide #shoutMenu{left:auto;right:max(84px,calc(env(safe-area-inset-right,0px) + 84px));bottom:50%;transform:translateY(50%);width:min(32vw,320px);justify-content:flex-end}
 .wide #myBubble{right:auto;left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 118px);border-radius:14px 14px 14px 4px}
 @media (prefers-reduced-motion:reduce){#shoutMenu,#myBubble,#shoutMenu .giveup.armed{animation:none}}
+/* video and voice at the board (online only): a camera chip, the ask card, round bubbles by each name card */
+#callBtn{display:none}
+.online #callBtn{display:flex}
+@media (max-width:420px){.online .bar{gap:6px}}
+#callBtn[aria-expanded="true"],#callBtn.live{border-color:var(--brass);color:var(--brass)}
+#callBtn.asking{border-color:var(--brass);animation:callAsk 1.4s ease-in-out infinite}
+#callBtn.live{background:rgba(230,183,111,.16)}
+@keyframes callAsk{0%,100%{box-shadow:0 0 0 0 rgba(230,183,111,.0)}50%{box-shadow:0 0 0 6px rgba(230,183,111,.22)}}
+#callMenu{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 124px);display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(92vw,370px);z-index:3;animation:pop .25s ease-out}
+#callMenu .pill{background:var(--card);color:var(--fg);border-color:rgba(230,183,111,.35);font-size:13px;padding:9px 14px;box-shadow:0 8px 24px rgba(0,0,0,.45);display:inline-flex;align-items:center;gap:6px}
+#callMenu .pill:hover{border-color:var(--brass)}#callMenu .pill:active{transform:scale(.95)}
+#callMenu .pill.off{color:var(--muted);border-style:dashed}
+#callMenu .pill.end{background:rgb(84,32,15);border-color:#d67048;color:#f6d9c8}
+#callMenu .note{flex-basis:100%;text-align:center;font-size:12px;color:var(--muted);margin-top:2px}
+.wide #callMenu{left:auto;right:max(84px,calc(env(safe-area-inset-right,0px) + 84px));bottom:50%;transform:translateY(50%);width:min(32vw,320px);justify-content:flex-end}
+.cam{position:relative;flex:none;width:64px;height:64px;border-radius:50%;border:2px solid var(--brass);box-shadow:0 0 0 4px rgba(230,183,111,.14),0 8px 22px rgba(0,0,0,.55);background:#140c07;pointer-events:auto;animation:camIn .45s cubic-bezier(.3,1.4,.5,1)}
+.cam video{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block}
+.cam.me{width:48px;height:48px;border-width:1.5px;border-color:rgba(230,183,111,.7)}
+.cam.me video{transform:scaleX(-1)}
+.cam .mut{position:absolute;right:-3px;bottom:-3px;width:20px;height:20px;border-radius:50%;background:rgb(84,32,15);border:1px solid #d67048;color:#f6d9c8;display:flex;align-items:center;justify-content:center}
+.cam .mut[hidden]{display:none}
+.cam[hidden]{display:none}
+.who.me{gap:10px}
+#oppFace.voice{border-color:var(--brass);box-shadow:0 0 0 3px rgba(230,183,111,.28)}
+#oppFace.voice.speaking,.cam.speaking{box-shadow:0 0 0 5px rgba(230,183,111,.38),0 8px 22px rgba(0,0,0,.55)}
+@keyframes camIn{from{transform:scale(.4);opacity:0}to{transform:scale(1);opacity:1}}
+@media (max-width:400px){.cam{width:56px;height:56px}.cam.me{width:42px;height:42px}}
+.wide .cam{width:88px;height:88px}.wide .cam.me{width:64px;height:64px}
+.door .three{display:flex;gap:8px}
+.door .three .btn{flex:1;flex-direction:row;gap:8px;text-align:center;border-radius:999px;padding:13px 6px;font:600 14px Inter,system-ui,sans-serif}
+.door .three #callVideo{background:var(--brass);color:#1a0f07;border:0}
+.door .three #callVoice,.door .three #callNo{background:none;color:var(--brass);border:1px solid rgba(230,183,111,.5)}
+.door .three [hidden]{display:none}
+@media (prefers-reduced-motion:reduce){#callBtn.asking,.cam,#callMenu{animation:none}}
 /* with friends: the name card and the door */
 .field{width:100%;box-sizing:border-box;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:13px 14px;font:500 16px Inter,system-ui,sans-serif;color:var(--fg);outline:none;-webkit-user-select:text;user-select:text}
 .field:focus{border-color:var(--brass)}
@@ -462,7 +496,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 <canvas id="c" aria-label="Ayo board"></canvas>
 <div id="badges" aria-hidden="true"></div>
 <div id="pits" role="group" aria-label="The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back"></div>
-<div class="hud top"><div class="who"><span class="face" id="oppFace"></span><div class="col"><span class="name" id="oppName">Nnamdi · Medium</span><span class="sub" id="oppSub">waiting</span></div></div><div class="col r"><span class="score" id="oppScore">0</span><span class="lab">captured</span></div></div>
+<div class="hud top"><div class="who"><span class="cam" id="theirCam" hidden><video id="theirVideo" autoplay playsinline muted></video><i class="mut" id="theirMuted" hidden aria-label="muted"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7"/><path d="M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 10.7 5.9M12 18v3M3 3l18 18"/></svg></i></span><span class="face" id="oppFace"></span><div class="col"><span class="name" id="oppName">Nnamdi · Medium</span><span class="sub" id="oppSub">waiting</span></div></div><div class="col r"><span class="score" id="oppScore">0</span><span class="lab">captured</span></div></div>
 <div id="hint" role="status"></div>
 <div id="words"><div id="review" hidden role="group" aria-label="Mama Ngozi's review"><div class="top"><span class="face s" id="revFace" aria-hidden="true"></span><span class="col"><b>Mama Ngozi's review</b><i id="revSay" hidden></i></span></div><span id="revWords" role="status"></span><div class="btns"><button type="button" id="revPrev" aria-label="The move before">‹ Back</button><button type="button" id="revAgain" aria-label="Play it again">Again</button><button type="button" id="revNext" aria-label="The next move">Next ›</button><button type="button" id="revDone" class="done">Done</button></div></div>
 <button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
@@ -473,12 +507,15 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 <div id="bubble" hidden role="status"></div>
 <div id="myBubble" hidden role="status"></div>
 <div id="shoutMenu" hidden role="group" aria-label="Shout"></div>
-<div class="hud bottom"><div class="col"><span class="score" id="myScore">0</span><span class="lab">captured</span></div><div class="col r"><span class="name" id="meName">Meka</span><span class="sub" id="turn">your move</span></div></div>
+<div id="callMenu" hidden role="group" aria-label="Video and voice"></div>
+<div class="hud bottom"><div class="col"><span class="score" id="myScore">0</span><span class="lab">captured</span></div><div class="who me"><span class="cam me" id="myCam" hidden><video id="myVideo" autoplay playsinline muted></video><i class="mut" id="myMuted" hidden aria-label="your microphone is off"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M9 9v3a3 3 0 0 0 5.1 2.1M15 9.3V5a3 3 0 0 0-5.9-.7"/><path d="M19 11a7 7 0 0 1-1.2 3.9M5 11a7 7 0 0 0 10.7 5.9M12 18v3M3 3l18 18"/></svg></i></span><div class="col r"><span class="name" id="meName">Meka</span><span class="sub" id="turn">your move</span></div></div></div>
+<audio id="theirVoice" autoplay hidden></audio>
 <div class="bar">
   <button class="chip" id="homeBtn" aria-label="Home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 11l9-8 9 8v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/></svg></button>
   <button class="chip" id="undo" aria-label="Undo" title="Undo · U"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
   <button class="chip" id="hintBtn" aria-label="Hint" title="Hint · H"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10.5c.7.6 1 1.3 1 2.5h6c0-1.2.3-1.9 1-2.5A6 6 0 0 0 12 3z"/></svg></button>
   <button class="chip" id="shoutBtn" aria-label="Shout" aria-expanded="false" title="Say something across the board"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 5h16v10H9l-5 4V5z"/><path d="M8 10h.01M12 10h.01M16 10h.01"/></svg></button>
+  <button class="chip" id="callBtn" aria-label="Video or voice" aria-expanded="false" title="Video or voice with your friend"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="6.5" width="12.5" height="11" rx="2.5"/><path d="M15.5 10.5l5-3v9l-5-3z"/></svg></button>
   <button class="chip" id="rulesBtn" aria-label="Rules"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 16v-4M12 8h.01"/></svg></button>
   <button class="chip" id="soundBtn" aria-label="Sound" aria-pressed="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16 9a4 4 0 0 1 0 6"/></svg></button>
   <button class="chip" id="settingsBtn" aria-label="Settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -676,6 +713,13 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
   <div class="col"><span class="eyebrow">Take it back?</span><div class="who"><span class="face m" id="backFace"></span><h2 id="backTitle">Tete asks to take back their move</h2></div></div>
   <p id="backSub">Their seeds go back where they were and it is their move again. Or play on and the move stands.</p>
   <div class="two" style="gap:8px"><button class="btn ghost" id="backNo" type="button" style="flex:1">Play on</button><button class="btn" id="backYes" type="button" style="flex:1">Let them</button></div>
+</div>
+
+<!-- Video and voice: the friend asks to talk; nothing is on until you say yes -->
+<div class="card door" id="callCard" hidden role="dialog" aria-labelledby="callTitle">
+  <div class="col"><span class="eyebrow">Video and voice</span><div class="who"><span class="face m" id="callFace"></span><h2 id="callTitle">Tete would like video at the board</h2></div></div>
+  <p id="callSub">Nothing is on until you say yes. The picture and sound go straight between your two phones and are never recorded.</p>
+  <div class="three"><button class="btn ghost" id="callNo" type="button">Not now</button><button class="btn ghost" id="callVoice" type="button">Voice only</button><button class="btn" id="callVideo" type="button">Video</button></div>
 </div>
 
 <!-- Rules -->

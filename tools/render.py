@@ -39,7 +39,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online (also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -145,6 +145,7 @@ if online or legal:  # the real server on its own port, so two pages can meet at
         print("server did not start:", n.stderr.read().decode()); sys.exit(1)
     node = start_node()
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
+if online: ARGS = ARGS + ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"]  # video and voice at the board: a test camera (a moving pattern) and a tone stand in for each phone's
 def watch(pg, errors, tag=""):
     pg.on("pageerror", lambda e: errors.append(tag + str(e)))
     pg.on("console", lambda m: errors.append(tag + m.text) if m.type == "error" and "Failed to load resource" not in m.text else None)
@@ -402,7 +403,7 @@ if online:
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []
         # two phones = two browser contexts, so neither sees the other's saved seat
-        host = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=1).new_page(); watch(host, errors, "host: ")
+        host = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=1, permissions=["camera", "microphone"]).new_page(); watch(host, errors, "host: ")
         host.goto("http://127.0.0.1:8767/?capture=1&stay=home", wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
         # Home → With friends: the Rooms screen; the name is asked once ("That's me"), then a room opens and its code lands on the tiles
         host.click("#friendsBtn"); host.wait_for_selector("#rooms:not([hidden])", timeout=10000)
@@ -420,7 +421,7 @@ if online:
         # the picture for Meka: the Rooms screen with its code (the board behind it frozen)
         host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=out, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
         # the friend goes the same way: Home → With friends (their own room opens), a wrong code is refused under the field, then the real code knocks
-        friend = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1).new_page(); watch(friend, errors, "friend: ")
+        friend = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1, permissions=["camera", "microphone"]).new_page(); watch(friend, errors, "friend: ")
         friend.goto("http://127.0.0.1:8767/?capture=1&stay=home", wait_until="load"); friend.wait_for_function("window.__done===true", timeout=180000)
         friend.click("#friendsBtn"); friend.wait_for_selector("#nameCard:not([hidden])", timeout=10000); friend.fill("#nameField", "Tete"); friend.click("#nameGo")
         friend.wait_for_function("document.querySelector('#roomStatus').dataset.state==='open'", timeout=20000)
@@ -492,6 +493,48 @@ if online:
         assert friend.evaluate("window.__ayo.shout('chai')") is True, "the friend can shout back"
         host.wait_for_function("document.querySelector('#bubble').textContent==='Chai!'", timeout=10000)
         print("online: shouts went both ways")
+        # video and voice at the board: the host asks from the camera chip; nothing opens until Tete says yes; then the faces sit by the names
+        call = "window.__ayo.call"
+        for pg in (host, friend): assert pg.evaluate("getComputedStyle(document.querySelector('#callBtn')).display") != "none", "the camera chip shows online"
+        assert host.evaluate(call)["chip"] == "Video or voice with Tete"
+        if host.evaluate("window.__ayo.quality.tier.lite"):  # the lighter board offers voice only
+            host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+            assert host.evaluate(call)["menu"] == ["Voice with Tete"], host.evaluate(call)["menu"]; host.click("#callBtn")
+            print("video: the lighter board offers voice only")
+        for pg in (host, friend): pg.evaluate("window.__ayo.callLite = false")  # the check goes on as two phones on the full board
+        host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+        assert host.evaluate(call)["menu"] == ["Video with Tete", "Voice only"], host.evaluate(call)["menu"]
+        host.click("#callMenu .pill[data-id=video]")
+        friend.wait_for_selector("#callCard:not([hidden])", timeout=10000)
+        hc = host.evaluate(call); fc = friend.evaluate(call)
+        assert fc["card"] == "Meka would like video at the board" and fc["phase"] == "asked", fc
+        assert hc["phase"] == "asking" and hc["local"] == [] and fc["local"] == [], "no camera or microphone opens before both say yes"
+        assert host.evaluate("document.querySelector('#hint').textContent") == "Asked Tete to talk — waiting for their yes"
+        outv1 = out[:-4] + "-video-ask.png" if out.endswith(".png") else out + "-video-ask.png"
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=outv1, timeout=120000, animations="disabled"); friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        friend.click("#callVideo")
+        for pg in (host, friend): pg.wait_for_function("(c => c.phase==='live' && c.theirCam && c.myCam && c.playing)(window.__ayo.call)", timeout=60000)
+        hc = host.evaluate(call); fc = friend.evaluate(call)
+        assert hc["local"] == ["audio", "video"] and hc["remote"] == ["audio", "video"] and fc["remote"] == ["audio", "video"], (hc, fc)
+        assert hc["asker"] == "me" and fc["asker"] == "them" and not hc["voiceRing"]
+        assert host.evaluate("document.querySelector('#oppFace').hidden"), "their picture takes the face's place by their name"
+        print("video: live both ways ·", hc["log"], "/", fc["log"])
+        outv = out[:-4] + "-video.png" if out.endswith(".png") else out + "-video.png"
+        host.wait_for_timeout(1500); host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=outv, timeout=120000); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        # the host mutes: Tete's board shows it on the host's bubble; Tete hides the host's picture on their own phone (the voice stays)
+        host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+        assert host.evaluate(call)["menu"] == ["Mute", "Camera off", "Hide Tete's picture", "Hang up"], host.evaluate(call)["menu"]
+        host.click("#callMenu .pill[data-id=mic]")
+        friend.wait_for_function("!document.querySelector('#theirMuted').hidden", timeout=10000)
+        assert host.evaluate(call)["local"] == ["audio:off", "video"] and not host.evaluate("document.querySelector('#myMuted').hidden")
+        host.click("#callBtn")  # closes the menu
+        friend.click("#callBtn"); friend.wait_for_selector("#callMenu:not([hidden])", timeout=5000); friend.click("#callMenu .pill[data-id=theirs]")
+        fc = friend.evaluate(call); assert fc["hideTheirs"] and not fc["theirCam"] and fc["voiceRing"], fc
+        # Tete hangs up: both cameras and microphones close
+        friend.click("#callMenu .pill[data-id=end]")
+        for pg in (host, friend): pg.wait_for_function("(c => c.phase==='idle' && !c.theirCam && !c.myCam && c.local.length===0)(window.__ayo.call)", timeout=20000)
+        assert "theyended" in host.evaluate(call)["log"] and not host.evaluate("document.querySelector('#oppFace').hidden")
+        print("video: muted, picture hidden on one phone, hung up — both closed")
         out2 = out[:-4] + "-friend.png" if out.endswith(".png") else out + "-friend.png"
         friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out2, timeout=120000, animations="disabled")
         friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
@@ -545,7 +588,7 @@ if online:
         friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out5, timeout=120000, animations="disabled")
         b.close(); node.terminate()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
-    srv.shutdown(); print("wrote", out, out3, out2, out4, out6, "and", out5); sys.exit(0)
+    srv.shutdown(); print("wrote", out, out3, out2, outv1, outv, out4, out6, "and", out5); sys.exit(0)
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
     pg = b.new_page(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2 if not (wide or home) else 1, has_touch=countc)

@@ -17,6 +17,8 @@ import { parseOwned, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS, f
 import { storeView, tapAction, restoreWords } from './store.js';
 import { reviewPlan, reviewOf, summaryWords, stepWords, OPEN_LINES, CLEAN_LINE, END_LINE } from './review.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
+import { CallFlow, callWords, pickMode } from './call.js';
+import { Talk } from './talk.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
 import { sowPath, pickedHint, hintedHint, playedWords, answerOf, giftNoteWords } from './path.js';
@@ -530,7 +532,7 @@ function paintRoomStatus() { // what the room card says, from the connection and
   setRoomStatus(knocks.length ? 'door' : 'open', knocks.length ? `${knocks[0].name} is at the door` : undefined);
 }
 function stopOnline() { // leave before anyone joined (Back on the Rooms screen, or a knock the host refused): the board is yours again, no reload
-  away.back(); if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
+  callEnd(); away.back(); if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
   $('#knockCard').hidden = true; hideBackCard(); backAsk.pending = false; backAsk.askedN = -1; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
   hideExplain(); if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
 }
@@ -659,6 +661,123 @@ function showShout(seat, id) {
   }
 }
 $('#shoutBtn').addEventListener('click', () => { if (!friend) return toast('Waiting for a friend'); toggleShoutMenu(); click(1.2, 0.05); });
+// ---------- video and voice at the board (web/call.js decides when, web/talk.js connects): nothing is on until both say yes ----------
+// the picture and sound go phone to phone; the room's socket carries only the asks and the WebRTC handshake, to the friend's seat only
+const call = { f: new CallFlow(0), talk: null, log: [], remote: null, level: null, raf: 0 };
+const callMenu = $('#callMenu');
+let callLiteSet = null; const callLite = () => (callLiteSet === null ? Q.lite : callLiteSet); // the lighter board sends voice only (a render can lift that to check video)
+const callName = () => (friend ? friend.name : 'your friend');
+const callAvailable = () => Talk.available();
+function callDo(effects) {
+  for (const e of effects) {
+    if (e.send && net) net.call(e.send, e.data);
+    if (e.close) callClose();
+    if (e.media) callOpen(e.media);
+    if (e.offer && call.talk) call.talk.offer().catch(() => callDo(call.f.failed()));
+    if (e.say) callSay(e.say);
+  }
+  paintCall();
+}
+function callSay(key) {
+  call.log.push(key);
+  const w = callWords(key, callName(), call.f.theirs);
+  if (key === 'asked') { showCallCard(); knockSound(); awayNote('call', { mode: call.f.theirs }); return; }
+  $('#callCard').hidden = true;
+  if (key === 'live') { click(1.6, 0.08); setTimeout(() => click(2.1, 0.08), 120); buzz(20); toast(w); showTurn(); return; }
+  if (key === 'asking') { $('#hint').textContent = w; click(1.2, 0.06); return; }
+  if (key === 'starting') { $('#hint').textContent = w; return; }
+  if (['ended', 'theyended', 'theyleft'].includes(key)) { click(0.8, 0.08); setTimeout(() => click(0.6, 0.08), 120); }
+  if (key === 'theysaidno' || key === 'failed' || key === 'nomedia') { click(0.6, 0.08); buzz(30); }
+  toast(w, key === 'failed' || key === 'nomedia' ? 4200 : 2200); showTurn();
+}
+function callOpen(mode) {
+  if (!callAvailable()) return callDo(call.f.noMedia());
+  if (!call.talk) call.talk = new Talk({
+    send: (kind, data) => net && net.call(kind, data),
+    onRemote: (stream) => { call.remote = stream; $('#theirVideo').srcObject = stream; const a = $('#theirVoice'); a.srcObject = stream; a.play().catch(() => {}); $('#theirVideo').play().catch(() => {}); callListen(stream); paintCall(); },
+    onState: (st) => { if (st === 'connected') callDo(call.f.connected()); else if (st === 'failed') callDo(call.f.failed()); },
+  });
+  const talk = call.talk;
+  talk.open(mode).then((stream) => {
+    if (talk !== call.talk) return;
+    if (talk.mode === 'voice' && call.f.mine === 'video') { call.f.mine = 'voice'; call.f.cam = false; toast('No camera here — voice only'); } // no camera, or it was refused: voice only
+    $('#myVideo').srcObject = stream; $('#myVideo').play().catch(() => {});
+    if (net) net.call('state', { mic: call.f.mic, cam: call.f.cam });
+    callDo(call.f.mediaReady());
+  }).catch(() => { if (talk === call.talk) callDo(call.f.noMedia()); });
+}
+function callClose() {
+  if (call.talk) call.talk.close(); call.talk = null; call.remote = null; cancelAnimationFrame(call.raf); call.raf = 0;
+  if (call.level) { try { call.level.ctx.close(); } catch {} call.level = null; }
+  for (const id of ['#theirVideo', '#myVideo', '#theirVoice']) { try { $(id).srcObject = null; } catch {} }
+}
+// who is speaking: a soft brass ring on their bubble (or their face, voice only) while their sound is up
+function callListen(stream) {
+  if (call.level || !stream.getAudioTracks().length) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext; const ctx = new AC(); const src = ctx.createMediaStreamSource(stream); const an = ctx.createAnalyser(); an.fftSize = 512; src.connect(an);
+    const buf = new Uint8Array(an.fftSize); call.level = { ctx, an, buf, on: false };
+    const tick = () => {
+      if (!call.level) return; an.getByteTimeDomainData(buf); let m = 0; for (const v of buf) m = Math.max(m, Math.abs(v - 128));
+      const on = m > 10 && call.f.their.mic; if (on !== call.level.on) { call.level.on = on; $('#theirCam').classList.toggle('speaking', on); $('#oppFace').classList.toggle('speaking', on); }
+      call.raf = requestAnimationFrame(tick);
+    };
+    tick();
+  } catch {}
+}
+function showCallCard() {
+  const lighter = callLite(); const n = callName();
+  $('#callTitle').textContent = callWords('asked', n, call.f.theirs); $('#callSub').textContent = callWords('askedSub', n) + (lighter ? ' The lighter board is on, so this phone sends voice only.' : '');
+  $('#callFace').innerHTML = initialFace(n); $('#callVideo').hidden = lighter; $('#callCard').hidden = false;
+}
+function paintCall() {
+  const f = call.f; const n = callName(); const btn = $('#callBtn');
+  btn.classList.toggle('asking', f.phase === 'asking'); btn.classList.toggle('live', f.on);
+  btn.disabled = !friend; btn.setAttribute('aria-label', f.on ? `Video and voice with ${n} — mute, camera, hang up` : f.phase === 'asking' ? callWords('asking', n) : callWords('chip', n));
+  if (f.phase !== 'asked') $('#callCard').hidden = true;
+  const remoteVideo = !!(call.remote && call.remote.getVideoTracks().length);
+  const theirs = f.on && remoteVideo && f.theirs === 'video' && f.their.cam && !f.hideTheirs;
+  $('#theirCam').hidden = !theirs; $('#oppFace').hidden = theirs; $('#oppFace').classList.toggle('voice', f.on && !theirs);
+  $('#theirMuted').hidden = !(f.on && !f.their.mic);
+  const mine = f.on && call.talk && call.talk.mode === 'video' && f.cam;
+  $('#myCam').hidden = !mine; $('#myMuted').hidden = !(f.on && !f.mic);
+  if (!callMenu.hidden) fillCallMenu();
+}
+function callPill(text, fn, cls = '', label) { const b = document.createElement('button'); b.className = 'pill ' + cls; b.type = 'button'; b.textContent = text; if (label) b.setAttribute('aria-label', label); b.addEventListener('click', fn); callMenu.appendChild(b); return b; }
+function fillCallMenu() {
+  const f = call.f; const n = callName(); callMenu.textContent = '';
+  if (f.phase === 'idle') {
+    if (!callAvailable()) { const p = document.createElement('span'); p.className = 'note'; p.textContent = 'This browser cannot do video or voice'; callMenu.appendChild(p); return; }
+    if (!callLite()) callPill(callWords('askVideo', n), () => { toggleCallMenu(false); callDo(f.ask(pickMode('video', { lighter: callLite() }))); }).dataset.id = 'video';
+    callPill(callLite() ? `Voice with ${n}` : callWords('askVoice', n), () => { toggleCallMenu(false); callDo(f.ask('voice')); }).dataset.id = 'voice';
+    const p = document.createElement('span'); p.className = 'note'; p.textContent = callLite() ? 'The lighter board is on: voice only. Nothing starts until they say yes.' : 'Nothing starts until they say yes.'; callMenu.appendChild(p);
+  } else if (f.phase === 'asking') {
+    callPill(callWords('stopAsk'), () => { toggleCallMenu(false); callDo(f.cancel()); }).dataset.id = 'stop';
+  } else if (f.phase === 'asked') {
+    callPill(callWords('askVoice'), () => { toggleCallMenu(false); callDo(f.answer('voice')); });
+  } else {
+    callPill(f.mic ? 'Mute' : 'Unmute', () => { callDo(f.toggleMic()); if (call.talk) call.talk.setMic(f.mic); click(f.mic ? 1.3 : 0.8, 0.05); }, f.mic ? '' : 'off', f.mic ? 'Mute your microphone' : 'Turn your microphone back on').dataset.id = 'mic';
+    if (f.mine === 'video') callPill(f.cam ? 'Camera off' : 'Camera on', () => { callDo(f.toggleCam()); if (call.talk) call.talk.setCam(f.cam); click(f.cam ? 1.3 : 0.8, 0.05); }, f.cam ? '' : 'off').dataset.id = 'cam';
+    if (f.theirs === 'video') callPill(f.hideTheirs ? `Show ${n}'s picture` : `Hide ${n}'s picture`, () => { f.toggleTheirs(); paintCall(); click(1, 0.05); }, f.hideTheirs ? 'off' : '').dataset.id = 'theirs';
+    callPill(callWords('hangUp'), () => { toggleCallMenu(false); callDo(f.hangUp()); }, 'end').dataset.id = 'end';
+  }
+}
+function toggleCallMenu(open = callMenu.hidden) {
+  callMenu.hidden = !open; $('#callBtn').setAttribute('aria-expanded', String(open));
+  if (open) { if (!shoutMenu.hidden) toggleShoutMenu(false); fillCallMenu(); }
+}
+$('#callBtn').addEventListener('click', () => { if (!friend) return toast('Waiting for a friend'); if (call.f.phase === 'asked') return showCallCard(); toggleCallMenu(); click(1.2, 0.05); });
+$('#callNo').addEventListener('click', () => callDo(call.f.cancel()));
+$('#callVoice').addEventListener('click', () => callDo(call.f.answer('voice')));
+$('#callVideo').addEventListener('click', () => callDo(call.f.answer(pickMode('video', { lighter: callLite() }))));
+function callMessage({ kind, data }) {
+  const eff = call.f.receive(kind, data);
+  if (eff.some((e) => e.connect) && call.talk) call.talk.receive(kind, data).catch(() => callDo(call.f.failed()));
+  callDo(eff.filter((e) => !e.connect));
+}
+function callRoom() { if (call.f.phase !== 'idle' && (!friend || !friend.online)) callDo(call.f.gone()); else paintCall(); } // the friend left the board: a call cannot outlive it
+function callEnd() { if (call.f.phase !== 'idle') { const e = call.f.hangUp(); callDo(e); } callMenu.hidden = true; $('#callCard').hidden = true; }
+
 function syncRoom(room) { // the room as the server shows it: the friend's seat and the whole game
   friend = room.players[them] || null;
   const s = stateFrom(room.state);
@@ -666,7 +785,7 @@ function syncRoom(room) { // the room as the server shows it: the friend's seat 
   state = s; if (!same) layoutFromState(state);
   const ask = room.ask || null; backAsk.pending = !!(ask && ask.seat === you); if (ask && ask.seat === you) backAsk.n = backAsk.askedN = ask.n; // a rejoin sees a "take it back?" still out
   if (ask && ask.seat === them && !state.over) showBackCard(); else hideBackCard();
-  refreshStatic(); paintRules(); paintDoor(); paintRoomStatus();
+  refreshStatic(); paintRules(); paintDoor(); paintRoomStatus(); callRoom();
 }
 let moveQueue = Promise.resolve();
 function sendMove(pit) { if (busy || !net || !net.move(pit)) return; busy = true; deselect(); }
@@ -740,7 +859,7 @@ async function flyBack(b, a, played, words = null) {
   })));
   await wait(reduceMotion ? 0 : 200);
 }
-function leaveRoom() { if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
+function leaveRoom() { callEnd(); if (net) net.leave(); prefs.set('room', 'null'); location.href = location.pathname; }
 function startOnline(code, { stay = false } = {}) {
   // code: 'new' opens a room, a four-letter code knocks on one. stay: asked from the Rooms screen, which stays up (the door card over it)
   // until a friend is in; otherwise (an invite link) the board shows at once with "Joining the room…"
@@ -750,7 +869,7 @@ function startOnline(code, { stay = false } = {}) {
   let held = null; try { held = JSON.parse(prefs.get('room', 'null')); } catch {}
   let triedJoin = false, seated = false, knocking = false;
   on('joined', ({ seat, code, token, room }) => {
-    const back = seated; seated = true; you = seat; them = 1 - seat; baseTheta = seat === 1 ? Math.PI : 0; if (!back) theta = baseTheta;
+    const back = seated; seated = true; you = seat; them = 1 - seat; call.f.seat = seat; baseTheta = seat === 1 ? Math.PI : 0; if (!back) theta = baseTheta;
     prefs.set('room', JSON.stringify({ code, token }));
     if (location.search !== '?room=' + code) history.replaceState(null, '', inviteLink(code, location.pathname)); // the address becomes the invite link (a reload comes back to this seat)
     syncRoom(room); $('#gameover').hidden = !state.over; if (state.over) gameOver();
@@ -773,10 +892,12 @@ function startOnline(code, { stay = false } = {}) {
   on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
   on('ticket', ({ code, token, ticket }) => { if (code && token) prefs.set('room', JSON.stringify({ code, token, ticket })); }); // kept with the seat, so even after a reload the room can be rebuilt if the server restarted
   on('shout', ({ seat, id }) => showShout(seat, id));
+  on('call', (m) => callMessage(m));
   // the door: this phone knocked and waits for the host; or (as host) someone is knocking on ours
   on('knocked', ({ host }) => { const again = knocking; knocking = true; if (roomsShowing()) { showScreen('play'); $('#oppFace').innerHTML = initialFace(host); } showTurn(); if (!again) { toast(`Knocked — ${host} decides`); click(1.1, 0.08); } });
   on('knock', ({ name }) => { knockSound(); awayNote('knock', { name }); });
   on('error', (e) => {
+    if (e.re === 'call') { if (call.f.phase === 'asking') call.f.reset(); toast(e.msg); paintCall(); showTurn(); return; } // a call the server would not pass on (the friend away, too fast): the game is untouched
     busy = false;
     if (e.re === 'rejoin' && !triedJoin) { triedJoin = true; prefs.set('room', 'null'); return net.join(roomWanted, myName()); } // our old seat is gone: knock for the free one
     if (e.code === 'noknock' || e.code === 'host') { toast(e.msg); paintDoor(); return; } // the host answered a knock that was already gone
@@ -1290,6 +1411,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle
     if (Math.abs(to - from) > 0.01) tween(650, (t) => { theta = from + (to - from) * t; }, easeInOut);
   }
   if (which !== 'play' && !shoutMenu.hidden) toggleShoutMenu(false);
+  if (which !== 'play' && !callMenu.hidden) toggleCallMenu(false);
   if (which !== 'play') { hideExplain(); if (selected === null) clearPath(); } // their last move stays on the board only while you are at it
   if (which === 'play') blinkLoop(); else { clearTimeout(blinkTimer); if (mood !== 'calm' && mood !== 'think') react('calm'); }
   if (which === 'play' && !busy && !state.over && state.turn === you && selected === null) showTurn(); else if (!board3d) paintFeed();
@@ -1672,6 +1794,7 @@ const fingers = new Map(); let pinch = null; // two-finger zoom on the phone
 const clampDist = () => { dist = Math.min(fitDist * 1.6, Math.max(fitDist * 0.5, dist)); };
 canvas.addEventListener('pointerdown', (e) => {
   if (!shoutMenu.hidden) toggleShoutMenu(false); // a tap on the board closes the shout row
+  if (!callMenu.hidden) toggleCallMenu(false);
   fingers.set(e.pointerId, { x: e.clientX, y: e.clientY }); canvas.setPointerCapture(e.pointerId);
   if (fingers.size === 2) { const [a, b] = [...fingers.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y), dist0: dist }; down = null; dragged = true; return; }
   down = { x: e.clientX, y: e.clientY, t: theta, p: phi }; dragged = false;
@@ -1793,11 +1916,11 @@ addEventListener('keydown', (e) => {
   const t = e.target; const a = keyAction(e, { tag: t && t.tagName, editable: !!(t && t.isContentEditable), you });
   if (!a) return;
   if (a.type === 'deselect') { // Esc closes what is open, nearest first
-    if (!shoutMenu.hidden) toggleShoutMenu(false); else if (!$('#rules').hidden) $('#rules').hidden = true; else if (selected !== null && !busy) deselect(); else return;
+    if (!callMenu.hidden) toggleCallMenu(false); else if (!shoutMenu.hidden) toggleShoutMenu(false); else if (!$('#rules').hidden) $('#rules').hidden = true; else if (selected !== null && !busy) deselect(); else return;
     return e.preventDefault();
   }
   if (a.type === 'sow' && hurry.depth > 0 && hurryNow()) return e.preventDefault(); // Space / Enter while a turn plays hurries it
-  if (body.classList.contains('screen') || !$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden || !$('#backCard').hidden) return; // keys play the board, not the screens or a card
+  if (body.classList.contains('screen') || !$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden || !$('#backCard').hidden || !$('#callCard').hidden) return; // keys play the board, not the screens or a card
   if (!keysUsed) { keysUsed = true; body.classList.add('keys'); showTurn(); } // from now on the hint line talks keys and your pits' badges show their key
   e.preventDefault();
   if (a.type === 'pit') { if (canPress()) pressPit(a.pit); else click(0.5, 0.04); }
@@ -1833,7 +1956,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get frames() { const i = renderer.info; return { stats: fm.meter.stats(), verdict: fm.verdict, judged: fm.judged, said: fm.said || null, measured: prefs.get('quality.measured', null), last: parseFrames(prefs.get('frames.last', '')), note: $('#qualityNow').textContent, calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, texBytes: texBytes(), pixelRatio: PIXEL_RATIO, drawn: renderer.getPixelRatio(), lite: Q.lite }; }, framesReset: () => { fm.meter.reset(); fm.n = 0; }, get remind() { return { on: remindOn(), hour: remindHour(), supported: reminders.supported, permission: reminders.permission, log: reminders.log.slice(), pending: remindFake ? [...remindFake.pending.values()].map((n) => ({ id: n.id, title: n.title, body: n.body, at: n.schedule.at.toISOString(), extra: n.extra })) : null, asked: remindFake ? remindFake.asked.slice() : null, note: $('#remindNow').textContent, offer: $('#pzRemind').hidden ? null : $('#pzRemindWords').textContent }; }, remindTap: (id) => remindFake && remindFake.tap(id), remindSync: () => remindSync(), get telemetry() { return { on: teleOn(), recording: tele.recording, sent: teleSink ? teleSink.log.slice() : null, note: $('#teleNow').textContent }; }, get finish() { return board.finish; }, get store() { return { open: !$('#store').hidden, tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, view: storeNow }; }, get review() { return { done: review.done, seen: review.seen, total: review.total, on: review.on, k: review.k, playing: review.playing, items: review.items.map((i) => ({ index: i.index, pit: i.pit, played: i.played, gap: i.take.gap, kind: i.take.kind })), card: revBtn.hidden ? null : $('#goRevWords').textContent, locked: revBtn.classList.contains('locked'), bar: revBar.hidden ? null : $('#revWords').textContent, hint: $('#hint').textContent }; }, openReview, reviewStep, endReview, get rating() { return { ...rating }; }, get lesson() { return { on: lesson.on, k: lesson.k, phase: lesson.phase, pit: lesson.on && lesson.k < LESSON.length ? LESSON[lesson.k].pit : null, title: $('#pzAsk').textContent, top: $('#pzHow').textContent, card: $('#lsCard').hidden ? null : $('#lsWords').textContent, next: $('#lsNext').textContent, skip: $('#pzHome').textContent, kept: prefs.get('lesson', null), tutorial: prefs.get('tutorial', null) }; }, get nextUp() { return $('#goNext').hidden ? null : { text: $('#goNext').textContent, level: $('#goNext').dataset.level }; }, get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get frames() { const i = renderer.info; return { stats: fm.meter.stats(), verdict: fm.verdict, judged: fm.judged, said: fm.said || null, measured: prefs.get('quality.measured', null), last: parseFrames(prefs.get('frames.last', '')), note: $('#qualityNow').textContent, calls: i.render.calls, triangles: i.render.triangles, geometries: i.memory.geometries, textures: i.memory.textures, texBytes: texBytes(), pixelRatio: PIXEL_RATIO, drawn: renderer.getPixelRatio(), lite: Q.lite }; }, framesReset: () => { fm.meter.reset(); fm.n = 0; }, get remind() { return { on: remindOn(), hour: remindHour(), supported: reminders.supported, permission: reminders.permission, log: reminders.log.slice(), pending: remindFake ? [...remindFake.pending.values()].map((n) => ({ id: n.id, title: n.title, body: n.body, at: n.schedule.at.toISOString(), extra: n.extra })) : null, asked: remindFake ? remindFake.asked.slice() : null, note: $('#remindNow').textContent, offer: $('#pzRemind').hidden ? null : $('#pzRemindWords').textContent }; }, remindTap: (id) => remindFake && remindFake.tap(id), remindSync: () => remindSync(), get telemetry() { return { on: teleOn(), recording: tele.recording, sent: teleSink ? teleSink.log.slice() : null, note: $('#teleNow').textContent }; }, get finish() { return board.finish; }, get store() { return { open: !$('#store').hidden, tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, view: storeNow }; }, get review() { return { done: review.done, seen: review.seen, total: review.total, on: review.on, k: review.k, playing: review.playing, items: review.items.map((i) => ({ index: i.index, pit: i.pit, played: i.played, gap: i.take.gap, kind: i.take.kind })), card: revBtn.hidden ? null : $('#goRevWords').textContent, locked: revBtn.classList.contains('locked'), bar: revBar.hidden ? null : $('#revWords').textContent, hint: $('#hint').textContent }; }, openReview, reviewStep, endReview, get rating() { return { ...rating }; }, get lesson() { return { on: lesson.on, k: lesson.k, phase: lesson.phase, pit: lesson.on && lesson.k < LESSON.length ? LESSON[lesson.k].pit : null, title: $('#pzAsk').textContent, top: $('#pzHow').textContent, card: $('#lsCard').hidden ? null : $('#lsWords').textContent, next: $('#lsNext').textContent, skip: $('#pzHome').textContent, kept: prefs.get('lesson', null), tutorial: prefs.get('tutorial', null) }; }, get nextUp() { return $('#goNext').hidden ? null : { text: $('#goNext').textContent, level: $('#goNext').dataset.level }; }, get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), set callLite(v) { callLiteSet = v; }, get call() { const f = call.f, t = call.talk; const tracks = (st) => st ? st.getTracks().map((k) => k.kind + (k.enabled ? '' : ':off')).sort() : []; return { phase: f.phase, mine: f.mine, theirs: f.theirs, asker: f.asker, mic: f.mic, cam: f.cam, their: { ...f.their }, hideTheirs: f.hideTheirs, state: t ? t.state : null, mode: t ? t.mode : null, local: tracks(t && t.local), remote: tracks(call.remote), theirCam: !$('#theirCam').hidden, myCam: !$('#myCam').hidden, voiceRing: $('#oppFace').classList.contains('voice'), card: $('#callCard').hidden ? null : $('#callTitle').textContent, menu: callMenu.hidden ? null : [...callMenu.querySelectorAll('.pill')].map((b) => b.textContent), chip: $('#callBtn').getAttribute('aria-label'), log: call.log.slice(), playing: (() => { const v = $('#theirVideo'); return !!(v.srcObject && v.videoWidth > 0); })() }; }, hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
@@ -1872,7 +1995,7 @@ if (reminders.supported) { reminders.perm(false).then(() => remindSync()); docum
 // ---------- inside the store apps: the phone's back button, share sheet, haptics and keep-awake (web/app.js; nothing on the web link) ----------
 startApp(() => {
   const screen = !$('#store').hidden ? 'store' : !$('#settings').hidden ? 'settings' : !$('#rooms').hidden ? 'rooms' : !$('#puzzle').hidden ? 'puzzle' : !$('#home').hidden ? 'home' : 'play';
-  const step = backStep({ rules: !$('#rules').hidden, shouts: !shoutMenu.hidden, door: !$('#knockCard').hidden || !$('#backCard').hidden, name: !$('#nameCard').hidden, gameover: !$('#gameover').hidden, screen, online, busy });
-  if (step === 'shouts') toggleShoutMenu(false); else if (step !== 'stay' && step !== 'minimize') $('#' + step).click();
+  const step = backStep({ rules: !$('#rules').hidden, shouts: !shoutMenu.hidden || !callMenu.hidden, door: !$('#knockCard').hidden || !$('#backCard').hidden, name: !$('#nameCard').hidden, gameover: !$('#gameover').hidden, screen, online, busy });
+  if (step === 'shouts') { toggleShoutMenu(false); toggleCallMenu(false); } else if (step !== 'stay' && step !== 'minimize') $('#' + step).click();
   return step;
 });
