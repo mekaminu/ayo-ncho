@@ -439,10 +439,13 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 .wide .bar{left:auto;right:0;bottom:50%;transform:translateY(50%);flex-direction:column;padding:0 max(24px,env(safe-area-inset-right,0px)) 0 0}
 .wide #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 24px);left:50%}
 .wide #words{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 32px + max(var(--hint-h,28px),28px));flex-direction:column} /* on the Mac the words hang under the hint line, her take below their move */
-.wide #home{flex-direction:row;align-items:stretch}
-.wide #home::before{background:linear-gradient(90deg,rgba(13,9,6,.95) 0%,rgba(13,9,6,.85) 34%,rgba(13,9,6,0) 60%)}
-.wide .homeTop{align-self:flex-start;padding-top:calc(env(safe-area-inset-top,0px) + 34px)}
-.wide .homeBottom{width:min(40vw,380px);justify-content:center;padding-bottom:0}
+/* Home on a wide screen (the Fold open, the Mac): one column down the left over the dark side of the light, the board
+   free on the right. (4 Nov: on Meka's Fold open the cards sat on the right on top of the board and the left was empty.) */
+.wide #home{flex-direction:column;justify-content:flex-start;align-items:flex-start}
+.wide #home::before{background:linear-gradient(90deg,rgba(13,9,6,.96) 0%,rgba(13,9,6,.9) 38%,rgba(13,9,6,0) 62%)}
+.wide .homeTop{width:min(44vw,440px);box-sizing:border-box;padding-top:calc(env(safe-area-inset-top,0px) + 26px)}
+.wide .homeBottom{width:min(44vw,440px);box-sizing:border-box;flex:1;min-height:0;overflow-y:auto;justify-content:center;gap:10px;padding-top:14px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 18px)}
+@media (max-height:640px){.wide .homeTop{padding-top:calc(env(safe-area-inset-top,0px) + 14px)}.wide .homeBottom{gap:8px;padding-top:8px;padding-bottom:calc(env(safe-area-inset-bottom,0px) + 10px)}} /* the Fold open on its side is short: the rating and streak lines still fit */
 .wide .setBody{max-width:560px;width:100%;margin:0 auto}
 .wide #rooms{right:auto;width:min(46vw,440px);justify-content:center;gap:6px}
 .wide #rooms::before{position:fixed;inset:0;background:linear-gradient(90deg,rgba(13,9,6,.95) 0%,rgba(13,9,6,.85) 34%,rgba(13,9,6,0) 60%)}
