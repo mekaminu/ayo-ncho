@@ -108,6 +108,7 @@ function privacy(c) {
 <li>No accounts and no sign-in.</li>
 <li>No advertising, and no tracking for advertising.</li>
 <li>No analytics or crash reports today. The switch for them is already in Settings → Privacy (Share game numbers and crash reports), but nothing is recorded or sent. If the apps start sending them, this page will say so first and say what is sent; it will never include your name, your moves, a room code or anything you type, and the switch turns it off. The web link will not send them.</li>
+<li>The daily puzzle reminder (Settings → Feel, in the apps, off until you turn it on) is set on your phone and raised by your phone at the time you choose, at most once a day. Nothing about it is sent anywhere, and turning it off removes every reminder still waiting.</li>
 <li>We do not sell or rent anyone's information.</li>
 </ul>
 

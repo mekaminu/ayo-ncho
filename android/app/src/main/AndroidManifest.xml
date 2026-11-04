@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -38,4 +39,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- The daily-puzzle reminder (web/remind.js) is scheduled inexact: a reminder a few minutes late is fine, so the app never
+         asks for "Alarms & reminders" (Play reviews apps that declare exact alarms). The notifications permission itself comes
+         from the plugin and is asked only when the player switches the reminder on. -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" tools:node="remove" />
 </manifest>

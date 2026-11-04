@@ -47,6 +47,10 @@
 #        --telemetry: game numbers and crash reports (L13) — with no sink nothing is recorded; with ?telemetry=test (a sink kept in memory)
 #        a move sends game_start once, the store sends store_open, the Settings → Privacy switch off sends nothing, on again sends;
 #        the words carry nothing typed (the name, the room code); a picture of the Privacy row (out-settings.png)
+#        --remind: the daily-puzzle reminder (L14) — on the web link the switch says "in the apps" and nothing is offered; with
+#        ?remind=test (a stand-in for the apps' notifications plugin) the switch asks once and plans a week at 19:00, the time
+#        moves them, the puzzle card offers it to a phone that has it off, a tap on a reminder opens the puzzle, and a phone that
+#        says no keeps it off (pictures: <out> the puzzle card's offer, <out>-settings.png the Feel rows)
 #        --legal: Settings → the Privacy · Terms · Support links point at the server's pages and open beside the game (Settings stays);
 #                  each page is screenshot (<out> privacy, <out>-terms.png, <out>-support.png, <out>-settings.png) and must not scroll sideways
 #        --master: Home shows Papa Ike (Master) locked with the Gold mark (<out>-home.png); a tap says where he plays and does not choose him;
@@ -108,7 +112,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; story = story or reviewc; record = record or story
+out = sys.argv[1]; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -295,6 +299,61 @@ if telec:  # game numbers and crash reports (L13): nothing without a sink; with 
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("telemetry: ok · wrote", out); sys.exit(0)
+if remindc:  # the daily-puzzle reminder (L14): only in the apps; asks once; a week planned; the card's offer; a tap opens the puzzle
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        base = "http://127.0.0.1:8766/web/index.html?capture=1"
+        def fresh(q, extra=""):
+            ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2)
+            pg = ctx.new_page(); watch(pg, errors)
+            pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done');" + extra)
+            pg.goto(base + q, wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); return pg
+        rem = lambda pg: pg.evaluate("window.__ayo.remind")
+        # the web link: nothing to switch on, nothing offered
+        pg = fresh("&stay=home"); pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])")
+        r = rem(pg); assert not r["supported"] and not r["on"] and "in the apps" in r["note"], r
+        assert pg.evaluate("document.querySelector('[data-set=remind]').disabled") and pg.evaluate("document.querySelector('#remindTimeRow').hidden")
+        pg.context.close()
+        # the app (stand-in plugin): the switch asks once and plans the week
+        pg = fresh("&stay=home&remind=test"); pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])")
+        r = rem(pg); assert r["supported"] and not r["on"] and r["asked"] == [] and r["pending"] == [], ("nothing until switched on", r)
+        pg.locator("[data-set=remind]").scroll_into_view_if_needed(); pg.click("[data-set=remind]")
+        pg.wait_for_function("window.__ayo.remind.pending.length >= 6", timeout=10000); r = rem(pg)
+        assert r["on"] and r["asked"] == ["granted"] and r["permission"] == "granted", r
+        assert len(r["pending"]) <= 7 and all(n["at"][11:16] == "19:00" for n in r["pending"]), r["pending"]
+        assert len({n["at"][:10] for n in r["pending"]}) == len(r["pending"]), "one a day"
+        for n in r["pending"]:
+            assert n["body"].startswith("Capture ") and "Nchò rules" in n["body"] and n["title"].startswith("Daily puzzle · "), n
+        pg.click("[data-set=remindAt] [data-v='9']"); pg.wait_for_timeout(300); r = rem(pg)
+        assert r["hour"] == 9 and all(n["at"][11:16] == "09:00" for n in r["pending"]) and r["asked"] == ["granted"], r
+        assert pg.evaluate("localStorage.getItem('ayo.remindAt')") == "9"
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("Settings scrolls sideways", W)
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(200); pg.screenshot(path=out.replace(".png", "-settings.png"), animations="disabled")
+        pg.evaluate("window.__freeze=false"); pg.click("[data-set=remind]"); pg.wait_for_timeout(300); r = rem(pg)
+        assert not r["on"] and r["pending"] == [], ("off cancels every one", r)
+        pg.context.close()
+        # the puzzle card offers it; a tap turns it on, and today's reminder goes once the puzzle is played
+        pg = fresh("&puzzle=1&remind=test"); pz = pg.evaluate("window.__ayo.puzzle")
+        tap(pg, pz["answer"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+        r = rem(pg); assert r["offer"] == "Remind me each day at 19:00", r
+        pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(200); pg.screenshot(path=out, animations="disabled"); pg.evaluate("window.__freeze=false; requestAnimationFrame(() => 0)")
+        pg.click("#pzRemind"); pg.wait_for_function("window.__ayo.remind.pending && window.__ayo.remind.pending.length >= 6", timeout=10000); r = rem(pg)
+        assert r["on"] and pz["key"] not in [n["extra"]["puzzle"] for n in r["pending"]], ("none today: it is played", r)
+        assert "Reminder on" in pg.evaluate("document.querySelector('#pzRemindWords').textContent")
+        # a tap on tomorrow's reminder from Home opens the puzzle
+        pg.click("#pzHome"); pg.wait_for_selector("#home:not([hidden])", timeout=10000)
+        pg.evaluate("window.__ayo.remindTap(%d)" % r["pending"][0]["id"]); pg.wait_for_selector("#puzzle:not([hidden])", timeout=10000)
+        assert pg.evaluate("window.__ayo.puzzle.on")
+        pg.context.close()
+        # a phone that says no: the switch stays off, the note says where to turn them on, never asked again
+        pg = fresh("&stay=home&remind=test&remindAnswer=denied"); pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])")
+        pg.locator("[data-set=remind]").scroll_into_view_if_needed(); pg.click("[data-set=remind]"); pg.wait_for_timeout(500); r = rem(pg)
+        assert not r["on"] and r["pending"] == [] and r["asked"] == ["denied"] and "phone's settings" in r["note"], r
+        assert pg.evaluate("document.querySelector('[data-set=remind]').getAttribute('aria-checked')") == "false"
+        pg.click("[data-set=remind]"); pg.wait_for_timeout(500); assert rem(pg)["asked"] == ["denied"], "not asked again"
+        pg.context.close(); b.close()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("remind: ok · wrote", out); sys.exit(0)
 if legal:  # privacy, terms and support: Settings links to the server's pages, which open beside the game and read well on a phone
     import atexit; atexit.register(lambda: node.terminate())
     with sync_playwright() as p:

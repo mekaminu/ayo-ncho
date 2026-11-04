@@ -159,6 +159,10 @@ button{font-family:inherit}
 .pzCard .two .btn{flex:1;flex-direction:row;padding:12px;font-size:14px;text-align:center}
 #pzHome{align-self:center;font-size:13px}
 .pzShow{color:var(--brass);font-size:13px;padding:4px 8px 0;margin-top:-4px}
+.pzRemind{color:var(--brass);font-size:13px;padding:4px 8px 0;margin-top:-4px;display:flex;align-items:center;justify-content:center;gap:6px}
+.pzRemind.on{animation:pzRing .5s ease-out}
+@keyframes pzRing{0%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(7deg)}60%{transform:rotate(-4deg)}80%{transform:rotate(2deg)}100%{transform:rotate(0)}}
+#remindTimeRow.off{opacity:.45}
 .pzShow .face.s{width:22px;height:22px;border:1px solid rgba(230,183,111,.5)}
 .pzBadge.shown{color:var(--fg);background:var(--soft);border-color:var(--line)}
 .puzzle #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 200px)}
@@ -215,7 +219,7 @@ button{font-family:inherit}
 .wide #store::before{position:fixed;inset:0;background:linear-gradient(90deg,rgba(13,9,6,.96) 0%,rgba(13,9,6,.9) 34%,rgba(13,9,6,0) 58%)}
 .wide .storeHead{padding-top:calc(env(safe-area-inset-top,0px) + 26px)}
 .wide .storeBody{max-height:none;flex:1;padding-bottom:24px}
-@media (prefers-reduced-motion:reduce){.pzCard,.pzRow span{animation:none}}
+@media (prefers-reduced-motion:reduce){.pzCard,.pzRow span,.pzRemind.on{animation:none}}
 /* the first game's lesson, in the puzzle's frame */
 .lsCard{gap:12px}
 .lsWords{margin:0;font-size:15px;line-height:1.45}
@@ -543,6 +547,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
       <div class="pzRow" id="pzRow" aria-label="8 of 8 seeds">●●●●●●●●</div>
       <div class="mini two2"><div><span>Your best today</span><b id="pzBest">8 of 8</b></div><div><span>Days solved</span><b id="pzRun">none yet</b></div></div>
       <div class="two"><button class="btn" id="pzShare" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button><button class="btn ghost" id="pzAgain" type="button">Try again</button></div>
+      <button class="btn quiet pzRemind" id="pzRemind" type="button" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span id="pzRemindWords">Remind me each day at 19:00</span></button>
       <button class="btn quiet pzShow" id="pzShow" type="button" hidden><span class="face s" data-face="hard"></span>Show me the move</button>
     </div>
     <!-- the first game's lesson (web/lesson.js) plays in this frame: what just happened, and Next -->
@@ -599,6 +604,8 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
         <div class="row"><div class="t"><b>Warn what it leaves open</b><span>with the marks: after your first tap, an ember ring round each pit their best answer could take, and how many seeds, before you sow</span></div><button class="sw" role="switch" data-set="answer" aria-checked="true" aria-label="Warn what it leaves open"><i></i></button></div>
         <div class="row"><div class="t"><b>Mama Ngozi's take</b><span>after your move against the computer, if a clearly better pit was there she says which one under the board; tap it to see that move play through</span></div><button class="sw" role="switch" data-set="take" aria-checked="true" aria-label="Mama Ngozi's take"><i></i></button></div>
         <div class="row"><div class="t"><b>Keep the screen on</b><span>while a game is in play the phone never goes dark; it may sleep after 3 minutes with nobody touching it (10 while a friend thinks)<em id="wakeNow"></em></span></div><button class="sw" role="switch" data-set="wake" aria-checked="true" aria-label="Keep the screen on"><i></i></button></div>
+        <div class="row"><div class="t"><b>Daily puzzle reminder</b><span>the phone tells you once a day when a new puzzle is waiting, and never on a day you have played it<em id="remindNow"></em></span></div><button class="sw" role="switch" data-set="remind" aria-checked="false" aria-label="Daily puzzle reminder"><i></i></button></div>
+        <div class="row" id="remindTimeRow"><div class="t"><b>Remind me at</b><span>the phone's own clock</span></div><div class="seg" data-set="remindAt"><button class="segbtn" data-v="9">9:00</button><button class="segbtn" data-v="13">13:00</button><button class="segbtn" data-v="19">19:00</button></div></div>
         <div class="row"><div class="t"><b>Sowing speed</b><span>how fast the hand moves</span></div><div class="seg" data-set="speed"><button class="segbtn" data-v="slow">Slow</button><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="fast">Fast</button></div></div>
         <div class="row"><div class="t"><b>Lighter board</b><span>for slow phones and weak signal · <em id="qualityNow">auto</em></span></div><div class="seg" data-set="quality"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="lite">On</button><button class="segbtn" data-v="full">Off</button></div></div>
         <div class="row"><div class="t"><b>Seed physics</b><span>seeds bounce and roll; off, they fly straight to their pit · <em id="physicsNow">auto</em></span></div><div class="seg" data-set="physics"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="on">On</button><button class="segbtn" data-v="off">Off</button></div></div>

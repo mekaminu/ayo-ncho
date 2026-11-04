@@ -27,6 +27,10 @@
       "insetsHandling": "native",
       "style": "DARK",
       "initialViewportFitValueHint": "cover"
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_ayo",
+      "iconColor": "#C9A15A"
     }
   }
 }
