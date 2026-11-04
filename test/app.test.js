@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { build, appHtml, THREE_CDN, FONTS } from "../tools/build-app.js";
-import { inApp, plugin, wsUrl, publicBase, linkable, hapticPlan, hapticCall, haptic, installShare, installWake, backStep, startApp, SERVER } from "../web/app.js";
+import { inApp, platform, plugin, wsUrl, publicBase, linkable, hapticPlan, hapticCall, haptic, installShare, installWake, backStep, startApp, SERVER } from "../web/app.js";
 import { supported as wakeSupported } from "../web/wake.js";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -114,4 +114,64 @@ test("in the app, start wires the back button, the share sheet and keep-awake", 
   assert.equal(startApp(() => step, w), true);
   assert.equal(typeof w.navigator.share, "function"); assert.ok(wakeSupported(w.navigator));
   back(); assert.equal(minimized, 1); step = "homeBtn"; back(); assert.equal(minimized, 1);
+});
+
+// ---------- the iPhone and iPad app (L4) ----------
+const png = (f) => { const b = readFileSync(path.join(ROOT, f)); return { w: b.readUInt32BE(16), h: b.readUInt32BE(20), colour: b[25], b }; };
+
+test("the iPhone and iPad app is set up as planned: same id and name, iPhone and iPad, iOS 15+, dark, no encryption to declare", () => {
+  const cfg = JSON.parse(readFileSync(path.join(ROOT, "capacitor.config.json"), "utf8"));
+  assert.equal(cfg.ios.backgroundColor, "#0d0906"); assert.equal(cfg.ios.contentInset, "never");   // under the notch: the page uses the safe areas
+  assert.equal(cfg.ios.scrollEnabled, false); assert.equal(cfg.ios.allowsLinkPreview, false);        // no rubber-band page, no link preview on a long press
+  const pbx = readFileSync(path.join(ROOT, "ios/App/App.xcodeproj/project.pbxproj"), "utf8");
+  const ids = [...pbx.matchAll(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)].map((m) => m[1]);
+  assert.ok(ids.length >= 2 && ids.every((i) => i === cfg.appId), "every build of the app is com.mekaminu.ayoncho");
+  assert.ok([...pbx.matchAll(/TARGETED_DEVICE_FAMILY = "([^"]+)";/g)].every((m) => m[1] === "1,2"), "iPhone and iPad");
+  assert.ok([...pbx.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([\d.]+);/g)].every((m) => +m[1] >= 15));
+  const plist = readFileSync(path.join(ROOT, "ios/App/App/Info.plist"), "utf8");
+  const key = (k) => { const m = plist.match(new RegExp(`<key>${k}</key>\\s*<([a-z]+)>?([^<]*)`)); return m && (m[1] === "string" ? m[2] : m[1]); };
+  assert.equal(key("CFBundleDisplayName"), "Ayo &amp; Nchò");
+  assert.equal(key("ITSAppUsesNonExemptEncryption"), "false");            // only HTTPS: no export paperwork in App Store Connect
+  assert.equal(key("UIStatusBarStyle"), "UIStatusBarStyleLightContent");    // light icons on the dark wood
+  assert.equal(key("LSApplicationCategoryType"), "public.app-category.board-games");
+  assert.ok(!plist.includes("armv7"), "no 32-bit requirement (Apple has refused armv7 builds for years)");
+  assert.match(plist, /UISupportedInterfaceOrientations~ipad/);
+  const launch = readFileSync(path.join(ROOT, "ios/App/App/Base.lproj/LaunchScreen.storyboard"), "utf8");
+  assert.match(launch, /red="0\.0509\d*" green="0\.0352\d*" blue="0\.0235\d*"/); assert.ok(!launch.includes("systemBackgroundColor"), "never a white launch screen");
+});
+
+test("the iPhone app's icon is 1024 with no transparency, and the splash is the board on the dark wood", () => {
+  const icon = png("ios/App/App/Assets.xcassets/AppIcon.appiconset/AppIcon-512@2x.png");
+  assert.equal(icon.w, 1024); assert.equal(icon.h, 1024);
+  assert.equal(icon.colour, 2, "RGB with no alpha channel: App Store Connect refuses an icon with one");
+  const set = JSON.parse(readFileSync(path.join(ROOT, "ios/App/App/Assets.xcassets/AppIcon.appiconset/Contents.json"), "utf8"));
+  assert.deepEqual(set.images.map((i) => [i.filename, i.size]), [["AppIcon-512@2x.png", "1024x1024"]]);
+  for (const f of ["splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"]) {
+    const s = png("ios/App/App/Assets.xcassets/Splash.imageset/" + f); assert.equal(s.w, 2732); assert.equal(s.h, 2732); assert.equal(s.colour, 2);
+  }
+});
+
+test("every app plugin is in the iPhone app's Swift package, so Xcode builds them all", () => {
+  const pkg = JSON.parse(readFileSync(path.join(ROOT, "package.json"), "utf8"));
+  const swift = readFileSync(path.join(ROOT, "ios/App/CapApp-SPM/Package.swift"), "utf8");
+  const plugins = Object.keys(pkg.devDependencies).filter((n) => /^@capacitor(-community)?\//.test(n) && !/\/(core|cli|android|ios)$/.test(n));
+  assert.ok(plugins.length >= 5);
+  for (const n of plugins) assert.ok(swift.includes(`node_modules/${n}"`), `${n} is in Package.swift (run npx cap sync ios)`);
+  assert.match(swift, /capacitor-swift-pm\.git", exact: "8\./);
+  assert.equal(pkg.devDependencies["@capacitor/ios"].replace(/^\^/, "").split(".")[0], pkg.devDependencies["@capacitor/android"].replace(/^\^/, "").split(".")[0]);
+});
+
+test("on the iPhone the page knows it, nothing waits for a back button, and keep-awake comes from the app", async () => {
+  assert.equal(platform(web), "web");
+  const listened = []; const log = [];
+  const w = appWin({ App: { addListener: (e) => { listened.push(e); } }, Share: { share: async () => {} }, KeepAwake: { keepAwake: async () => log.push("awake"), allowSleep: async () => log.push("sleep") } });
+  w.Capacitor.getPlatform = () => "ios"; const classes = []; w.document.documentElement.classList.add = (...c) => classes.push(...c);
+  // iOS's WKWebView may offer a wake lock that does nothing inside an app (before iOS 18.4): the app's own is used instead
+  w.navigator.wakeLock = { request: async () => { throw new Error("not in an app"); } };
+  assert.equal(platform(w), "ios");
+  assert.equal(startApp(() => "minimize", w), true);
+  assert.deepEqual(classes, ["app", "ios"]); assert.deepEqual(listened, [], "an iPhone has no back button");
+  const s = await w.navigator.wakeLock.request("screen"); await s.release(); assert.deepEqual(log, ["awake", "sleep"]);
+  assert.equal(typeof w.navigator.share, "function");
+  w.Capacitor.getPlatform = () => "android"; assert.equal(platform(w), "android");
 });

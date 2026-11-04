@@ -1,9 +1,12 @@
-"""The Android app's icons and splash, from web/icon.svg (the web link's icon), so the app never shows Capacitor's own.
+"""The Android and iPhone apps' icons and splash, from web/icon.svg (the web link's icon), so the app never shows Capacitor's own.
 Run: python3 tools/app-icons.py   (L6 will replace icon.svg with one cut from the 3D render; run this again then.)
   - mipmap-*/ic_launcher.png, ic_launcher_round.png: the whole icon (legacy launchers)
   - mipmap-*/ic_launcher_foreground.png: the board alone on transparent, inside the adaptive icon's safe circle,
     over the dark background colour (values/ic_launcher_background.xml)
   - drawable*/splash.png: the board small in the middle of the dark lamp-lit wood colour
+  - iOS: AppIcon.appiconset/AppIcon-512@2x.png, the whole icon at 1024 with no transparency (Apple refuses an icon with
+    an alpha channel; iOS rounds the corners itself), and Splash.imageset's three 2732 squares, the board small in the
+    middle (the launch screen fills the screen with the square, so the board is drawn smaller than on Android)
 """
 import io, pathlib, re
 from PIL import Image
@@ -11,6 +14,7 @@ from playwright.sync_api import sync_playwright
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 RES = ROOT / 'android/app/src/main/res'
+IOS = ROOT / 'ios/App/App/Assets.xcassets'
 DARK = (13, 9, 6, 255)
 DENS = {'mdpi': 1, 'hdpi': 1.5, 'xhdpi': 2, 'xxhdpi': 3, 'xxxhdpi': 4}
 SPLASH = {'mdpi': (320, 480), 'hdpi': (480, 800), 'xhdpi': (720, 1280), 'xxhdpi': (960, 1600), 'xxxhdpi': (1280, 1920)}
@@ -43,8 +47,12 @@ def main():
     for d, (w, h) in SPLASH.items():
         splash(w, h, RES / f'drawable-port-{d}/splash.png'); splash(h, w, RES / f'drawable-land-{d}/splash.png')
     splash(480, 320, RES / 'drawable/splash.png')
+    flat = Image.new('RGBA', (1024, 1024), DARK); flat.alpha_composite(whole); flat.convert('RGB').save(IOS / 'AppIcon.appiconset/AppIcon-512@2x.png')
+    sq = Image.new('RGBA', (2732, 2732), DARK); s = round(2732 * 0.24)
+    sq.alpha_composite(board_only.resize((s, s), Image.LANCZOS), ((2732 - s) // 2, (2732 - s) // 2)); sq = sq.convert('RGB')
+    for n in ('splash-2732x2732.png', 'splash-2732x2732-1.png', 'splash-2732x2732-2.png'): sq.save(IOS / 'Splash.imageset' / n, optimize=True)
     (RES / 'values/ic_launcher_background.xml').write_text('<?xml version="1.0" encoding="utf-8"?>\n<resources>\n    <color name="ic_launcher_background">#0D0906</color>\n</resources>\n')
-    print('icons and splash written under', RES.relative_to(ROOT))
+    print('icons and splash written under', RES.relative_to(ROOT), 'and', IOS.relative_to(ROOT))
 
 if __name__ == '__main__':
     main()

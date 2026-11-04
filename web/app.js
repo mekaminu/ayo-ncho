@@ -1,9 +1,11 @@
-// The store apps (Capacitor): the same web files inside an Android (and later iPhone) app, opened from the phone itself with
+// The store apps (Capacitor): the same web files inside the Android and the iPhone / iPad app, opened from the phone itself with
 // no signal. Everything here is a no-op on the web link, so the browser game is unchanged. Inside the app:
 //   - online rooms talk to the live server (the app's own address is https://localhost, which has no rooms), and invite
 //     links point at the web link so a friend without the app can still open them;
 //   - the phone's own haptics, share sheet and keep-awake stand in for navigator.vibrate / navigator.share / the screen wake
-//     lock, which Android's WebView lacks or does poorly; the rest of the game calls the web APIs as before;
+//     lock, which Android's WebView and iOS's WKWebView lack or do poorly (iOS has no navigator.vibrate at all, and its
+//     wake lock did nothing inside apps before iOS 18.4); the rest of the game calls the web APIs as before;
+//   - the page is marked html.app plus html.ios / html.android, for the few things that differ;
 //   - the Android back button steps back the way the screens' own Back buttons do, and on Home puts the app away.
 // The native plugins are reached through window.Capacitor.Plugins (registered by the app itself), so no bundler is needed.
 
@@ -12,6 +14,12 @@ export const SERVER = 'https://ayo-ncho.onrender.com';
 export function inApp(w = globalThis) {
   const C = w && w.Capacitor;
   return !!(C && typeof C.isNativePlatform === 'function' && C.isNativePlatform());
+}
+// 'ios' | 'android' inside the app, 'web' on the web link.
+export function platform(w = globalThis) {
+  if (!inApp(w)) return 'web';
+  const p = typeof w.Capacitor.getPlatform === 'function' ? w.Capacitor.getPlatform() : '';
+  return p === 'ios' || p === 'android' ? p : 'android';
 }
 export function plugin(name, w = globalThis) { return (inApp(w) && w.Capacitor.Plugins && w.Capacitor.Plugins[name]) || null; }
 
@@ -93,11 +101,12 @@ export function backStep(ui) {
 // Wire it all up once, at start. `onBack` gets the step to take.
 export function startApp(onBack, w = globalThis) {
   if (!inApp(w)) return false;
-  w.document && w.document.documentElement.classList.add('app');
+  w.document && w.document.documentElement.classList.add('app', platform(w));
   installShare(w.navigator, plugin('Share', w));
-  if (!(w.navigator.wakeLock && typeof w.navigator.wakeLock.request === 'function')) installWake(w.navigator, plugin('KeepAwake', w));
-  const A = plugin('App', w);
-  if (A && A.addListener) A.addListener('backButton', () => { const step = onBack(); if (step === 'minimize' && A.minimizeApp) A.minimizeApp(); });
+  // The app's keep-awake whenever it is there: a WebView's own wake lock may exist yet do nothing (iOS before 18.4).
+  installWake(w.navigator, plugin('KeepAwake', w));
+  const A = plugin('App', w);   // the back button is Android's; iPhones have none, so nothing listens there
+  if (A && A.addListener && platform(w) === 'android') A.addListener('backButton', () => { const step = onBack(); if (step === 'minimize' && A.minimizeApp) A.minimizeApp(); });
   const S = plugin('SplashScreen', w); if (S && S.hide) setTimeout(() => S.hide({ fadeOutDuration: 250 }), 0);
   return true;
 }

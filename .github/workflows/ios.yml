@@ -1,0 +1,24 @@
+# The iPhone and iPad app: does it still compile? Run by hand only (Actions → ios → Run workflow), because macOS minutes
+# cost ten times Linux ones once the repo is private. It builds the app's web files, syncs them into ios/ and compiles the
+# app for the iOS Simulator with no signing (signing and TestFlight happen in Xcode on Meka's Mac: docs/launch/apps.md).
+name: ios
+on: workflow_dispatch
+jobs:
+  compile:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - uses: maxim-lobanov/setup-xcode@v1
+        with: { xcode-version: latest-stable }   # Capacitor 8 needs Xcode 26
+      - run: npm ci || npm install
+      - run: node tools/build-app.js
+      - run: npx cap sync ios
+      - run: xcodebuild -version && xcodebuild -list -project ios/App/App.xcodeproj
+      - run: >
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug
+          -destination 'generic/platform=iOS Simulator' -derivedDataPath build
+          CODE_SIGNING_ALLOWED=NO build
+      - run: test -d build/Build/Products/Debug-iphonesimulator/App.app && ls build/Build/Products/Debug-iphonesimulator/App.app/public | head
