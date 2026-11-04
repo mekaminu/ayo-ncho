@@ -1,0 +1,160 @@
+{
+  "date": "2026-11-04",
+  "throttle": 4.0,
+  "moves": {
+    "lite": 3,
+    "full": 1
+  },
+  "drawscale": 0.25,
+  "viewport": "390x844 @2x, touch",
+  "renderer": "headless Chromium, SwiftShader (software WebGL): render and gap_ms are the container's software drawing, not a phone's GPU; logic_ms and the scene are what is judged",
+  "budget": {
+    "logic_p95_ms": 4.0,
+    "logic_p50_ms": 2.0,
+    "calls": 140,
+    "triangles": 150000,
+    "tex_mb": 8.0,
+    "pixel_ratio": 1.0,
+    "lite_vs_full_triangles": 0.6,
+    "lite_vs_full_tex": 0.5
+  },
+  "lite": {
+    "lite": true,
+    "moves": 6,
+    "seconds": 77.6,
+    "frames": 183,
+    "worked": 224,
+    "logic_ms": {
+      "p50": 0.4,
+      "p95": 3,
+      "max": 6.9,
+      "frames": 224
+    },
+    "work_ms": {
+      "p50": 5.9,
+      "p95": 14.9,
+      "max": 1211.4
+    },
+    "gap_ms": {
+      "p50": 300,
+      "p75": 316.7,
+      "p95": 366.7,
+      "max": 383.4
+    },
+    "fps_here": 4,
+    "calls": 112,
+    "triangles": 95056,
+    "geometries": 23,
+    "textures": 6,
+    "tex_mb": 5.8,
+    "pixel_ratio": 1,
+    "drawn_ratio": 0.25,
+    "parts_ms": {
+      "tweens": {
+        "mean": 0.23,
+        "max": 4.9
+      },
+      "physics": {
+        "mean": 0.05,
+        "max": 2
+      },
+      "place": {
+        "mean": 0.48,
+        "max": 6.8
+      },
+      "render": {
+        "mean": 15.3,
+        "max": 1210
+      }
+    }
+  },
+  "full": {
+    "lite": false,
+    "moves": 2,
+    "seconds": 247.3,
+    "frames": 47,
+    "worked": 231,
+    "logic_ms": {
+      "p50": 0.7,
+      "p95": 5.1,
+      "max": 16.2,
+      "frames": 232
+    },
+    "work_ms": {
+      "p50": 7.1,
+      "p95": 18.7,
+      "max": 3239.3
+    },
+    "gap_ms": {
+      "p50": 33.3,
+      "p75": 49.9,
+      "p95": 133.3,
+      "max": 216.7
+    },
+    "fps_here": 23,
+    "calls": 114,
+    "triangles": 317176,
+    "geometries": 22,
+    "textures": 6,
+    "tex_mb": 23.0,
+    "pixel_ratio": 1.5,
+    "drawn_ratio": 0.375,
+    "parts_ms": {
+      "tweens": {
+        "mean": 0.08,
+        "max": 3
+      },
+      "physics": {
+        "mean": 1.06,
+        "max": 16.1
+      },
+      "place": {
+        "mean": 0.33,
+        "max": 4.5
+      },
+      "render": {
+        "mean": 33.65,
+        "max": 3238.3
+      }
+    }
+  },
+  "checks": [
+    {
+      "name": "lighter: the page's logic a frame at 4× slower CPU, 95th percentile ≤ 4 ms",
+      "ok": true
+    },
+    {
+      "name": "lighter: the page's logic a frame at 4× slower CPU, median ≤ 2 ms",
+      "ok": true
+    },
+    {
+      "name": "lighter: draw calls a frame ≤ 140",
+      "ok": true
+    },
+    {
+      "name": "lighter: triangles a frame ≤ 150000",
+      "ok": true
+    },
+    {
+      "name": "lighter: textures ≤ 8 MB",
+      "ok": true
+    },
+    {
+      "name": "lighter: pixel ratio 1",
+      "ok": true
+    },
+    {
+      "name": "lighter: triangles ≤ 60% of the full board's",
+      "ok": true
+    },
+    {
+      "name": "lighter: textures ≤ 50% of the full board's",
+      "ok": true
+    },
+    {
+      "name": "enough moving frames measured (lighter ≥ 150, full ≥ 20)",
+      "ok": true
+    }
+  ],
+  "pass": true
+}

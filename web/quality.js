@@ -7,7 +7,8 @@
 
 export const SLOW_NETWORKS = ['slow-2g', '2g', '3g'];
 
-// env: { saveData, effectiveType, deviceMemory, cores, pref, param }
+// env: { saveData, effectiveType, deviceMemory, cores, pref, param, measured }
+//   measured: 'slow' once this phone has been seen drawing the full board slowly on Auto (web/frametime.js)
 //   pref:  'auto' | 'lite' | 'full'  (Settings → Feel → Lighter board)
 //   param: the ?lite= URL value, if any (for renders and tests)
 // Returns { lite: boolean, reason: string }.
@@ -18,16 +19,17 @@ export function decideQuality(env = {}) {
   if (env.pref === 'full') return { lite: false, reason: 'chosen in Settings' };
   if (env.saveData) return { lite: true, reason: 'data saver is on' };
   if (env.effectiveType && SLOW_NETWORKS.includes(String(env.effectiveType).toLowerCase())) return { lite: true, reason: 'slow connection' };
+  if (env.measured === 'slow') return { lite: true, reason: 'this phone drew the full board slowly' };
   if (typeof env.deviceMemory === 'number' && env.deviceMemory <= 2) return { lite: true, reason: 'small phone memory' };
   if (typeof env.cores === 'number' && env.cores <= 2) return { lite: true, reason: 'slow phone' };
   return { lite: false, reason: 'auto' };
 }
 
 // Read the browser's signals (safe where any of them is missing).
-export function browserEnv(pref, param) {
+export function browserEnv(pref, param, measured) {
   const nav = typeof navigator !== 'undefined' ? navigator : {};
   const c = nav.connection || nav.mozConnection || nav.webkitConnection || {};
-  return { saveData: !!c.saveData, effectiveType: c.effectiveType, deviceMemory: nav.deviceMemory, cores: nav.hardwareConcurrency, pref, param };
+  return { saveData: !!c.saveData, effectiveType: c.effectiveType, deviceMemory: nav.deviceMemory, cores: nav.hardwareConcurrency, pref, param, measured };
 }
 
 // Seed physics: the falling, bouncing, rolling seeds — or, on the weakest phones, a plain flight from hand to pit
