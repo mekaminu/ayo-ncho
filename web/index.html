@@ -151,7 +151,8 @@ button{font-family:inherit}
 .pzBig small{font-size:18px;color:var(--muted);font-weight:700}
 .pzBadge{font-size:13px;font-weight:600;color:var(--brass);background:rgba(230,183,111,.14);border:1px solid rgba(230,183,111,.4);border-radius:999px;padding:6px 12px;white-space:nowrap}
 .pzBadge.miss{color:var(--muted);background:var(--soft);border-color:var(--line)}
-.pzRow{display:flex;gap:4px;font-size:18px;letter-spacing:2px;color:var(--brass);line-height:1}
+.pzRow{display:flex;flex-wrap:wrap;gap:4px;font-size:18px;letter-spacing:2px;color:var(--brass);line-height:1}
+.pzRow:has(span:nth-child(11)){font-size:14px;gap:3px;letter-spacing:0} /* a big target (up to 16 seeds) keeps to one row on the Fold folded */
 .pzRow span{animation:seedIn .35s cubic-bezier(.3,1.4,.5,1) backwards}
 .pzRow span.o{color:rgba(230,183,111,.45)}
 @keyframes seedIn{from{opacity:0;transform:translateY(6px) scale(.6)}to{opacity:1;transform:none}}

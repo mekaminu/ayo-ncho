@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- Google Play's feature graphic (L15), drawn by the game's own board.js, slots.js and textures.js: the whole carved board lying
+     across the picture under the warm lamp, four Job's tears poured in every pit as at the start of a game (a few already in the
+     troughs), the name set on the dark wood to its left. tools/store-shots.py opens this page in headless Chromium at 1024 × 500
+     (device scale 2, then cut down to 1024 × 500), waits for window.__done and screenshots it. Nothing here is the store's
+     artwork: it is the board as the game draws it. ?finish=mahogany|iroko|ebony|bronze|grandpa, ?seeds=jobs|stones|cowries|kernels -->
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Fraunces;font-weight:600;src:url(/node_modules/@fontsource/fraunces/files/fraunces-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:Inter;font-weight:500;src:url(/node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2) format('woff2')}
+html,body{margin:0;background:#0d0906;overflow:hidden;width:1024px;height:500px}
+canvas{display:block;position:absolute;inset:0;width:1024px;height:500px}
+#name{position:absolute;left:64px;top:50%;transform:translateY(-54%);color:#f1e6d2;text-shadow:0 2px 18px rgba(0,0,0,.8)}
+#name h1{font:600 64px/1 Fraunces,serif;margin:0;letter-spacing:-.01em}
+#name p{font:500 21px/1.3 Inter,sans-serif;margin:14px 0 0;color:#e6b76f;letter-spacing:.06em;text-transform:uppercase}
+#shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(13,9,6,.92) 0%,rgba(13,9,6,.6) 30%,rgba(13,9,6,0) 52%)}
+</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<div id="shade"></div><div id="name"><h1>Ayo &amp; Nchò</h1><p>Nigerian mancala in 3D</p></div>
+<script type="module">
+{ let s = 20261104; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; } // the same picture every run
+const THREE = await import('three');
+const { buildBoard, buildTable, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, BT, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D } = await import('/web/board.js');
+const { pour, place } = await import('/web/slots.js');
+const q = new URLSearchParams(location.search); const FINISH = q.get('finish') || 'mahogany', SET_ID = q.get('seeds') || 'jobs';
+const W = 1024, H = 500, DPR = 2;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(DPR); renderer.setSize(W, H); document.body.prepend(renderer.domElement);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0; renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
+buildBoard(scene, FINISH, { woodW: 2048, woodH: 4096, anisotropy: 16 }); buildTable(scene, {});
+
+// Lamp light: a low warm fill, a lamp over the middle of the board whose pool falls off before the ends, and the game's rim light.
+scene.add(new THREE.HemisphereLight(0xffe2c0, 0x1a0e07, 0.2));
+const lamp = new THREE.SpotLight(0xffdcb0, 9, 3.2, 0.62, 0.75, 1.2);
+lamp.position.set(-0.35, 1.15, 0.25); lamp.target.position.set(0, 0, 0.05); scene.add(lamp, lamp.target);
+lamp.castShadow = true; lamp.shadow.mapSize.set(2048, 2048); lamp.shadow.bias = -0.0003; lamp.shadow.normalBias = 0.003;
+const rim = new THREE.DirectionalLight(0xffb070, 0.6); rim.position.set(0.8, 0.9, -1.2); scene.add(rim);
+
+// The seeds: four in every pit, poured exactly as the game pours them, and a few in each trough (a game a few moves in).
+const SET = SEED_SETS[SET_ID] || SEED_SETS.jobs; const mat = seedMaterialFor(SET_ID, { seedS: 512 }); const geo = seedGeometryFor({}, SET_ID);
+const dims = { a: (SET.r[0] + SET.r[2]) / 2 * 0.98, b: SET.r[1] };
+let r = 11; const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+function fill(spots, cx, cz, n, turn) {
+  for (let k = 0; k < n; k++) {
+    const m = new THREE.Mesh(geo, mat); m.rotation.order = 'XZY';
+    const j = [0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2];
+    m.scale.set(SET.r[0] * j[0], SET.r[1] * j[1], SET.r[2] * j[2]);
+    const p = place(spots[k], cx, cz, BT, turn); p.y += SET.r[1] * (j[1] - 1);
+    m.position.set(p.x, p.y, p.z); m.rotation.set(p.rx, p.ry, p.rz); m.castShadow = m.receiveShadow = true; scene.add(m);
+  }
+}
+const pitSpots = pour({ rx: PIT_R, rz: PIT_R, depth: PIT_D }, dims, 48, 3);
+const COUNTS = [3, 5, 0, 6, 5, 2, 4, 1, 5, 4, 7, 0]; // a few moves in; the troughs hold the rest of the 48
+pitCenters.forEach(([x, z], i) => fill(pitSpots, x, z, COUNTS[i], i * 2.39996));
+const storeSpots = pour({ rx: STORE_RX, rz: STORE_RZ, depth: STORE_D, flat: 1.8 }, dims, 48, 5);
+const inPits = COUNTS.reduce((a, b) => a + b, 0), troughs = 48 - inPits; // every one of the 48 seeds is somewhere
+fill(storeSpots, storeCenters[0][0], storeCenters[0][1], Math.ceil(troughs / 2), 0.7);
+fill(storeSpots, storeCenters[1][0], storeCenters[1][1], Math.floor(troughs / 2), 2.1);
+window.__seeds = { inPits, troughs };
+
+// The camera: from the player's long side, a little above, the board running left to right and set to the right of the name.
+const camera = new THREE.PerspectiveCamera(+(q.get('fov') || 36), W / H, 0.05, 8);
+camera.position.set(+(q.get('cx') || 1.05), +(q.get('cy') || 1.3), +(q.get('cz') || -0.55)); camera.lookAt(0, 0.0, 0.02);
+camera.setViewOffset(W, H, -W * +(q.get('off') || 0.18), 0, W, H); // shift the board right, so the left third is the dark wood the name sits on
+renderer.render(scene, camera); renderer.render(scene, camera);
+window.__done = true;
+</script>
+</body></html>

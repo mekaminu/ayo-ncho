@@ -87,6 +87,21 @@
 #                  Back goes back to Settings; ?try=looks shows the looks as open for the visit. --wide for the Mac (<out> only)
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
+if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py): every page at this pixel density, the layout unchanged
+    from playwright.sync_api import Browser as _B
+    def _scaled(f):
+        def g(self, *a, **k):
+            k["device_scale_factor"] = float(os.environ["RENDER_SCALE"])
+            if (k.get("viewport") or {}).get("width", 0) < 600: k["has_touch"] = True  # a phone's words ("tap"), not a mouse's
+            return f(self, *a, **k)
+        return g
+    _B.new_context = _scaled(_B.new_context); _B.new_page = _scaled(_B.new_page)
+    from playwright.sync_api import Page as _P, Locator as _Lc
+    def _calm(f):  # a toast is a passing word (often about the web link), not the screen: the store pictures leave it out
+        def g(self, *a, **k):
+            k["style"] = (k.get("style") or "") + ".toast{display:none!important}"; return f(self, *a, **k)
+        return g
+    _P.screenshot = _calm(_P.screenshot); _Lc.screenshot = _calm(_Lc.screenshot)
 #        add --wake (with --smoke) to check keeping the screen on: a stand-in for the browser's wake lock records each request; during the
 #                  game the screen is held, 3 minutes with nobody touching it lets it go, a key takes it back, Home lets it go, Play takes it
 #                  again, and Settings → Feel → Keep the screen on off lets it go

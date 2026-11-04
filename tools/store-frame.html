@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- One store screenshot's frame (tools/store-shots.py): the game's own render set on the dark wood under its caption, in the game's
+     colours and type (Fraunces and Inter from @fontsource, as the apps carry them). The page is the store's exact size;
+     ?img= the render, ?caption= its words, ?cap= the caption's size as a share of the width, ?share= the screen's share of the height.
+     window.__fit is false if the caption needs more than two lines. -->
+<html><head><meta charset="utf-8">
+<style>
+@font-face{font-family:Fraunces;font-weight:600;src:url(/node_modules/@fontsource/fraunces/files/fraunces-latin-600-normal.woff2) format('woff2')}
+html,body{margin:0;height:100%;overflow:hidden}
+body{background:radial-gradient(120% 70% at 50% 0%,#3a2213 0%,#1c110a 45%,#0d0906 100%);color:#f1e6d2;display:flex;flex-direction:column;align-items:center}
+#cap{display:flex;flex-direction:column;align-items:center;justify-content:center;box-sizing:border-box;width:100%}
+h1{font-family:Fraunces,serif;font-weight:600;margin:0;text-align:center;line-height:1.08;letter-spacing:-.01em;text-wrap:balance;text-shadow:0 2px 24px rgba(0,0,0,.6)}
+#rule{background:#e6b76f;border-radius:9px;opacity:.85}
+#screen{display:flex;align-items:flex-start;justify-content:center;width:100%}
+img{display:block;box-shadow:0 0 0 2px rgba(230,183,111,.38),0 30px 80px rgba(0,0,0,.7),0 8px 24px rgba(0,0,0,.5)}
+</style></head><body>
+<div id="cap"><h1 id="t"></h1><div id="rule"></div></div><div id="screen"><img id="im"></div>
+<script>
+const q = new URLSearchParams(location.search), W = innerWidth, H = innerHeight, share = +q.get('share'), cap = +q.get('cap');
+const capH = Math.round(H * (1 - share)), t = document.getElementById('t'), im = document.getElementById('im');
+document.getElementById('cap').style.cssText = `height:${capH}px;padding:0 ${Math.round(W * 0.07)}px;gap:${Math.round(W * cap * 0.32)}px`;
+t.style.fontSize = Math.round(W * cap) + 'px'; t.textContent = q.get('caption');
+const rule = document.getElementById('rule'); rule.style.width = Math.round(W * cap * 1.1) + 'px'; rule.style.height = Math.max(3, Math.round(W * cap * 0.06)) + 'px';
+im.onload = async () => {
+  await document.fonts.ready;
+  const boxW = W * 0.86, boxH = H * share - Math.round(H * 0.045), k = Math.min(boxW / im.naturalWidth, boxH / im.naturalHeight);
+  const w = Math.round(im.naturalWidth * k), h = Math.round(im.naturalHeight * k);
+  im.style.width = w + 'px'; im.style.height = h + 'px'; im.style.borderRadius = Math.round(Math.min(w, h) * 0.055) + 'px';
+  window.__fit = t.getBoundingClientRect().height <= W * cap * 1.08 * 2 + 4;
+  requestAnimationFrame(() => requestAnimationFrame(() => { window.__done = true; }));
+};
+im.src = q.get('img');
+</script></body></html>
