@@ -33,6 +33,9 @@ export function publicBase(w = globalThis) {
   if (inApp(w)) return SERVER + '/';
   const L = w.location; return L.origin + L.pathname;
 }
+// The privacy, terms and support pages live on the server (the stores link to them there), so the apps open the web link's.
+export const LEGAL = ['privacy', 'terms', 'support'];
+export function legalLink(page, w = globalThis) { return publicBase(w) + page; }
 // Can a shared link be opened by someone else? (A page on a laptop at http://localhost cannot.)
 export function linkable(w = globalThis) { return inApp(w) || (w.location && w.location.protocol === 'https:'); }
 

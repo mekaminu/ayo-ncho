@@ -12,6 +12,7 @@
 // Restarts: every room snapshot carries rid and sig, and move / resign / takeback carry the new sig; a board keeps them with the
 // moves as its ticket (ticketOf in rooms.js) and sends it with a rejoin. A room the server has forgotten is rebuilt from it
 // (see rooms.js); the secret is ROOM_SECRET.
+// /privacy, /terms and /support are the pages the stores ask for (server/legal.js).
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
 import express from "express";
 import http from "node:http";
@@ -19,11 +20,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage, backMessage } from "./rooms.js";
+import { mountLegal } from "./legal.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000 } = {}) {
+export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000, env = process.env } = {}) {
   const app = express();
+  mountLegal(app, env);
   app.use("/engine", express.static(path.join(__dirname, "..", "engine")));
   app.use(express.static(path.join(__dirname, "..", "web")));
   app.get("/healthz", (_req, res) => res.json({ ok: true, rooms: rooms.size }));

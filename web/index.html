@@ -224,6 +224,9 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .swatch[aria-pressed="true"]{border-color:var(--brass)}
 .note{font-size:11px;color:var(--muted);padding:0 4px}
 .choose{font:600 12px Inter,system-ui,sans-serif;color:var(--muted);background:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
+.legal{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:-6px}
+.legal a{font:500 12px Inter,system-ui,sans-serif;color:var(--muted);text-decoration:none;padding:8px 10px;border-radius:999px}
+.legal a:hover,.legal a:focus-visible{color:var(--brass)}.legal a+a::before{content:"·";margin:0 10px 0 -8px;color:var(--line)}
 .choose[aria-pressed="true"]{color:#1a0f07;background:var(--brass);border-color:var(--brass)}
 
 /* Game over */
@@ -475,6 +478,7 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
       </div>
     </div>
     <button class="btn quiet" id="settingsRules">How to play · Credits</button>
+    <nav class="legal" aria-label="Privacy, terms and support"><a id="lnkPrivacy" data-page="privacy" href="./privacy" target="_blank" rel="noopener">Privacy</a><a id="lnkTerms" data-page="terms" href="./terms" target="_blank" rel="noopener">Terms</a><a id="lnkSupport" data-page="support" href="./support" target="_blank" rel="noopener">Support</a></nav>
   </div>
 </section>
 

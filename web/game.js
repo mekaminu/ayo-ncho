@@ -10,7 +10,7 @@ import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
-import { startApp, backStep, haptic, wsUrl, publicBase, linkable } from './app.js';
+import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink } from './app.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
@@ -1219,6 +1219,8 @@ $('#homeSettings').addEventListener('click', () => { paintSettings(); showScreen
 $('#settingsBtn').addEventListener('click', () => { if (!busy) { paintSettings(); showScreen('settings'); } });
 $('#settingsBack').addEventListener('click', () => { if (online) return showScreen('play'); const r = settings.rules(); const same = state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(r) && state.moves.length; showScreen(same ? 'play' : 'home'); });
 $('#settingsRules').addEventListener('click', () => { $('#rules').hidden = false; });
+// Privacy, terms and support: the server's pages, opened beside the game (a new tab, or the phone's browser from the apps) so the game stays where it was.
+for (const a of document.querySelectorAll('.legal a')) a.href = legalLink(a.dataset.page);
 
 // game over card, as approved
 function gameOver() {
