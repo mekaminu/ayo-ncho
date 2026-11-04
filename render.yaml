@@ -3,7 +3,7 @@ services:
     name: ayo-ncho
     runtime: node
     plan: free
-    buildCommand: npm install
+    buildCommand: npm install --omit=dev # the server needs express and ws only; the app tooling stays out
     startCommand: npm start
     healthCheckPath: /healthz
     envVars:

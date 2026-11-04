@@ -1,0 +1,25 @@
+{
+  "appId": "com.mekaminu.ayoncho",
+  "appName": "Ayo & Nchò",
+  "webDir": "app/www",
+  "backgroundColor": "#0d0906",
+  "android": {
+    "backgroundColor": "#0d0906",
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 900,
+      "launchAutoHide": true,
+      "launchFadeOutDuration": 250,
+      "backgroundColor": "#0d0906",
+      "showSpinner": false,
+      "androidScaleType": "CENTER_INSIDE"
+    },
+    "SystemBars": {
+      "insetsHandling": "native",
+      "style": "DARK",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}

@@ -10,6 +10,7 @@ import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
+import { startApp, backStep, haptic, wsUrl, publicBase, linkable } from './app.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
@@ -239,7 +240,7 @@ function land(k, onSeed, p, home) { if (!soundOn()) return; try { sound().land(k
 function click(pitch = 1, gain = 0.12) { if (!soundOn()) return; try { sound().tap(pitch, gain); } catch {} }
 // a handful of seeds scooped up: quick small clacks as they jostle in the hand
 function rattle(n, p) { if (!soundOn()) return; try { sound().rattle(n, panOf(p)); } catch {} }
-const buzz = (ms) => { if (prefs.get('haptics', '1') === '1' && navigator.vibrate) navigator.vibrate(ms); };
+const buzz = (ms) => { if (prefs.get('haptics', '1') !== '1') return; if (!haptic(ms) && navigator.vibrate) navigator.vibrate(ms); }; // the app's own haptics, else the browser's
 
 // ---------- HUD ----------
 const badges = []; const badgeLayer = $('#badges');
@@ -445,7 +446,7 @@ function setRoomStatus(s, text) {
   rooms.state = s; const el = $('#roomStatus'); el.dataset.state = s; el.querySelector('span').textContent = text || STATUS_TEXT[s];
   const ready = (s === 'open' || s === 'door') && net && net.code;
   $('#waBtn').classList.toggle('off', !ready); $('#copyBtn').disabled = !ready; $('#shareLinkBtn').disabled = !ready;
-  if (ready) $('#waBtn').href = whatsappLink(net.code, inviteLink(net.code)); else $('#waBtn').removeAttribute('href');
+  if (ready) $('#waBtn').href = whatsappLink(net.code, inviteLink(net.code, publicBase())); else $('#waBtn').removeAttribute('href');
 }
 function paintRoomStatus() { // what the room card says, from the connection and the door
   if (!roomsShowing()) return;
@@ -470,9 +471,9 @@ $('#roomsBack').addEventListener('click', () => { if (friend) return leaveRoom()
 $('#roomStatus').addEventListener('click', () => { if (rooms.state === 'error' || rooms.state === 'idle') { if (net) { net.leave(); net = null; } openRoom(); } });
 $('#codeField').addEventListener('input', (e) => { const c = cleanCode(e.target.value); if (e.target.value !== c) e.target.value = c; $('#joinBtn').disabled = c.length !== 4; if ($('#joinNote').classList.contains('bad')) { $('#joinNote').textContent = ''; $('#joinNote').className = 'note'; } });
 $('#joinCard').addEventListener('submit', (e) => { e.preventDefault(); const code = cleanCode($('#codeField').value); if (code.length === 4 && !(net && net.seat === null && roomWanted === code)) joinByCode(code); });
-$('#copyBtn').addEventListener('click', async () => { if (!net || !net.code) return; const link = inviteLink(net.code); try { await navigator.clipboard.writeText(link); toast('Link copied'); click(1.3, 0.06); } catch { toast(link); } });
+$('#copyBtn').addEventListener('click', async () => { if (!net || !net.code) return; const link = inviteLink(net.code, publicBase()); try { await navigator.clipboard.writeText(link); toast('Link copied'); click(1.3, 0.06); } catch { toast(link); } });
 $('#shareLinkBtn').addEventListener('click', async () => {
-  if (!net || !net.code) return; const link = inviteLink(net.code);
+  if (!net || !net.code) return; const link = inviteLink(net.code, publicBase());
   try { if (navigator.share) await navigator.share({ title: 'Ayo & Nchò', text: inviteText(net.code), url: link }); else { await navigator.clipboard.writeText(link); toast('Link copied'); } } catch {}
 });
 $('#waBtn').addEventListener('click', () => click(1.3, 0.06));
@@ -671,14 +672,14 @@ function startOnline(code, { stay = false } = {}) {
   // code: 'new' opens a room, a four-letter code knocks on one. stay: asked from the Rooms screen, which stays up (the door card over it)
   // until a friend is in; otherwise (an invite link) the board shows at once with "Joining the room…"
   roomWanted = String(code).toUpperCase(); online = true; local = false;
-  net = new Online((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/ws');
+  net = new Online(wsUrl());
   const self = net; const on = (t, fn) => self.on(t, (d) => { if (net === self) fn(d); }); // a room left behind (Back, a new name) says nothing more
   let held = null; try { held = JSON.parse(prefs.get('room', 'null')); } catch {}
   let triedJoin = false, seated = false, knocking = false;
   on('joined', ({ seat, code, token, room }) => {
     const back = seated; seated = true; you = seat; them = 1 - seat; baseTheta = seat === 1 ? Math.PI : 0; if (!back) theta = baseTheta;
     prefs.set('room', JSON.stringify({ code, token }));
-    if (location.search !== '?room=' + code) history.replaceState(null, '', inviteLink(code)); // the address becomes the invite link (a reload comes back to this seat)
+    if (location.search !== '?room=' + code) history.replaceState(null, '', inviteLink(code, location.pathname)); // the address becomes the invite link (a reload comes back to this seat)
     syncRoom(room); $('#gameover').hidden = !state.over; if (state.over) gameOver();
     if (roomsShowing()) { if (friend) showScreen('play'); else { paintCode(code); paintRoomStatus(); if (!back) { click(1.4, 0.08); setTimeout(() => click(1.8, 0.08), 120); } } } // the tiles fill in on the Rooms screen
     if (knocking) { knocking = false; toast(`${friend ? friend.name : 'Your friend'} let you in — ${state.turn === you ? 'your move' : 'they start'}`); click(1.5, 0.1); setTimeout(() => click(2, 0.1), 120); buzz(20); }
@@ -1044,7 +1045,7 @@ function closePuzzle() { // Back to home: the board goes back to your game (or a
   if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
 }
 async function sharePuzzle() {
-  const p = puzzle.p; const text = shareText(p, puzzle.got) + (location.protocol === 'https:' ? `\n${location.origin}${location.pathname}?puzzle=1` : '');
+  const p = puzzle.p; const text = shareText(p, puzzle.got) + (linkable() ? `\n${publicBase()}?puzzle=1` : '');
   try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast('Result copied'); } } catch {}
 }
 $('#puzzleCard').addEventListener('click', () => { openPuzzle(); click(1.3, 0.08); });
@@ -1578,3 +1579,10 @@ function loop(now) {
 function start() { if (running) return; running = true; last = performance.now(); requestAnimationFrame(loop); }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !window.__freeze && !params.get('still')) start(); });
 start();
+// ---------- inside the store apps: the phone's back button, share sheet, haptics and keep-awake (web/app.js; nothing on the web link) ----------
+startApp(() => {
+  const screen = !$('#settings').hidden ? 'settings' : !$('#rooms').hidden ? 'rooms' : !$('#puzzle').hidden ? 'puzzle' : !$('#home').hidden ? 'home' : 'play';
+  const step = backStep({ rules: !$('#rules').hidden, shouts: !shoutMenu.hidden, door: !$('#knockCard').hidden || !$('#backCard').hidden, name: !$('#nameCard').hidden, gameover: !$('#gameover').hidden, screen, online, busy });
+  if (step === 'shouts') toggleShoutMenu(false); else if (step !== 'stay' && step !== 'minimize') $('#' + step).click();
+  return step;
+});
