@@ -71,6 +71,23 @@ export class Talk {
   capVideo() { // keep the picture small on the wire
     try { for (const s of this.pc.getSenders()) if (s.track && s.track.kind === 'video' && s.getParameters) { const p = s.getParameters(); if (!p.encodings || !p.encodings.length) p.encodings = [{}]; p.encodings[0].maxBitrate = VIDEO_KBPS * 1000; s.setParameters(p).catch(() => {}); } } catch {}
   }
+  // the line's numbers, for web/call.js LineWatch (null before there is a connection or where the browser has no getStats)
+  async stats() {
+    if (!this.pc || this.closed || typeof this.pc.getStats !== 'function') return null;
+    try { const r = await this.pc.getStats(); const out = []; r.forEach((v) => out.push(v)); return out; } catch { return null; }
+  }
+  // the line is too weak for pictures: stop sending this phone's picture (the camera stays open, so it comes straight back);
+  // on: send it again. The track is taken off the sender rather than disabled, so nothing at all goes for it (a disabled
+  // track still sends black frames).
+  async sendVideo(on) {
+    if (!this.pc || this.closed) return;
+    const v = this.pc.getSenders().find((s) => (s.track && s.track.kind === 'video') || s === this.vidSender);
+    if (!v) return;
+    this.vidSender = v;
+    if (!on) { if (v.track) this.vidTrack = v.track; this.sending = false; await v.replaceTrack(null).catch(() => {}); }
+    else { const t = this.vidTrack || (this.local && this.local.getVideoTracks()[0]); this.sending = true; if (t) await v.replaceTrack(t).catch(() => {}); this.capVideo(); }
+  }
+  get sendingVideo() { return !!(this.vidSender ? this.vidSender.track : this.pc && this.pc.getSenders().some((s) => s.track && s.track.kind === 'video')); }
   setMic(on) { if (this.local) for (const t of this.local.getAudioTracks()) t.enabled = !!on; }
   setCam(on) { if (this.local) for (const t of this.local.getVideoTracks()) t.enabled = !!on; }
   close() {

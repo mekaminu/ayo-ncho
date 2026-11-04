@@ -12,7 +12,8 @@
 //   yes   {mode}          they asked and I say yes (mode: what I will share)
 //   no    {}              not now (or: I stop asking)
 //   offer {sdp}  answer {sdp}  ice {c}   the WebRTC handshake (the asker makes the offer, once both said yes)
-//   state {mic, cam}      my microphone / camera switched on or off (so their bubble can say "muted")
+//   state {mic, cam, weak?} my microphone / camera switched on or off (so their bubble can say "muted"); weak: true when the
+//                         line between the phones is too weak for pictures (both go voice only), false when video comes back
 //   end   {}              hang up
 
 export const CALL_KINDS = ['ask', 'yes', 'no', 'offer', 'answer', 'ice', 'state', 'end'];
@@ -43,7 +44,7 @@ export function callMessage(kind, data) {
       if (Number.isInteger(c.sdpMLineIndex) && c.sdpMLineIndex >= 0 && c.sdpMLineIndex < 16) out.sdpMLineIndex = c.sdpMLineIndex;
       return { c: out };
     }
-    case 'state': return { mic: !!d.mic, cam: !!d.cam };
+    case 'state': return typeof d.weak === 'boolean' ? { mic: !!d.mic, cam: !!d.cam, weak: d.weak } : { mic: !!d.mic, cam: !!d.cam };
     default: return null;
   }
 }
@@ -77,7 +78,8 @@ export function pickMode(wanted, { lighter = false, camera = true } = {}) {
 //        idle → asked (they asked; the card is up) → starting (I said yes; media opens, then I wait for their offer) → live
 export class CallFlow {
   constructor(seat = 0) { this.seat = seat; this.reset(); }
-  reset() { this.phase = 'idle'; this.mine = null; this.theirs = null; this.asker = null; this.mic = true; this.cam = true; this.their = { mic: true, cam: true }; this.hideTheirs = false; }
+  reset() { this.phase = 'idle'; this.mine = null; this.theirs = null; this.asker = null; this.mic = true; this.cam = true; this.their = { mic: true, cam: true }; this.hideTheirs = false; this.weak = false; this.better = false; this.camBefore = true; }
+  get video() { return this.mine === 'video' || this.theirs === 'video'; } // anything to drop when the line is weak
   get on() { return this.phase === 'starting' || this.phase === 'live'; }
 
   ask(mode) { // I tap Video or Voice only
@@ -111,7 +113,26 @@ export class CallFlow {
     return this.phase === 'starting' && this.asker === 'me' ? [{ offer: true }] : [];
   }
   toggleMic() { if (!this.on) return []; this.mic = !this.mic; return [{ send: 'state', data: { mic: this.mic, cam: this.cam } }]; }
-  toggleCam() { if (!this.on || this.mine !== 'video') return []; this.cam = !this.cam; return [{ send: 'state', data: { mic: this.mic, cam: this.cam } }]; }
+  toggleCam() { if (!this.on || this.mine !== 'video' || this.weak) return []; this.cam = !this.cam; return [{ send: 'state', data: { mic: this.mic, cam: this.cam } }]; }
+  // The line between the phones (web/call.js LineWatch, from the connection's own numbers): too weak for pictures, so the
+  // whole call goes voice only — this phone stops sending its picture and tells the friend, whose phone does the same (the
+  // line is the same both ways). Voice carries on. Video comes back only when someone taps Video again once the line is
+  // better (never by itself, so a line that comes and goes does not flick the pictures on and off).
+  //   {video: false|true}   stop / start sending this phone's picture (web/talk.js sendVideo)
+  lineWeak() {
+    if (this.weak) { this.better = false; return []; } // weak again before Video again was tapped: the offer goes
+    if (!this.on || !this.video) return [];
+    this.goWeak();
+    return [{ video: false }, { send: 'state', data: { mic: this.mic, cam: false, weak: true } }, { say: 'weak' }];
+  }
+  lineBetter() { if (!this.weak || this.better) return []; this.better = true; return [{ say: 'better' }]; }
+  videoAgain() {
+    if (!this.on || !this.weak) return [];
+    this.goStrong();
+    return [{ video: true }, { send: 'state', data: { mic: this.mic, cam: this.cam, weak: false } }, { say: 'videoagain' }];
+  }
+  goWeak() { this.weak = true; this.better = false; this.camBefore = this.cam; if (this.mine === 'video') this.cam = false; this.their = { ...this.their, cam: false }; }
+  goStrong() { this.weak = false; this.better = false; if (this.mine === 'video') this.cam = this.camBefore; }
   toggleTheirs() { if (!this.on) return []; this.hideTheirs = !this.hideTheirs; return []; } // only on this phone: their picture is not shown
 
   // a message from the friend
@@ -137,9 +158,14 @@ export class CallFlow {
         { const was = this.phase; this.reset(); return was === 'asked' || was === 'asking' ? [{ say: 'theystopped' }] : [{ close: true }, { say: 'theyended' }]; }
       case 'offer': case 'answer': case 'ice':
         return this.on ? [{ connect: true }] : [];
-      case 'state':
-        if (this.on) this.their = { mic: !!data.mic, cam: !!data.cam };
-        return [];
+      case 'state': {
+        if (!this.on) return [];
+        const eff = [];
+        if (data.weak === true && !this.weak) { this.goWeak(); eff.push({ video: false }, { send: 'state', data: { mic: this.mic, cam: false } }, { say: 'theirweak' }); }
+        else if (data.weak === false && this.weak) { this.goStrong(); eff.push({ video: true }, { send: 'state', data: { mic: this.mic, cam: this.cam } }, { say: 'theirvideoagain' }); }
+        this.their = { mic: !!data.mic, cam: !!data.cam && !this.weak };
+        return eff;
+      }
       default: return [];
     }
   }
@@ -175,6 +201,64 @@ export function callWords(key, name = 'your friend', mode) {
     case 'theirCam': return `${N}'s picture`;
     case 'hangUp': return 'Hang up';
     case 'muted': return 'muted';
+    case 'weak': return 'The line is weak — voice only for now, so you can keep talking';
+    case 'theirweak': return `${N}'s line is weak — voice only for now`;
+    case 'better': return 'The line is better — Video again is under the camera button';
+    case 'videoAgain': return 'Video again';
+    case 'videoagain': return 'Video again';
+    case 'theirvideoagain': return `${N} turned video back on`;
+    case 'weakNote': return 'The line was weak, so the pictures stopped and the voice carried on.';
     default: return '';
   }
+}
+
+// ---------- how good the line is (Launch L16b, slice 3) ----------
+// Every LINE.everyMs the board reads the connection's own numbers (RTCPeerConnection.getStats: the round trip on the pair
+// of addresses in use, the bitrate the browser thinks it can send, the packets lost coming in) and asks LineWatch whether
+// the line still carries pictures. Weak: LINE.weakOf of the last LINE.window samples bad. Better: LINE.goodFor good in a row.
+export const LINE = {
+  everyMs: 2000, window: 4, weakOf: 3, goodFor: 10,
+  rttMs: 700,      // a round trip slower than this: the faces lag the voice and the voice breaks up
+  loss: 0.08,      // more than 8% of the packets coming in lost
+  kbps: 150,       // the browser estimates it can send less than this: the voice (~40) and a small face (~150) no longer fit
+};
+// One reading from getStats' entries (an array of report objects); prev holds the incoming packet counts of the last reading.
+export function readLine(entries, prev = {}) {
+  let rtt = null, kbps = null, lost = 0, got = 0, pairs = 0;
+  const all = Array.isArray(entries) ? entries : [];
+  const transport = all.find((r) => r && r.type === 'transport' && r.selectedCandidatePairId);
+  for (const r of all) {
+    if (!r || typeof r !== 'object') continue;
+    if (r.type === 'candidate-pair') {
+      const inUse = transport ? r.id === transport.selectedCandidatePairId : (r.nominated && r.state === 'succeeded') || r.selected;
+      if (!inUse) continue; pairs++;
+      if (typeof r.currentRoundTripTime === 'number') rtt = Math.round(r.currentRoundTripTime * 1000);
+      if (typeof r.availableOutgoingBitrate === 'number') kbps = Math.round(r.availableOutgoingBitrate / 1000);
+    } else if (r.type === 'inbound-rtp') {
+      lost += Math.max(0, r.packetsLost || 0); got += Math.max(0, r.packetsReceived || 0);
+    }
+  }
+  const dl = lost - (prev.lost || 0), dg = got - (prev.got || 0);
+  const loss = dl + dg > 0 && lost >= (prev.lost || 0) ? dl / (dl + dg) : 0;
+  return { sample: { rtt, kbps, loss: Math.round(loss * 1000) / 1000, pairs }, prev: { lost, got } };
+}
+export function badLine(s) {
+  if (!s) return false;
+  return (s.rtt !== null && s.rtt > LINE.rttMs) || s.loss > LINE.loss || (s.kbps !== null && s.kbps < LINE.kbps);
+}
+export class LineWatch {
+  constructor() { this.recent = []; this.good = 0; this.weak = false; this.prev = {}; }
+  // feed one getStats reading (entries); returns 'weak' the moment the line turns weak, 'better' once it has held good, else null
+  read(entries) { const r = readLine(entries, this.prev); this.prev = r.prev; return this.push(r.sample); }
+  push(s) {
+    if (!s || !s.pairs) return null; // not connected on a pair yet: nothing to judge
+    const bad = badLine(s);
+    this.recent.push(bad); if (this.recent.length > LINE.window) this.recent.shift();
+    this.good = bad ? 0 : this.good + 1;
+    if (!this.weak && this.recent.filter(Boolean).length >= LINE.weakOf) { this.weak = true; this.good = 0; return 'weak'; }
+    if (this.weak && this.good >= LINE.goodFor) { this.weak = false; this.recent = []; return 'better'; }
+    return null;
+  }
+  // the call went voice only because of the FRIEND's line: watch for it to hold good here too before offering video again
+  markWeak() { this.weak = true; this.good = 0; }
 }

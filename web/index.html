@@ -419,6 +419,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 #callBtn[aria-expanded="true"],#callBtn.live{border-color:var(--brass);color:var(--brass)}
 #callBtn.asking{border-color:var(--brass);animation:callAsk 1.4s ease-in-out infinite}
 #callBtn.live{background:rgba(230,183,111,.16)}
+#callBtn.live.weak{border-style:dashed;border-color:#d67048;color:#e9a98a;background:rgba(214,112,72,.14)}
 @keyframes callAsk{0%,100%{box-shadow:0 0 0 0 rgba(230,183,111,.0)}50%{box-shadow:0 0 0 6px rgba(230,183,111,.22)}}
 #callMenu{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 124px);display:flex;flex-wrap:wrap;justify-content:center;gap:6px;width:min(92vw,370px);z-index:3;animation:pop .25s ease-out}
 #callMenu .pill{background:var(--card);color:var(--fg);border-color:rgba(230,183,111,.35);font-size:13px;padding:9px 14px;box-shadow:0 8px 24px rgba(0,0,0,.45);display:inline-flex;align-items:center;gap:6px}

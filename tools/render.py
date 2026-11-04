@@ -39,7 +39,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, a weak line going voice only on both phones and Video again bringing the pictures back (picture <out>-weak.png), mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -521,6 +521,32 @@ if online:
         print("video: live both ways ·", hc["log"], "/", fc["log"])
         outv = out[:-4] + "-video.png" if out.endswith(".png") else out + "-video.png"
         host.wait_for_timeout(1500); host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=outv, timeout=120000); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        # a weak line (slice 3): the real readings of a good local line leave the pictures on; then the host's line goes bad
+        # (window.__lineBad stands in its numbers, readings quickened): both go voice only, the voice stays; the line comes
+        # back, Video again is offered, and a tap brings both pictures back
+        for pg in (host, friend): pg.evaluate("window.__lineMs = 250")
+        host.wait_for_timeout(2500)
+        hc = host.evaluate(call); assert not hc["weak"] and hc["sending"] and "weak" not in hc["lineLog"], hc
+        host.evaluate("window.__lineBad = true")
+        host.wait_for_function("(c => c.weak && c.sending===false && !c.myCam && c.weakChip)(window.__ayo.call)", timeout=20000)
+        friend.wait_for_function("(c => c.weak && c.sending===false && !c.theirCam && c.voiceRing && c.log.includes('theirweak'))(window.__ayo.call)", timeout=20000)
+        for pg in (host, friend): assert pg.evaluate(call)["phase"] == "live", "the voice carries on"
+        host.wait_for_function("(c => !c.theirCam && c.voiceRing)(window.__ayo.call)", timeout=20000)
+        host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+        assert host.evaluate(call)["menu"] == ["Mute", "Hang up", "Report a problem", "Block Tete"], host.evaluate(call)["menu"]
+        assert "Video again comes here" in host.evaluate("document.querySelector('#callMenu .note').textContent")
+        outw = out[:-4] + "-weak.png" if out.endswith(".png") else out + "-weak.png"
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=outw, timeout=120000); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        host.click("#callBtn")
+        host.evaluate("window.__lineBad = false")
+        host.wait_for_function("(c => c.better)(window.__ayo.call)", timeout=20000)
+        host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+        assert host.evaluate(call)["menu"] == ["Mute", "Video again", "Hang up", "Report a problem", "Block Tete"], host.evaluate(call)["menu"]
+        host.click("#callMenu .pill[data-id=again]")
+        for pg in (host, friend): pg.wait_for_function("(c => !c.weak && c.sending && c.theirCam && c.myCam && c.playing)(window.__ayo.call)", timeout=30000)
+        assert "theirvideoagain" in friend.evaluate(call)["log"]
+        for pg in (host, friend): pg.evaluate("window.__lineBad = null; window.__lineMs = 0")
+        print("video: weak line → voice only on both phones, then Video again brought both pictures back")
         # the host mutes: Tete's board shows it on the host's bubble; Tete hides the host's picture on their own phone (the voice stays)
         host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
         assert host.evaluate(call)["menu"] == ["Mute", "Camera off", "Hide Tete's picture", "Hang up", "Report a problem", "Block Tete"], host.evaluate(call)["menu"]
