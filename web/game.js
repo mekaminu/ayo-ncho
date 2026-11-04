@@ -242,16 +242,18 @@ function sound() { // the board's audio, made on first use (a tap always comes f
   if (audio.ctx.state === 'suspended') audio.ctx.resume();
   return audio;
 }
+// the store's preview video (tools/store-preview.py) keeps every sound with its moment, to play them again into the video's own sound track
+const heard = (kind, ...args) => { if (window.__soundLog) window.__soundLog.push([performance.now(), kind, ...args]); };
 const TUNE = [1, 0.95, 1.05, 0.98, 1.07, 0.93, 1.02, 0.96, 1.06, 0.99, 0.94, 1.04]; // each pit carved by hand, each its own note
 const tuneOf = (home) => typeof home === 'string' ? 0.78 : TUNE[home] || 1; // the troughs, bigger and deeper, sound lower
 const at = (pit) => ({ x: pitCenters[pit][0], y: BT, z: pitCenters[pit][1] });
 function panOf(p) { if (!p) return 0; vp.set(p.x, p.y, p.z).project(camera); return Math.max(-0.6, Math.min(0.6, vp.x * 0.55)); } // left of the screen, more in the left ear
 // a seed touching down: the physics says when, how hard (0..1) and whether on the wood or on another seed
-function land(k, onSeed, p, home) { if (!soundOn()) return; try { sound().land(k, onSeed, panOf(p), tuneOf(home)); } catch {} }
+function land(k, onSeed, p, home) { if (!soundOn()) return; heard('land', k, onSeed, panOf(p), tuneOf(home)); try { sound().land(k, onSeed, panOf(p), tuneOf(home)); } catch {} }
 // a tap on the wood: the buttons, a knock at the door, the chimes
-function click(pitch = 1, gain = 0.12) { if (!soundOn()) return; try { sound().tap(pitch, gain); } catch {} }
+function click(pitch = 1, gain = 0.12) { if (!soundOn()) return; heard('tap', pitch, gain); try { sound().tap(pitch, gain); } catch {} }
 // a handful of seeds scooped up: quick small clacks as they jostle in the hand
-function rattle(n, p) { if (!soundOn()) return; try { sound().rattle(n, panOf(p)); } catch {} }
+function rattle(n, p) { if (!soundOn()) return; heard('rattle', n, panOf(p)); try { sound().rattle(n, panOf(p)); } catch {} }
 const buzz = (ms) => { if (prefs.get('haptics', '1') !== '1') return; if (!haptic(ms) && navigator.vibrate) navigator.vibrate(ms); }; // the app's own haptics, else the browser's
 
 // ---------- HUD ----------

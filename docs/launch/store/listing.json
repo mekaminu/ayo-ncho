@@ -65,6 +65,10 @@
     { "caption": "Two of you, one phone", "shows": "two of us, the board turned to Player 2", "from": "docs/render-2026-10-30-twoofus.png" },
     { "caption": "Carved boards, real seeds", "shows": "the store with Benin bronze on the board", "from": "docs/render-2026-11-04-store.png" }
   ],
+  "preview": {
+    "about": "The app preview video (tools/store-preview.py): one caption at a time over the real board, in this order — your first tap, the turn sowing, Nnamdi's answer, a hint, the name.",
+    "captions": ["See where every seed will go", "Sow every seed by hand", "Opponents who answer back", "Hints that show you why", "Ayo & Nchò · Nigerian Mancala"]
+  },
   "reviewNotes": [
     "No sign-in or account. Against the computer, two players on one phone, the lesson and the daily puzzle play offline.",
     "To try a game with a friend you need a second device or a browser: in the app tap With friends, then open the invite link (https://ayo-ncho.onrender.com/?room=CODE) or type the four-letter code on the second device, and tap Let in when it knocks. The game server may take up to a minute to answer the first time if nobody has played for a while.",
