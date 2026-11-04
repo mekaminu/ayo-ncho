@@ -82,7 +82,7 @@ test("the seed set drawn: the phone's choice if it may have it, else Job's tears
 
 test("the words: a locked look says where it comes from; the Settings line names what is still in the store", () => {
   assert.equal(lookLockedWords("Cowries", false), "Cowries are a look from the store, in the app — the web link sells nothing");
-  assert.match(lookLockedWords("Palm kernels", true), /store comes to the app soon/);
+  assert.match(lookLockedWords("Palm kernels", true), /a look from the store — the bag on Home/);
   assert.equal(seedsLine({ stones: false, days: 3, need: 7 }), "Job's tears · river stones at 7 days played (3 so far) · cowries and palm kernels in the store");
   assert.equal(seedsLine({ stones: true, days: 9, need: 7, owned: parseOwned('["seeds_cowries"]') }), "Job's tears · river stones (yours: 7 days played) · palm kernels in the store");
   assert.equal(seedsLine({ stones: true, days: 9, need: 7, owned: parseOwned('["bundle_all"]') }), "Job's tears · river stones (yours: 7 days played)");
@@ -126,7 +126,7 @@ test("the board drawn: a wood always; a store board once bought, with the bundle
 
 test("the words for the boards: a locked board 'is' a look; the Settings line names what is still in the store", () => {
   assert.equal(lookLockedWords("Benin bronze", false, "board"), "Benin bronze is a look from the store, in the app — the web link sells nothing");
-  assert.equal(lookLockedWords("Grandpa's board", true, "board"), "Grandpa's board is a look from the store — the store comes to the app soon");
+  assert.equal(lookLockedWords("Grandpa's board", true, "board"), "Grandpa's board is a look from the store — the bag on Home");
   assert.equal(boardsLine(), "mahogany · iroko · ebony · Benin bronze and Grandpa's board in the store");
   assert.equal(boardsLine({ owned: parseOwned('["board_grandpa"]') }), "mahogany · iroko · ebony · Grandpa's board · Benin bronze in the store");
   assert.equal(boardsLine({ preview: "looks" }), "mahogany · iroko · ebony · Benin bronze · Grandpa's board");

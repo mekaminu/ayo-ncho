@@ -236,6 +236,26 @@ if storec:  # the store screen (L11): Gold at the top, every look tried on the l
         sub = pg.evaluate("document.querySelector('#shopSeeds .item[data-id=kernels] .lb span').textContent"); assert "open for this visit" in sub, sub
         pg.click("#shopSeeds .item[data-id=kernels] .sbtn"); pg.wait_for_timeout(300)
         assert pg.evaluate("window.__ayo.seedSet") == "kernels" and pg.evaluate("localStorage.getItem('ayo.seeds')") == "kernels"
+        # buying (L12) against the test store (?store=test, kept for the visit only): prices from the store, a buy, Gold, restore
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home&store=test", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.evaluate("localStorage.setItem('ayo.finish','mahogany')")
+        pg.click("#homeStore"); pg.wait_for_selector("#store:not([hidden])", timeout=10000); pg.wait_for_timeout(300)
+        assert pg.evaluate("document.querySelector('#goldBtn').textContent") == "£T.GO", "Gold's price is the store's"
+        assert states("#shopBoards")[3] == ["benin", "buy", "£T.BB"], states("#shopBoards")
+        pg.click("#shopBoards .item[data-id=benin] .who"); pg.wait_for_timeout(300)
+        pg.click("#shopBoards .item[data-id=benin] .sbtn"); pg.wait_for_timeout(700)
+        assert "Benin bronze is yours" in toasts(), toasts()
+        assert states("#shopBoards")[3][1] == "on", ("bought while trying: now yours on the board", states("#shopBoards"))
+        assert pg.evaluate("window.__ayo.finish") == "benin" and pg.evaluate("localStorage.getItem('ayo.finish')") == "benin"
+        pg.click("#goldBtn"); pg.wait_for_timeout(700); assert "Gold is yours" in toasts(), toasts()
+        assert pg.evaluate("document.querySelector('#goldBtn').textContent") == "Yours"
+        pg.click("#restoreBtn"); pg.wait_for_timeout(700); assert "All restored" in toasts(), toasts()
+        pg.click("#storeBack"); pg.wait_for_selector("#home:not([hidden])", timeout=10000)
+        assert not pg.evaluate("document.querySelector('.pill[data-level=master]').classList.contains('locked')"), "Gold opens Papa Ike"
+        assert pg.evaluate("localStorage.getItem('ayo.owned')") in (None, "[]"), "the test store's purchases are never kept"
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        assert pg.evaluate("window.__ayo.finish") == "mahogany", "without the test store the board is not owned"
+        assert pg.evaluate("document.querySelector('.pill[data-level=master]').classList.contains('locked')")
         b.close()
     assert not errors, errors
     print("store: ok"); sys.exit(0)

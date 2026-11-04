@@ -1,8 +1,8 @@
 // The store screen (L11), as Meka approved it on 30 Oct with a Gold card at its top: what each row says and what its button
 // does, from what this phone owns (web/entitle.js). Looks only, never a win. Pure functions, no DOM, so they are tested in node.
 //
-// Prices are never written here: inside the apps they come from Apple's and Google's own stores (L12 hands them in as
-// `prices`, product id → the store's own price text); until then a row says "Soon". The web link sells nothing, so there every
+// Prices are never written here: inside the apps they come from Apple's and Google's own stores (web/purchase.js hands them
+// in as `prices`, product id → the store's own price text); until the store answers, a row says "Soon". The web link sells nothing, so there every
 // button that would buy says "Get the app".
 //
 // A tap on a board or a seed set (not its button) puts it on the live board behind the screen for a look, owned or not;
@@ -102,11 +102,11 @@ export function tapAction(row, { inApp = false, prices = null, days = 0, need = 
   const name = row.name || 'Gold';
   if (!inApp) return { act: row.kind ? 'try' : 'say', id: row.id, words: `${name} ${row.kind === 'seeds' ? 'are' : 'is'} bought in the app — the web link sells nothing. Ayo & Nchò comes to the App Store and Google Play soon.` };
   const price = prices && prices[row.product];
-  if (!price) return { act: row.kind ? 'try' : 'say', id: row.id, words: `Buying ${name} comes to the app soon` };
+  if (!price) return { act: row.kind ? 'try' : 'say', id: row.id, words: `The store has no price for ${name} yet — try again with signal` };
   return { act: 'buy', id: row.id, product: row.product };
 }
 
 // What "Restore purchases" says before the store is wired (L12).
 export function restoreWords(inApp) {
-  return inApp ? 'Restoring comes with buying, in the app soon' : 'Purchases live in the app — the web link has nothing to restore';
+  return inApp ? 'Asking the store…' : 'Purchases live in the app — the web link has nothing to restore';
 }

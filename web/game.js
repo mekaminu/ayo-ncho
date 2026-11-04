@@ -11,7 +11,8 @@ import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
-import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink, inApp } from './app.js';
+import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink, inApp, plugin, platform } from './app.js';
+import { makeShop, makeTestStore } from './purchase.js';
 import { parseOwned, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS, featureOpen, featureLockedWords, LOOKS, lookOpen, seedSetFor, lookLockedWords, seedsLine, finishFor, boardsLine } from './entitle.js';
 import { storeView, tapAction, restoreWords } from './store.js';
 import { reviewPlan, reviewOf, summaryWords, stepWords, OPEN_LINES, CLEAN_LINE, END_LINE } from './review.js';
@@ -61,6 +62,7 @@ renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadow
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 20);
+let visitOwned = null; // the test store's purchases (?store=test): this visit only, never kept
 const shop = { from: 'home', tryFinish: null, trySeeds: null }; // the store (L11): what is on the board for a look, never kept
 const finishId = () => finishFor(params.get('finish') || prefs.get('finish', 'mahogany'), { owned: owned(), preview: GOLD_PREVIEW }); // a store board only once it is yours (or ?try=looks)
 const finish = finishId();
@@ -1262,11 +1264,35 @@ function paintSettings() {
 const LOCK_SVG = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg>';
 const WOOD_TONE = { mahogany: '#7a3b1c', iroko: '#a97a3d', ebony: '#2a221c' };
 const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-let storePrices = null; // L12: the stores' own price text by product id, once the apps can ask for it
+let storePrices = null; // the stores' own price text by product id (L12), asked for once the app starts
+// Buying (L12, web/purchase.js): Apple's and Google's own purchase systems through the app's NativePurchases plugin; on the web
+// link nothing is sold. ?store=test puts the test store in its place for the browser checks, kept for that visit only.
+const testStore = params.get('store') === 'test' && !inApp() ? makeTestStore({ prices: { gold: '£T.GO', board_benin_bronze: '£T.BB', board_grandpa: '£T.GB', seeds_cowries: '£T.SC', seeds_palm_kernels: '£T.SP', bundle_all: '£T.AL' } }) : null;
+const sales = plugin('NativePurchases') ? makeShop(plugin('NativePurchases'), { platform: platform(), load: () => prefs.get('owned', '[]'), save: (j) => prefs.set('owned', j) })
+  : testStore ? makeShop(testStore, { platform: 'ios', load: () => visitOwned || '[]', save: (j) => { visitOwned = j; } }) : null;
+function ownedChanged() { applyLooks(); paintGold(); if (!$('#store').hidden) paintStore(); if (!$('#settings').hidden) paintSettings(); if (!$('#home').hidden) paintHome(); }
+if (sales) {
+  sales.listen(() => { ownedChanged(); toast('A purchase came through — thank you', 2600); });
+  sales.sync().then(ownedChanged).catch(() => {});
+  sales.prices().then((p) => { storePrices = p; if (!$('#store').hidden) paintStore(); }).catch(() => {});
+}
+let buying = false;
+async function buyIt(row) { // ask the store; the look you were trying becomes yours on the board
+  if (buying) return; buying = true; const btn = document.querySelector(`#storeBody .item[data-id="${row.id}"] .sbtn`) || $('#goldBtn'); if (btn) { btn.textContent = '…'; btn.disabled = true; }
+  try {
+    const r = await sales.buy(row.product);
+    if (r.ok) {
+      if (row.kind === 'board' && shop.tryFinish === row.id) { prefs.set('finish', row.id); params.delete('finish'); shop.tryFinish = null; }
+      if (row.kind === 'seeds' && shop.trySeeds === row.id) { prefs.set('seeds', row.id); shop.trySeeds = null; }
+      [1.5, 2.0, 2.6].forEach((p, k) => setTimeout(() => click(p, 0.08), k * 140)); buzz([12, 60, 12]);
+    } else click(0.7, 0.05);
+    toast(r.words, 3200);
+  } finally { buying = false; if (btn) btn.disabled = false; ownedChanged(); }
+}
 function storeCtx() {
   return { owned: owned(), preview: GOLD_PREVIEW, stones: unlocked(streak, 'stones'), days: streak.days.length, need: MILESTONES[0].days,
     finish: finishFor(prefs.get('finish', 'mahogany'), { owned: owned(), preview: GOLD_PREVIEW }), seeds: seedSetFor(prefs.get('seeds', 'jobs'), { stones: unlocked(streak, 'stones'), owned: owned(), preview: GOLD_PREVIEW }),
-    tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, inApp: inApp(), prices: storePrices };
+    tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, inApp: inApp() || !!sales, prices: storePrices };
 }
 let storeNow = null;
 function paintStore() {
@@ -1300,7 +1326,7 @@ function storeTap(row) { // a tap on a row's button
     applyLooks(); paintStore(); click(1.2, 0.06); toast(`${row.name} on the board`); return;
   }
   if (a.act === 'try' && row.kind && !row.trying) tryLook(row.kind, row.id);
-  else if (a.act === 'buy') toast('Buying comes to the app soon', 2600); // L12 asks the store here
+  else if (a.act === 'buy') return buyIt(row);
   if (a.words) toast(a.words, 3600); click(0.8, 0.05);
 }
 $('#storeBody').addEventListener('click', (e) => {
@@ -1311,7 +1337,7 @@ $('#storeBody').addEventListener('click', (e) => {
   if (e.target.closest('.sbtn')) storeTap(row); else if (kind) tryLook(kind, id);
 });
 $('#goldBtn').addEventListener('click', () => { if (storeNow) storeTap({ ...storeNow.gold, id: 'gold', name: 'Gold' }); });
-$('#restoreBtn').addEventListener('click', () => { toast(restoreWords(inApp()), 3000); click(0.8, 0.05); });
+$('#restoreBtn').addEventListener('click', async () => { click(0.8, 0.05); if (!sales) return toast(restoreWords(false), 3000); const b = $('#restoreBtn'); b.disabled = true; b.textContent = 'Asking the store…'; try { const r = await sales.restore(); toast(r.words, 3600); } finally { b.disabled = false; b.textContent = 'Restore purchases'; ownedChanged(); } });
 $('#storeBack').addEventListener('click', () => { const back = shop.from === 'settings' ? 'settings' : 'home'; if (back === 'settings') paintSettings(); showScreen(back); click(1, 0.05); });
 $('#homeStore').addEventListener('click', () => openStore('home'));
 $('#settingsStore').addEventListener('click', () => openStore('settings'));
@@ -1337,7 +1363,7 @@ function sayText(text, mood = 'calm', ms = 2600) { // the opponent says these wo
   const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, ms);
 }
 // Gold (L7/L9): Master is locked with a small Gold mark until bought; ?try=master opens him for one visit (web/entitle.js).
-function owned() { return parseOwned(prefs.get('owned', '[]')); }
+function owned() { return parseOwned(visitOwned ?? prefs.get('owned', '[]')); } // what the phone bought (L12), or the test store's visit
 function goldLocked(lv) { if (levelOpen(lv, owned(), GOLD_PREVIEW)) return false; toast(lockedWords(names[lv], inApp()), 3200); click(0.7, 0.05); return true; }
 function paintGold() { document.querySelectorAll('[data-level]').forEach((b) => { if (!GOLD_LEVELS.includes(b.dataset.level)) return; const shut = !levelOpen(b.dataset.level, owned(), GOLD_PREVIEW); b.classList.toggle('locked', shut); const row = b.closest('.row'); if (row) row.classList.toggle('locked', shut); }); }
 function toast(text, ms = 1800) { const t = document.createElement('div'); t.className = ms > 1800 ? 'toast long' : 'toast'; t.textContent = text; body.appendChild(t); setTimeout(() => t.remove(), ms); }

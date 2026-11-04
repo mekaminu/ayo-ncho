@@ -91,7 +91,7 @@ test("Gold: the review is locked until bought; ?try=review or ?try=gold opens it
   assert.equal(levelOpen("master", none, previewOf("?try=gold")), true);
   assert.equal(featureOpen("anything-else", none), true);
   assert.match(featureLockedWords("Mama Ngozi's review", false), /in the app — the web link sells nothing/);
-  assert.match(featureLockedWords("Mama Ngozi's review", true), /comes to the app soon/);
+  assert.match(featureLockedWords("Mama Ngozi's review", true), /it's in the store/);
 });
 
 test("the page carries the card line and the panel, and the offline cache has the module", () => {

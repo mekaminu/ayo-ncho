@@ -89,12 +89,12 @@ test("what each button does", () => {
   assert.equal(a.act, "try"); assert.match(a.words, /Cowries are bought in the app — the web link sells nothing/);
   a = tapAction(row(web, "board", "benin")); assert.match(a.words, /Benin bronze is bought in the app/);
   a = tapAction(row(web, "seeds", "stones"), base); assert.equal(a.act, "try"); assert.match(a.words, /7 days played — 3 so far/);
-  a = tapAction(row(app, "seeds", "cowries"), { inApp: true }); assert.equal(a.act, "try"); assert.match(a.words, /comes to the app soon/);
+  a = tapAction(row(app, "seeds", "cowries"), { inApp: true }); assert.equal(a.act, "try"); assert.match(a.words, /no price for Cowries yet/);
   a = tapAction(row(storeView({ ...base, ...priced }), "seeds", "cowries"), priced); assert.deepEqual(a, { act: "buy", id: "cowries", product: "seeds_cowries" });
   a = tapAction({ ...web.gold, id: "gold", name: "Gold" }); assert.equal(a.act, "say"); assert.match(a.words, /Gold is bought in the app/);
   a = tapAction({ ...storeView({ ...base, owned: parseOwned('["gold"]') }).gold, id: "gold", name: "Gold" }); assert.equal(a.words, "Gold is yours");
   a = tapAction(web.bundle); assert.equal(a.act, "say"); assert.match(a.words, /The whole market is bought in the app/);
-  assert.match(restoreWords(false), /web link/); assert.match(restoreWords(true), /soon/);
+  assert.match(restoreWords(false), /web link/); assert.match(restoreWords(true), /Asking the store/);
 });
 
 test("Gold's card lists what it opens, the two not built yet marked coming", () => {

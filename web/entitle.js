@@ -1,5 +1,5 @@
-// Gold and the looks: what this phone owns, behind one module (L9 grows it, L12 fills it from Apple's and Google's own
-// purchase receipts). Nothing is sold yet, so nothing is owned yet; the web link never sells anything and says "in the app".
+// Gold and the looks: what this phone owns, behind one module (L9 grows it; web/purchase.js fills 'ayo.owned' from Apple's
+// and Google's own purchases inside the apps). The web link never sells anything and says "in the app".
 // Pure functions, no DOM, so they are tested in node.
 //
 // Gold opens Master (Papa Ike, L7) and Mama Ngozi's review of a whole game (L9); later the puzzle archive and your history (L9).
@@ -33,12 +33,12 @@ export function featureOpen(feature, owned, preview = null) {
   return !GOLD_FEATURES.includes(feature) || owns(owned, 'gold') || previewed(feature, preview);
 }
 
-// What a tap on a locked Gold opponent (or feature: "Mama Ngozi's review") says: on the web link "in the app"; in the apps, until the store is built, "soon".
+// What a tap on a locked Gold opponent (or feature: "Mama Ngozi's review") says: on the web link "in the app"; in the apps, where it is in the store.
 export function lockedWords(name, inApp) {
-  return inApp ? `${name} plays in Gold — the upgrade comes to the app soon` : `${name} plays in Gold, in the app — the web link sells nothing`;
+  return inApp ? `${name} plays in Gold — it's in the store (the bag on Home)` : `${name} plays in Gold, in the app — the web link sells nothing`;
 }
 export function featureLockedWords(what, inApp) {
-  return inApp ? `${what} is part of Gold — the upgrade comes to the app soon` : `${what} is part of Gold, in the app — the web link sells nothing`;
+  return inApp ? `${what} is part of Gold — it's in the store (the bag on Home)` : `${what} is part of Gold, in the app — the web link sells nothing`;
 }
 
 // The looks sold in the store (L10/L11): looks only, never a win. Each is its own product (the ids L12 creates in the stores),
@@ -71,7 +71,7 @@ export function finishFor(pref, { owned = null, preview = null } = {}) {
 // What a tap on a locked look says (a seed set is plural, a board is not).
 export function lookLockedWords(name, inApp, kind = 'seeds') {
   const is = kind === 'board' ? 'is' : 'are';
-  return inApp ? `${name} ${is} a look from the store — the store comes to the app soon` : `${name} ${is} a look from the store, in the app — the web link sells nothing`;
+  return inApp ? `${name} ${is} a look from the store — the bag on Home` : `${name} ${is} a look from the store, in the app — the web link sells nothing`;
 }
 // The Settings line under Board, in plain words.
 export function boardsLine({ owned = null, preview = null } = {}) {
