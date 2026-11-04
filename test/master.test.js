@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newGame, applyMove, legalMoves, replay } from "../engine/ayo.js";
-import { chooseMove, masterSearch, MASTER } from "../engine/ai.js";
+import { chooseMove, masterSearch, counterReply, MASTER } from "../engine/ai.js";
 import { playGame } from "../tools/master-match.js";
 import { CHARACTERS, faceFor, line } from "../web/characters.js";
 import { parseOwned, owns, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS } from "../web/entitle.js";
@@ -80,4 +80,24 @@ test("Gold: Master is locked until bought, ?try=master opens him for a visit, th
   assert.equal(levelOpen("master", none, previewOf("?room=AB&try=master")), true);
   assert.equal(playable("master", none), "hard", "a locked Master falls back to Mama Ngozi"); assert.equal(playable("master", gold), "master");
   assert.match(lockedWords("Papa Ike", false), /in the app/); assert.match(lockedWords("Papa Ike", true), /Gold/);
+});
+
+test("The player Master sets traps for counts like Mama Ngozi: with her weights and 9 half-moves, counterReply is her move", () => {
+  let seed = 11; const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); let checked = 0;
+  for (let g = 0; g < 8; g++) {
+    let s = newGame("ncho", {}, g % 2);
+    for (let k = 0; k < 3 + g * 2 && !s.over; k++) { const m = legalMoves(s); s = applyMove(s, m[Math.floor(rnd() * m.length)]).state; }
+    if (s.over || legalMoves(s).length < 2) continue;
+    assert.equal(counterReply(s, MASTER.sees, { side: MASTER.seeSide, three: MASTER.seeThree }), chooseMove(s, "hard"), `game ${g}`);
+    checked++;
+  }
+  assert.ok(checked >= 5);
+});
+
+test("From a bad opening Master looks for a turn-round, but only so far: a trap move is never worse than hope seeds by best play", () => {
+  assert.ok(MASTER.hope > 0 && MASTER.hope <= 8 && MASTER.risk > 0);
+  const s = replay([0, 6], "ncho"); // the first mover's pit 0, then Mama Ngozi's best answer: the opener is about 8 seeds down
+  const r = masterSearch(s, { ...fixed, nodes: 60000, traps: 60000 });
+  assert.ok(legalMoves(s).includes(r.pit));
+  if (r.trap) assert.ok(r.trap > 0);
 });

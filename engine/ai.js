@@ -69,25 +69,45 @@ export function rateMoves(state, level = "hard") {
 // table, the table's best move tried first, a better evaluation and a quicker win preferred to a slower one. It thinks
 // for a fixed budget of positions (so the same position always gets the same answer, in a test or on any phone) with a
 // clock as a backstop: on a slow phone the worker stops it at `ms` and plays the deepest search it finished.
-export const MASTER = { nodes: 120000, ms: 1400, maxDepth: 40, contempt: 3, traps: 150000, sees: 8, tie: 1 };
+// side/three: his evaluation (seeds kept on his side; 3s that could become 4s — measured at 0 over the match).
+// sees/seeSide/seeThree: the player he sets traps for counts 9 half-moves and weighs store and side seeds like Mama Ngozi.
+// hope: when his best with best play is a draw or worse, moves up to this many seeds worse are trap candidates too;
+// risk: a move worse with best play must promise that much more per seed it gives up (L7, slice 2).
+export const MASTER = { nodes: 120000, ms: 1400, maxDepth: 40, contempt: 3, traps: 150000, sees: 9, tie: 1, side: 0.35, three: 0, seeSide: 0.08, seeThree: 0, hope: 6, risk: 0.5 };
 const WIN = 1000;
 
 // The position from the side to move, in seeds. Store difference first; then a little for seeds kept on your own side
 // (they are yours at a stalemate call and yours to sow), a pit of 3 on their side your sowing could make 4 is a threat to
 // them, one of 3 on yours is a threat to you; and in the end game whoever is closer to 25 is worth a touch more.
-function masterEval(s) {
+function masterEval(s, w = MASTER) {
   const me = s.turn, you = 1 - me, P = s.pits;
   if (s.over) return s.winner === me ? WIN : s.winner === you ? -WIN : 0;
   let v = s.stores[me] - s.stores[you];
   const mine = me * 6, theirs = you * 6; let sm = 0, st = 0, t3m = 0, t3t = 0;
   for (let k = 0; k < 6; k++) { const a = P[mine + k], b = P[theirs + k]; sm += a; st += b; if (a === 3) t3m++; if (b === 3) t3t++; }
   const four = !s.rules || s.rules.capture === 4;
-  v += (sm - st) * 0.12;
-  if (four) v += (t3t - t3m) * 0.35; // with relay sowing a 3 rarely survives long; the side to move gets there first
+  v += (sm - st) * w.side;
+  if (four) v += (t3t - t3m) * w.three; // with relay sowing a 3 rarely survives long; the side to move gets there first
   return v;
 }
 
 function ttKey(s) { return s.pits.join(',') + '|' + s.stores[0] + ',' + s.stores[1] + '|' + s.turn + '|' + (s.quiet >= 40 ? s.quiet : 0); }
+
+// The move a player who counts `sees` half-moves ahead would choose, weighing positions with `w` (plain alpha-beta, no
+// table, first of equals). With sees 9 and Mama Ngozi's weights it is exactly her move: the player Master sets traps for.
+// `count` is called for every position looked at; when it returns true the look is abandoned and null comes back.
+const STOP = {};
+export function counterReply(s, sees, w, count = () => false) {
+  const look = (p, d, a, b) => {
+    if (count()) throw STOP; if (p.over || d === 0) return masterEval(p, w);
+    const ms = legalMoves(p); if (!ms.length) return masterEval(p, w);
+    let bv = -Infinity; for (const m of ms) { const v = -look(applyMove(p, m).state, d - 1, -b, -a); if (v > bv) bv = v; if (v > a) a = v; if (a >= b) break; } return bv;
+  };
+  let best = null, bv = -Infinity;
+  try { for (const m of legalMoves(s)) { const v = -look(applyMove(s, m).state, sees - 1, -Infinity, Infinity); if (v > bv) { bv = v; best = m; } } }
+  catch (e) { if (e === STOP) return null; throw e; }
+  return best;
+}
 
 // One master search. Returns {pit, value, depth, nodes} — value from the mover's side, in seeds (±1000 for a forced result).
 export function masterSearch(state, opts = {}) {
@@ -95,7 +115,7 @@ export function masterSearch(state, opts = {}) {
   const now = opts.now || (() => (typeof performance !== 'undefined' ? performance.now() : Date.now()));
   const root = { ...state, moves: [] }; // the history is not part of the position; a short list keeps each move cheap
   const moves = legalMoves(root);
-  if (!moves.length) return { pit: null, value: masterEval(root), depth: 0, nodes: 0 };
+  if (!moves.length) return { pit: null, value: masterEval(root, cfg), depth: 0, nodes: 0 };
   if (moves.length === 1) return { pit: moves[0], value: 0, depth: 0, nodes: 0 };
   const me = root.turn; const tt = new Map(); const t0 = now(); let nodes = 0; let stop = false;
   let tick = 0; // the clock is read every 256 inner positions
@@ -109,8 +129,8 @@ export function masterSearch(state, opts = {}) {
   }
   function nega(s, depth, alpha, beta, ply) {
     nodes++;
-    if (s.over) { const e = masterEval(s); return e > 0 ? e - ply : e < 0 ? e + ply : (s.turn === me ? -cfg.contempt : cfg.contempt); } // a draw is worth a little less than nothing to Master: she plays to win
-    if (depth === 0) return masterEval(s);
+    if (s.over) { const e = masterEval(s, cfg); return e > 0 ? e - ply : e < 0 ? e + ply : (s.turn === me ? -cfg.contempt : cfg.contempt); } // a draw is worth a little less than nothing to Master: she plays to win
+    if (depth === 0) return masterEval(s, cfg);
     if (out()) return 0;
     const key = ttKey(s); const hit = tt.get(key); const a0 = alpha;
     if (hit && hit.depth >= depth) {
@@ -119,7 +139,7 @@ export function masterSearch(state, opts = {}) {
       if (hit.flag === -1 && hit.value <= alpha) return hit.value;
     }
     const list = children(s, key);
-    if (!list.length) return masterEval(s);
+    if (!list.length) return masterEval(s, cfg);
     const first = hit ? hit.move : -1;
     const order = first >= 0 ? [...list].sort((x, y) => (y.m === first) - (x.m === first)) : list;
     let best = -Infinity, bestMove = order[0].m;
@@ -136,12 +156,13 @@ export function masterSearch(state, opts = {}) {
   }
   let done = { pit: moves[0], value: 0, depth: 0 }, doneScores = null;
   let rootOrder = moves.slice();
+  const win = Math.max(1, cfg.tie, cfg.hope || 0); // moves within this much of the best get exact values (the trap candidates)
   for (let d = 1; d <= cfg.maxDepth; d++) {
     let alpha = -Infinity, bestPit = rootOrder[0]; const scores = new Map();
     for (const m of rootOrder) {
       const n = applyMove(root, m).state;
-      // a window one seed below the best so far, so every move within a seed of the best gets its exact value (the ties)
-      const v = -nega(n, d - 1, -Infinity, -(alpha - 1), 1);
+      // a window `win` seeds below the best so far, so every move that close to the best gets its exact value (the trap candidates)
+      const v = -nega(n, d - 1, -Infinity, -(alpha - win), 1);
       if (stop) break;
       scores.set(m, v);
       if (v > alpha) { alpha = v; bestPit = m; }
@@ -152,26 +173,26 @@ export function masterSearch(state, opts = {}) {
     if (Math.abs(alpha) >= WIN - 100) break; // a forced result is found: deeper search cannot change it
   }
   // Ties: when several moves are worth the same with best play (a level game is often a draw with best play), Master
-  // picks the one that sets a trap — where the reply that LOOKS best to a player seeing a few moves less far than her
-  // (cfg.sees, half-moves) in fact loses ground against her deeper search. A strong player at a real board does the same.
+  // picks the one that sets a trap — where the reply that LOOKS best to a player seeing a few moves less far than him
+  // (cfg.sees, half-moves) in fact loses ground against his deeper search. A strong player at a real board does the same.
+  // When his best is only a draw or worse (a bad opening), he looks further down the list (cfg.hope) for a move whose
+  // likely reply turns it round, paying cfg.risk for every seed the move gives up against best play.
   if (doneScores && Math.abs(done.value) < WIN - 100 && cfg.traps) {
-    const best = done.value; const ties = rootOrder.filter((m) => doneScores.get(m) >= best - cfg.tie);
+    const best = done.value; const tol = cfg.tie + (best <= 0 ? (cfg.hope || 0) : 0); const ties = rootOrder.filter((m) => doneScores.get(m) >= best - tol);
     if (ties.length > 1) {
-      stop = false; const budget = nodes + cfg.traps; const t1 = now(); const depth = Math.max(1, done.depth - 3);
+      stop = false; const budget = nodes + cfg.traps; const t1 = now(); const depth = Math.max(1, done.depth - (cfg.tdrop ?? 3));
       const saveOut = out; out = () => { if (nodes >= budget || ((++tick & 255) === 0 && now() - t1 > cfg.ms * 0.4)) stop = true; return stop; };
-      const shallow = (s, d, a, b) => { // plain alpha-beta, no table: what a shallower player sees
-        nodes++; if (s.over || d === 0) return masterEval(s);
-        const ms = legalMoves(s); if (!ms.length) return masterEval(s);
-        let bv = -Infinity; for (const m of ms) { const v = -shallow(applyMove(s, m).state, d - 1, -b, -a); if (v > bv) bv = v; if (v > a) a = v; if (a >= b) break; } return bv;
-      };
+      const see = { side: cfg.seeSide ?? cfg.side, three: cfg.seeThree ?? cfg.three };
+      const count = () => { nodes++; return out(); };
       let pick = done.pit, gain = 0;
       for (const m of ties) {
         const n = applyMove(root, m).state; const replies = legalMoves(n); if (replies.length < 2) continue;
-        let seen = null, sv = -Infinity; // the reply a shallower player would choose
-        for (const r of replies) { const n2 = applyMove(n, r).state; const v = -shallow(n2, cfg.sees - 1, -Infinity, Infinity); if (v > sv) { sv = v; seen = n2; } }
+        const reply = counterReply(n, cfg.sees, see, count); if (reply === null) break; // the reply a shallower player would choose
+        const seen = applyMove(n, reply).state;
         const v = nega(seen, depth, -Infinity, Infinity, 2); // and what it is really worth to Master
         if (stop) break;
-        if (v - best > gain + 0.5) { gain = v - best; pick = m; }
+        const g = v - best - (cfg.risk || 0) * (best - doneScores.get(m)); // a move worse with best play must promise more
+        if (g > gain + 0.5) { gain = g; pick = m; }
       }
       out = saveOut;
       if (gain > 0) done = { ...done, pit: pick, trap: gain };
