@@ -102,6 +102,9 @@ if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py):
             k["style"] = (k.get("style") or "") + ".toast{display:none!important}"; return f(self, *a, **k)
         return g
     _P.screenshot = _calm(_P.screenshot); _Lc.screenshot = _calm(_Lc.screenshot)
+#        add --music (with --smoke) to check the music (L17): off on a new phone, Settings → Feel → Music on starts it (bars on the
+#                  clock, the audio running), the speaker on the board silences it and says so under the switch, it keeps playing on
+#                  Home, and off takes every note off the clock
 #        add --wake (with --smoke) to check keeping the screen on: a stand-in for the browser's wake lock records each request; during the
 #                  game the screen is held, 3 minutes with nobody touching it lets it go, a key takes it back, Home lets it go, Play takes it
 #                  again, and Settings → Feel → Keep the screen on off lets it go
@@ -127,7 +130,7 @@ if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py):
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; story = story or reviewc; record = record or story
+out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1394,6 +1397,26 @@ with sync_playwright() as p:
             homes = pg.evaluate("(()=>{const s=window.__ayo.seeds;return s.length})()"); assert homes == 48, homes
             assert pg.evaluate("document.querySelector('#hint').textContent") != words, "the hint line goes back to your move"
             print("undo:", words, "· the seeds flew back; moves", n, "→", len(st2["moves"]), "· badges", counts)
+        if musicc:  # music: off by default, on from Settings, silenced by the speaker, off with nothing left on the clock
+            pg.wait_for_function("!window.__ayo.busy", timeout=240000)
+            m = pg.evaluate("window.__ayo.music"); assert not m["on"] and not m["playing"], ("music is off on a new phone", m)
+            pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])")
+            assert pg.evaluate("document.querySelector('[data-set=music]').getAttribute('aria-checked')") == "false"
+            pg.click("[data-set=music]"); assert pg.evaluate("localStorage.getItem('ayo.music')") == "1"
+            pg.wait_for_timeout(600); m = pg.evaluate("window.__ayo.music")
+            assert m["playing"] and m["bars"] >= 1 and m["scheduled"] > 10 and m["state"] == "running", ("on: the tune plays", m)
+            assert m["note"] == "", m
+            pg.click("#settingsBack"); pg.wait_for_timeout(300)
+            pg.click("#soundBtn"); pg.wait_for_timeout(400); m = pg.evaluate("window.__ayo.music"); assert not m["playing"] and m["pending"] == 0, ("the speaker silences it", m)
+            pg.click("#settingsBtn"); assert "sound is off" in pg.evaluate("document.querySelector('#musicNow').textContent"); pg.click("#settingsBack")
+            pg.click("#soundBtn"); pg.wait_for_timeout(400); assert pg.evaluate("window.__ayo.music")["playing"], "the speaker on again: it plays again"
+            pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])"); pg.wait_for_timeout(4000)
+            m = pg.evaluate("window.__ayo.music"); assert m["playing"] and m["bars"] >= 2, ("it carries on at Home", m)
+            pg.click("#homeSettings")
+            pg.wait_for_selector("#settings:not([hidden])"); pg.click("[data-set=music]"); pg.wait_for_timeout(300)
+            m = pg.evaluate("window.__ayo.music"); assert not m["playing"] and m["pending"] == 0 and pg.evaluate("localStorage.getItem('ayo.music')") == "0", ("off: nothing left", m)
+            pg.click("#settingsBack"); pg.wait_for_timeout(200)
+            print("music:", m)
         if wakec:  # keep the screen on: held during the game, let go when it is not wanted
             pg.wait_for_function("!window.__ayo.busy", timeout=240000); pg.wait_for_timeout(200)
             w = pg.evaluate("window.__ayo.wake"); assert w["supported"] and w["wanted"] and w["held"], ("the screen should be held while the game is in play", w)

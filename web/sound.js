@@ -9,11 +9,11 @@
 // seed had already settled. Meka: "it should sound like a seed actually dropped in a wooden pit".)
 // The samples are pure numbers (tested in node); boardAudio needs a Web Audio context.
 
-function rng(n) { let s = (n >>> 0) || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+export function rng(n) { let s = (n >>> 0) || 1; return () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
 
 // Add a decaying resonance to `out`: amplitude a, frequency f (Hz), dying to 1/e in tau seconds (a two-pole ringing
 // filter struck once: y[n] = 2r·cos(w)·y[n-1] − r²·y[n-2], which is a·rⁿ·sin(wn)).
-function ring(out, rate, f, a, tau) {
+export function ring(out, rate, f, a, tau) {
   if (!(f > 0) || f >= rate * 0.45) return;
   const w = 2 * Math.PI * f / rate, r = Math.exp(-1 / (tau * rate)), c = 2 * r * Math.cos(w), r2 = r * r;
   const n = Math.min(out.length, Math.ceil(tau * rate * 9)); // until it is ~80 dB down
@@ -21,14 +21,14 @@ function ring(out, rate, f, a, tau) {
   for (let i = 2; i < n; i++) { const y = c * y1 - r2 * y2; out[i] += y; y2 = y1; y1 = y; }
 }
 // The contact itself: a burst of noise a few tenths of a millisecond long, with its low end taken out.
-function burst(out, rate, a, tau, hp, rand) {
+export function burst(out, rate, a, tau, hp, rand) {
   const n = Math.min(out.length, Math.ceil(tau * rate * 8)), k = Math.exp(-1 / (tau * rate)), al = 1 / (1 + 2 * Math.PI * hp / rate);
   let e = a, x1 = 0, y1 = 0;
   for (let i = 0; i < n; i++) { const x = (rand() * 2 - 1) * e, y = al * (y1 + x - x1); out[i] += y; x1 = x; y1 = y; e *= k; }
 }
 // A strike takes a moment (no hard edge at the very start), the tail fades to nothing, and the peak sits at 0.9
 // (the player sets the loudness).
-function finish(out, rate) {
+export function finish(out, rate) {
   const on = Math.max(1, Math.round(rate * 0.00025)); for (let i = 0; i < on && i < out.length; i++) out[i] *= 0.5 - 0.5 * Math.cos(Math.PI * i / on);
   const off = Math.min(out.length, Math.round(rate * 0.006)); for (let i = 0; i < off; i++) out[out.length - 1 - i] *= i / off;
   let p = 0; for (const v of out) p = Math.max(p, Math.abs(v)); if (p > 0) for (let i = 0; i < out.length; i++) out[i] *= 0.9 / p;
