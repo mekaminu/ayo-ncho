@@ -45,6 +45,11 @@ const LOOKS = {
   easy: { skin: '#9c6b3f', cloth: '#c9184a', grin: 1,
     hair: '<path d="M19 26c0-9 6-14 13-14s13 5 13 14" fill="#1a0f07"/><circle cx="19" cy="24" r="3.5" fill="#e6b76f"/><circle cx="45" cy="24" r="3.5" fill="#e6b76f"/>',
     rest: '<path d="M27 36q5 4 10 0" stroke="#1a0f07" stroke-width="1.6" fill="none" stroke-linecap="round"/>', always: '' },
+  // Auntie Bisi (Steady): a primary-school teacher — a gele tied high in indigo, reading glasses, small gold studs
+  steady: { skin: '#8a5530', cloth: '#7a3b2a', grin: 0.65,
+    hair: '<path d="M16 23c1-9 8-14 16-14s15 5 16 14c-3-2-6-3-8-3l-8 2-8-2c-2 0-5 1-8 3z" fill="#3a5bb0"/><path d="M24 12q8-6 16 0q-2 4-8 3q-6 1-8-3z" fill="#5b7fd1"/><path d="M18 21q14-5 28 0" stroke="#e6b76f" stroke-width="1.2" fill="none"/>',
+    rest: '<path d="M27 37q5 2.6 10 0" stroke="#1a0f07" stroke-width="1.6" fill="none" stroke-linecap="round"/>',
+    always: '<circle cx="27" cy="29" r="3.6" fill="none" stroke="#c8932f" stroke-width="1.1"/><circle cx="37" cy="29" r="3.6" fill="none" stroke="#c8932f" stroke-width="1.1"/><path d="M30.6 29h2.8" stroke="#c8932f" stroke-width="1.1"/><circle cx="19.5" cy="32" r="1.4" fill="#e6b76f"/><circle cx="44.5" cy="32" r="1.4" fill="#e6b76f"/>' },
   medium: { skin: '#7a4a24', cloth: '#1d3557', grin: 0.8,
     hair: '<path d="M19 24c1-9 7-12 13-12s12 3 13 12" fill="#1a0f07"/>',
     rest: '<path d="M26 37q6 3 12 0" stroke="#1a0f07" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M22 24l9-2" stroke="#1a0f07" stroke-width="1.4" stroke-linecap="round"/>', always: '' },
@@ -84,6 +89,22 @@ export const CHARACTERS = {
     // your record against them: what they say when you are on a run (yours: you keep winning; theirs: they do)
     runs: { yours: { 3: 'Three in a row? I\'m telling Mama.', 5: 'Five! Are you magic?', more: (n) => `${n} in a row. I give up. No I don't.` },
             theirs: { 3: 'Three for me! Hehe.', 5: 'Five! I\'m the champion of everything.', more: (n) => `${n}! Are you letting me win?` } },
+  },
+  steady: {
+    name: 'Auntie Bisi', level: 'Steady', bio: 'Teaches at the primary school. Counts every pit twice, and makes you count it too.',
+    lines: {
+      start: ['Sit up straight. We count before we sow.', 'Good afternoon. Your move, and no rushing.'],
+      capture: ['Four. Now you see why we count.', 'Mm. Write that one down.', 'Thank you. Next.'],
+      lost: ['Very good. That was well counted.', 'Ah. A star for you.', 'I saw that coming. Too late.'],
+      undo: ['Correction is allowed. Once.', 'Rub it out, then. Neatly.'],
+      win: ['Homework: count to four, carefully.', 'Well tried. Again tomorrow.'],
+      lose: ['Excellent. Top of the class.', 'You were listening after all.'],
+      firstWin: ['Well done! I knew you could. Now Nnamdi.'],
+      last8: ['Eight left. Count them, every one.', 'The last eight. Concentrate, please.'],
+      circling: ['We are going round in circles. Somebody take something.', 'Round and round. Think, class.'],
+    },
+    runs: { yours: { 3: 'Three in a row. You have been practising.', 5: 'Five! I am telling your mother — good news, this time.', more: (n) => `${n} in a row. Time I moved you up a class.` },
+            theirs: { 3: 'Three for me. Count slower.', 5: 'Five. We will go over it again.', more: (n) => `${n}. Patience. Counting is a habit.` } },
   },
   medium: {
     name: 'Nnamdi', level: 'Medium', bio: 'Your quick cousin. Talks more than he plans, plans more than you think.',

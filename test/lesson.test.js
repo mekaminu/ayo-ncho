@@ -80,8 +80,9 @@ test("the lesson is due once, for the computer, never for two of us; new phones 
 });
 
 test("after a first win the next opponent up is offered, never past Mama Ngozi", () => {
-  const names = { easy: "Adaeze", medium: "Nnamdi", hard: "Mama Ngozi" };
-  assert.deepEqual(nextUp("easy", "firstWin", names), { level: "medium", text: "Ready for Nnamdi? Play him next · Medium" });
+  const names = { easy: "Adaeze", steady: "Auntie Bisi", medium: "Nnamdi", hard: "Mama Ngozi" };
+  assert.deepEqual(nextUp("easy", "firstWin", names), { level: "steady", text: "Ready for Auntie Bisi? Play her next · Steady" });
+  assert.deepEqual(nextUp("steady", "firstWin", names), { level: "medium", text: "Ready for Nnamdi? Play him next · Medium" });
   assert.deepEqual(nextUp("medium", "firstWin", names), { level: "hard", text: "Ready for Mama Ngozi? Play her next · Hard" });
   assert.equal(nextUp("hard", "firstWin", names), null);
   assert.equal(nextUp("easy", "run", names), null); assert.equal(nextUp("easy", null, names), null);

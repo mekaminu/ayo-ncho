@@ -307,7 +307,8 @@ with sync_playwright() as p:
         end = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "endgame.js"), "7", "ncho"]).decode())
         saved = {"moves": end["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "hard", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 7 * 60 * 1000}}  # a game that began a few minutes ago
         before = {"easy": {"w": 4, "l": 2, "d": 0, "best": [31, 17], "run": 1}, "medium": {"w": 1, "l": 3, "d": 1, "best": [25, 23], "run": -2}, "hard": {"w": 2, "l": 1, "d": 0, "best": [26, 22], "run": 2}, "last": 1}
-        pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.record', %s); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.tutorial', '3');" % (json.dumps(json.dumps(saved)), json.dumps(json.dumps(before))))
+        rbefore = {"r": 1180, "n": 14, "last": 0, "change": 12}  # a settled rating, up 12 last game
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.record', %s); localStorage.setItem('ayo.rating', %s); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.tutorial', '3'); }" % (json.dumps(json.dumps(saved)), json.dumps(json.dumps(before)), json.dumps(json.dumps(rbefore))))
     if last8:  # a saved game against Nnamdi one move from the last 8
         pos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "last8pos.js"), "5"]).decode())
         saved = {"moves": pos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "medium", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 5 * 60 * 1000}}
@@ -336,7 +337,10 @@ with sync_playwright() as p:
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
     if record:
         pills = pg.evaluate("[...document.querySelectorAll('.pill[data-level]')].map(b=>[b.dataset.level, b.querySelector('small.rec').textContent])")
-        assert pills == [["easy", "you lead 4–2"], ["medium", "you trail 1–3"], ["hard", "you lead 2–1"], ["master", ""]], pills
+        assert pills == [["easy", "you lead 4–2"], ["steady", ""], ["medium", "you trail 1–3"], ["hard", "you lead 2–1"], ["master", ""]], pills
+        rl = pg.evaluate("document.querySelector('#ratingLine').hidden ? null : document.querySelector('#ratingText').textContent"); assert rl == "Your rating 1180 · +12 last game", rl
+        assert pg.evaluate("document.querySelector('.pill[data-level=steady] .face svg') !== null"), "Auntie Bisi's face on her pill"
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("Home scrolls sideways", W)
         assert not pg.evaluate("document.querySelector('#continueBtn').disabled") and "moves in" in pg.evaluate("document.querySelector('#continueSub').textContent"), "the saved game should be there to continue"
         print("record: Home pills", pills)
         out2 = out[:-4] + "-home.png" if out.endswith(".png") else out + "-home.png"
@@ -356,6 +360,26 @@ with sync_playwright() as p:
         kept = json.loads(pg.evaluate("localStorage.getItem('ayo.record')"))
         assert kept["hard"] == {"w": 3, "l": 1, "d": 0, "best": end["scores"], "run": 3} and kept["easy"] == before["easy"] and kept["last"] == saved["stats"]["started"], kept
         print("record: card says", line, say)
+        # your rating: 1180 against Mama Ngozi (1600), a win at K 24 — the number ticks up to it on the card and Home says it
+        want = round(1180 + 24 * (1 - 1 / (1 + 10 ** ((1600 - 1180) / 400))))
+        assert not pg.evaluate("document.querySelector('#goRating').hidden"), "the rating shows on the card"
+        pg.wait_for_function("document.querySelector('#goRatingNum').textContent === '%d'" % want, timeout=8000)
+        ch = pg.evaluate("document.querySelector('#goRatingChange').textContent"); why = pg.evaluate("document.querySelector('#goRatingWhy').textContent")
+        assert ch == "+%d" % (want - 1180) and why == "+%d for beating Mama Ngozi (1600)" % (want - 1180), (ch, why)
+        kr = json.loads(pg.evaluate("localStorage.getItem('ayo.rating')")); assert kr == {"r": want, "n": 15, "last": saved["stats"]["started"], "change": want - 1180}, kr
+        print("rating: 1180 →", want, "·", why)
+        if not story:
+            pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300)
+            pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+            assert pg.evaluate("window.__ayo.rating")["r"] == want, "the rating is kept over a reload"
+            rl = pg.evaluate("document.querySelector('#ratingText').textContent"); assert rl == "Your rating %d · +%d last game" % (want, want - 1180), rl
+            pg.click(".pill[data-level=steady]"); assert pg.evaluate("window.__ayo.level") == "steady" and "Auntie Bisi · Steady" in pg.evaluate("document.querySelector('#playSub').textContent")
+            pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=60000)
+            assert pg.evaluate("document.querySelector('#oppName').textContent") == "Auntie Bisi · Steady", pg.evaluate("document.querySelector('#oppName').textContent")
+            if pg.evaluate("window.__ayo.state.turn") == 0: tap(pg, pg.evaluate("window.__ayo.legal")[0])
+            pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy", timeout=60000)
+            print("steady: Auntie Bisi chosen on Home, played and answered", pg.evaluate("window.__ayo.state.moves"))
         if story:
             pg.wait_for_timeout(2200)  # the line draws in, the marks pop
             js = "import('%s').then(async (m) => { const s = m.gameStory(%s, 'ncho', {}, 0); console.log(JSON.stringify({ words: m.storyWords(s, { me: 'You', them: 'Mama Ngozi' }), biggest: s.biggest })); })" % (os.path.join(root, "web", "story.js"), json.dumps(end["moves"] + [end["pit"]]))
@@ -373,10 +397,11 @@ with sync_playwright() as p:
             b.close()
             if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
             srv.shutdown(); print("wrote", out); sys.exit(0)
-        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(500); pg.screenshot(path=out, timeout=120000, animations="disabled")
+        out3 = out[:-4] + "-steady.png" if out.endswith(".png") else out + "-steady.png"
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(500); pg.screenshot(path=out3, timeout=120000, animations="disabled")
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
-        srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
+        srv.shutdown(); print("wrote", out, out2, "and", out3); sys.exit(0)
     if startsc:
         sub = pg.evaluate("document.querySelector('#playSub').textContent"); assert sub == "vs Mama Ngozi · Hard · Mama Ngozi starts", sub
         pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])")

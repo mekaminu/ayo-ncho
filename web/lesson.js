@@ -60,9 +60,9 @@ export function lessonDue({ newPhone, mode, lesson }) { return !!newPhone && mod
 export function firstLevel(newPhone) { return newPhone ? 'easy' : 'medium'; }
 
 // After your first ever win over an opponent, the Game over card offers the next one up (never past Mama Ngozi).
-export const LADDER = ['easy', 'medium', 'hard'];
+export const LADDER = ['easy', 'steady', 'medium', 'hard'];
 export function nextUp(level, moment, names) {
   const i = LADDER.indexOf(level); if (moment !== 'firstWin' || i < 0 || i >= LADDER.length - 1) return null;
-  const to = LADDER[i + 1], label = { medium: 'Medium', hard: 'Hard' }[to];
-  return { level: to, text: `Ready for ${names[to]}? Play ${to === 'hard' ? 'her' : 'him'} next · ${label}` };
+  const to = LADDER[i + 1], label = { steady: 'Steady', medium: 'Medium', hard: 'Hard' }[to];
+  return { level: to, text: `Ready for ${names[to]}? Play ${to === 'medium' ? 'him' : 'her'} next · ${label}` };
 }

@@ -85,6 +85,6 @@ test("the hint line and their move's words say when a move sweeps the last seeds
 });
 
 test("every opponent has a word for the last 8", () => {
-  for (const k of ["easy", "medium", "hard"]) assert.ok(CHARACTERS[k].lines.last8.length >= 2, k);
+  for (const k of Object.keys(CHARACTERS)) assert.ok(CHARACTERS[k].lines.last8.length >= 2, k);
   assert.equal(MOOD_FOR.last8, "surprised");
 });

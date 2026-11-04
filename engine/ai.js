@@ -3,6 +3,7 @@ import { applyMove, legalMoves, seedsOnSide, opponent, WIN_SEEDS } from "./ayo.j
 
 export const LEVELS = {
   easy:   { depth: 1, noise: 3.0 },   // plays like a child: shallow, a bit random
+  steady: { depth: 3, noise: 1.5 },   // Auntie Bisi: counts a move and its answer, not much further (between Easy and Medium)
   medium: { depth: 4, noise: 0.6 },
   hard:   { depth: 9, noise: 0.0 },
 };

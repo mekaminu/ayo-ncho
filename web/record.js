@@ -1,12 +1,12 @@
 // Your record against each opponent: wins, losses, draws and your best win, kept on this phone per opponent
-// (Adaeze, Nnamdi, Mama Ngozi). Pure functions (no DOM) so they are tested in node.
+// (Adaeze, Auntie Bisi, Nnamdi, Mama Ngozi, Papa Ike). Pure functions (no DOM) so they are tested in node.
 // Storage shape: { easy: {w, l, d, best: [you, them] | null, run}, medium: {…}, hard: {…}, last: <game id> }
 //   run  — your current run against them: +3 is three wins in a row, −2 two losses; a draw ends a run
 //   best — the win with the widest margin (the higher score of yours breaks a tie)
 //   last — the id of the last game counted, so one game is never counted twice (a reload, a replay)
 // Online games and the daily puzzle are not counted: a friend is not an opponent with a record, and a puzzle is one move.
 
-export const LEVELS = ['easy', 'medium', 'hard', 'master'];
+export const LEVELS = ['easy', 'steady', 'medium', 'hard', 'master'];
 
 const fresh = () => ({ w: 0, l: 0, d: 0, best: null, run: 0 });
 
