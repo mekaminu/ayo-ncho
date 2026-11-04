@@ -15,7 +15,7 @@ export const owns = (owned, item) => !!owned && owned.has(item);
 
 // A look at Gold before it can be bought, for that visit only (never kept), so Meka and the testers can try it now:
 // `?try=master` opens Papa Ike, `?try=review` Mama Ngozi's review, `?try=gold` all of Gold. Gone once purchases exist (L12).
-const PREVIEWS = ['master', 'review', 'gold'];
+const PREVIEWS = ['master', 'review', 'gold', 'looks']; // ?try=looks: the store's looks (cowries, palm kernels) for the visit
 export function previewOf(search) {
   try { const t = new URLSearchParams(search || '').get('try'); return PREVIEWS.includes(t) ? t : null; } catch { return null; }
 }
@@ -39,4 +39,33 @@ export function lockedWords(name, inApp) {
 }
 export function featureLockedWords(what, inApp) {
   return inApp ? `${what} is part of Gold — the upgrade comes to the app soon` : `${what} is part of Gold, in the app — the web link sells nothing`;
+}
+
+// The looks sold in the store (L10/L11): looks only, never a win. Each is its own product (the ids L12 creates in the stores),
+// and the bundle owns every one. Gold is depth and teaching, so it does not open looks, nor ?try=gold; ?try=looks does.
+export const LOOKS = {
+  cowries: { product: 'seeds_cowries', kind: 'seeds', name: 'Cowries' },
+  kernels: { product: 'seeds_palm_kernels', kind: 'seeds', name: 'Palm kernels' },
+};
+export const BUNDLE = 'bundle_all';
+export function lookOpen(id, owned, preview = null) {
+  const L = LOOKS[id]; if (!L) return true;
+  return owns(owned, L.product) || owns(owned, BUNDLE) || preview === 'looks';
+}
+// The seed set to draw: what the phone chose, if it may have it — river stones once the calm streak has earned them, a store
+// look once bought (or previewed) — else Job's tears. Anything unknown is Job's tears.
+export function seedSetFor(pref, { stones = false, owned = null, preview = null } = {}) {
+  if (pref === 'stones') return stones ? 'stones' : 'jobs';
+  if (LOOKS[pref]) return lookOpen(pref, owned, preview) ? pref : 'jobs';
+  return 'jobs';
+}
+// What a tap on a locked look says.
+export function lookLockedWords(name, inApp) {
+  return inApp ? `${name} are a look from the store — the store comes to the app soon` : `${name} are a look from the store, in the app — the web link sells nothing`;
+}
+// The Settings line under Seeds, in plain words.
+export function seedsLine({ stones, days, need, owned = null, preview = null }) {
+  const st = stones ? 'river stones (yours: 7 days played)' : `river stones at ${need} days played (${days} so far)`;
+  const shop = Object.keys(LOOKS).filter((id) => !lookOpen(id, owned, preview)).map((id) => LOOKS[id].name.toLowerCase());
+  return `Job's tears · ${st}` + (shop.length ? ` · ${shop.join(' and ')} in the store` : '');
 }

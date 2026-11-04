@@ -58,3 +58,32 @@ export function clothTexture(q={}){
   ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; t.wrapS=t.wrapT=THREE.RepeatWrapping; t.repeat.set(6,6); return t;
 }
 
+// Cowries (L10, a look sold in the store): the money cowrie's glossy ivory back with a faint warm band and paler flanks, and
+// on the flat underside (the sphere's bottom, v < ~0.35) the slit along the shell's length lined with its little teeth.
+// The slit sits on the meridians where z = 0 (u = 0, 0.5, 1 in three's sphere), the long axis of the scaled seed.
+export function cowrieTexture(q={}){
+  const S=q.seedS||256; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d');
+  const n=noise2(S,S,4); const img=ctx.createImageData(S,S);
+  for(let y=0;y<S;y++) for(let x=0;x<S;x++){ const i=y*S+x, o=i*4; const u=x/S, v=1-y/S; const t=n[i];
+    let r=0xee+t*14, g=0xe2+t*12, b=0xc6+t*10; // ivory
+    const band=Math.exp(-Math.pow((v-0.78)/0.07,2))*0.6+Math.exp(-Math.pow((v-0.62)/0.05,2))*0.35; r-=band*22; g-=band*30; b-=band*46; // the dorsal bands, a pale honey
+    if(v<0.42){ const k=(0.42-v)/0.42; r+=k*10; g+=k*14; b+=k*24; } // the base whiter
+    const du=Math.min(Math.abs(u-0),Math.abs(u-0.5),Math.abs(u-1)); const w=0.006+0.05*Math.max(0,0.32-v);
+    if(v<0.36 && du<w*2.6){ const tooth=Math.sin(v*190)>0.15; const inSlit=du<w; // the dark slit, ridged teeth on its lips
+      const d=inSlit?0.62:(tooth?0.2:0.04); r*=1-d; g*=1-d*1.05; b*=1-d*1.15; }
+    img.data[o]=Math.min(255,r); img.data[o+1]=Math.min(255,g); img.data[o+2]=Math.min(255,b); img.data[o+3]=255; }
+  ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}
+// Palm kernels (L10): the nut's dark brown shell, a net of pale fibres where the husk was and a few warmer patches, and the
+// three germ pores ("eyes") at one end (the +x end of the seed: u = 0.5, v = 0.5).
+export function kernelTexture(q={}){
+  const S=q.seedS||256; const c=document.createElement('canvas'); c.width=c.height=S; const ctx=c.getContext('2d');
+  const n=noise2(S,S,5), f=noise2(S,S,4), m=noise2(S,S,2); const img=ctx.createImageData(S,S);
+  for(let y=0;y<S;y++) for(let x=0;x<S;x++){ const i=y*S+x, o=i*4; const u=x/S, v=1-y/S; const t=n[i];
+    const fibre=Math.pow(Math.max(0,1-Math.abs(f[i]-0.5)*5),1.5)*0.8+Math.pow(Math.max(0,1-Math.abs(n[i]-0.45)*9),2)*0.4;
+    const patch=Math.max(0,m[i]-0.55)*1.6;
+    let r=0x2c+t*24+fibre*112+patch*50, g=0x1c+t*16+fibre*80+patch*32, b=0x11+t*8+fibre*50+patch*16;
+    for(const [pu,pv] of [[0.5,0.56],[0.47,0.46],[0.53,0.46]]){ const d=Math.hypot((u-pu)*2,(v-pv)); if(d<0.026){ const k=1-d/0.026; r+=k*70; g+=k*58; b+=k*40; } }
+    img.data[o]=Math.min(255,r); img.data[o+1]=Math.min(255,g); img.data[o+2]=Math.min(255,b); img.data[o+3]=255; }
+  ctx.putImageData(img,0,0); const t=new THREE.CanvasTexture(c); t.colorSpace=THREE.SRGBColorSpace; return t;
+}

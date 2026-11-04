@@ -12,7 +12,7 @@ import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink, inApp } from './app.js';
-import { parseOwned, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS, featureOpen, featureLockedWords } from './entitle.js';
+import { parseOwned, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS, featureOpen, featureLockedWords, LOOKS, lookOpen, seedSetFor, lookLockedWords, seedsLine } from './entitle.js';
 import { reviewPlan, reviewOf, summaryWords, stepWords, OPEN_LINES, CLEAN_LINE, END_LINE } from './review.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
@@ -62,14 +62,13 @@ const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 20);
 const finish = params.get('finish') || prefs.get('finish', 'mahogany');
 const board = buildBoard(scene, finish, Q); buildTable(scene, Q); buildLights(scene, Q.lite ? Q.shadow : phone || (window.devicePixelRatio || 1) > 2 ? 1024 : 2048);
-const seedGeometry = seedGeometryFor(Q);
-// seed set: Job's tears, or river stones once the calm streak has unlocked them
+// seed set: Job's tears; river stones once the calm streak has unlocked them; cowries and palm kernels once bought (or ?try=looks)
 let streak = parseStreak(prefs.get('streak', null));
-const seedSetId = () => { const v = prefs.get('seeds', 'jobs'); return v === 'stones' && unlocked(streak, 'stones') ? 'stones' : 'jobs'; };
-let SET = SEED_SETS[seedSetId()]; let seedMat = seedMaterialFor(seedSetId(), Q); const seedMats = { [seedSetId()]: seedMat };
+const seedSetId = () => seedSetFor(prefs.get('seeds', 'jobs'), { stones: unlocked(streak, 'stones'), owned: owned(), preview: GOLD_PREVIEW });
+let SET = SEED_SETS[seedSetId()]; let seedMat = seedMaterialFor(seedSetId(), Q); const seedMats = { [seedSetId()]: seedMat }; let seedGeometry = seedGeometryFor(Q, seedSetId()), seedGeometryOver = seedGeometryFor(Q, seedSetId(), true);
 function applySeedSet() { // swap every seed's look and shape in place (no new game needed)
-  const id = seedSetId(); SET = SEED_SETS[id]; seedMat = seedMats[id] = seedMats[id] || seedMaterialFor(id, Q);
-  for (const m of seeds) { m.material = seedMat; const j = m.userData.jit; m.scale.set(SET.r[0] * j[0], SET.r[1] * j[1], SET.r[2] * j[2]); }
+  const id = seedSetId(); SET = SEED_SETS[id]; seedMat = seedMats[id] = seedMats[id] || seedMaterialFor(id, Q); seedGeometry = seedGeometryFor(Q, id); seedGeometryOver = seedGeometryFor(Q, id, true);
+  for (const m of seeds) { m.material = seedMat; m.geometry = m.userData.over ? seedGeometryOver : seedGeometry; const j = m.userData.jit; m.scale.set(SET.r[0] * j[0], SET.r[1] * j[1], SET.r[2] * j[2]); }
   for (const k in homes) homes[k].forEach((m, i) => { if (!sim.has(m)) put(m, slotPose(k === 'S0' || k === 'S1' ? k : +k, i, m)); });
 }
 const sim = new SeedSim(surfaceY);
@@ -78,6 +77,7 @@ const sim = new SeedSim(surfaceY);
 let baseTheta = 0; /* π when you hold the far seat of an online room: your pits still nearest you */ let theta = 0, phi = 0.72, dist = 1.55; const target = new THREE.Vector3(0, 0.02, 0.02);
 function placeCam() { camera.position.set(target.x + dist * Math.sin(phi) * Math.sin(theta), target.y + dist * Math.cos(phi), target.z + dist * Math.sin(phi) * Math.cos(theta)); camera.lookAt(target); }
 let wide = null, fitDist = 1.55;
+const CLOSE = params.get('still') === 'close';
 // The board's edge, along its top and its foot: all of it has to be on screen.
 const EDGE = []; const vp = new THREE.Vector3();
 for (const [sx, sz, a0] of [[1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI], [1, -1, Math.PI * 1.5]]) for (let i = 0; i <= 6; i++) {
@@ -108,6 +108,7 @@ function frame() {
   dist = fitDist = hi; placeCam(); const b = onScreen(w, h);
   camera.setViewOffset(w, h, ((b.l + b.r) - (R.l + R.r)) / 2, ((b.t + b.b) - (R.t + R.b)) / 2, w, h);
   theta = th; placeCam();
+  if (CLOSE) { camera.clearViewOffset(); target.set(pitCenters[3][0] - 0.02, 0.06, pitCenters[3][1] + 0.03); phi = 0.78; dist = 0.36; placeCam(); } // ?still=close: a close look at the seeds (the seed-set renders)
 }
 function resize() {
   const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
@@ -141,7 +142,7 @@ function slotPose(home, k, m) { // where the k-th seed of a home lies, and how i
 const handPose = (pit, k) => place(spots('hand')[Math.min(k, 47)], pitCenters[pit][0], pitCenters[pit][1], BT + HAND_Y, pit * 1.3);
 function put(m, p) { m.position.set(p.x, p.y, p.z); m.rotation.set(p.rx, p.ry, p.rz); }
 function makeSeed() {
-  const m = new THREE.Mesh(seedGeometry, seedMat); m.rotation.order = 'XZY'; // turned to its yaw, then leant with what it rests on (slots.js)
+  const over = rnd() < 0.45; const m = new THREE.Mesh(over ? seedGeometryOver : seedGeometry, seedMat); m.userData.over = over; m.rotation.order = 'XZY'; // turned to its yaw, then leant with what it rests on (slots.js)
   m.userData.jit = [0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2]; // each seed its own size, kept across seed sets
   m.scale.set(SET.r[0] * m.userData.jit[0], SET.r[1] * m.userData.jit[1], SET.r[2] * m.userData.jit[2]);
   m.rotation.set(rnd() * 0.6 - 0.3, rnd() * Math.PI * 2, rnd() * 0.6 - 0.3);
@@ -1240,8 +1241,9 @@ function paintSettings() {
   const r = settings.rules();
   const set = (name, v) => document.querySelectorAll(`[data-set="${name}"] .segbtn, [data-set="${name}"] .swatch`).forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === String(v)));
   set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', seedSetId()); set('speed', settings.speed); set('starts', startsPref());
-  const stones = unlocked(streak, 'stones'); $('[data-set="seeds"] [data-v="stones"]').disabled = !stones;
-  $('#seedsSub').textContent = stones ? "Job's tears · river stones (yours: 7 days played)" : `Job's tears · river stones unlock at ${MILESTONES[0].days} days played (${streak.days.length} so far)`;
+  const stones = unlocked(streak, 'stones'); const sb = $('[data-set="seeds"] [data-v="stones"]'); sb.classList.toggle('locked', !stones); sb.setAttribute('aria-label', stones ? 'River stones' : `River stones — at ${MILESTONES[0].days} days played`);
+  for (const id in LOOKS) { const b = $(`[data-set="seeds"] [data-v="${id}"]`); const shut = !lookOpen(id, owned(), GOLD_PREVIEW); b.classList.toggle('locked', shut); b.setAttribute('aria-label', shut ? `${LOOKS[id].name} — in the store` : LOOKS[id].name); }
+  $('#seedsSub').textContent = seedsLine({ stones, days: streak.days.length, need: MILESTONES[0].days, owned: owned(), preview: GOLD_PREVIEW });
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : '';
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
@@ -1294,7 +1296,10 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
       else if (name === 'capture') { prefs.set('rules.capture', v); rulesChanged(); }
       else if (name === 'relay') { prefs.set('rules.relay', v); rulesChanged(); }
       else if (name === 'finish') { prefs.set('finish', v); toast('New wood on the next game'); }
-      else if (name === 'seeds') { if (v === 'stones' && !unlocked(streak, 'stones')) return; prefs.set('seeds', v); applySeedSet(); }
+      else if (name === 'seeds') { // a seed set this phone does not have yet says where it comes from, and stays as it was
+        if (v === 'stones' && !unlocked(streak, 'stones')) { toast(`River stones come with ${MILESTONES[0].days} days played — ${streak.days.length} so far`, 2600); click(0.7, 0.05); return; }
+        if (LOOKS[v] && !lookOpen(v, owned(), GOLD_PREVIEW)) { toast(lookLockedWords(LOOKS[v].name, inApp()), 3200); click(0.7, 0.05); return; }
+        prefs.set('seeds', v); applySeedSet(); paintSettings(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
       else if (name === 'starts') { prefs.set('starts.pref', v); toast(v === 'loser' ? 'From the next game: the loser goes first' : v === 'you' ? 'From the next game: you always start' : 'From the next game: they always start'); }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto')) { prefs.set('quality', v); save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
@@ -1655,7 +1660,7 @@ else if (roomParam) startOnline(roomParam); // an invite link: straight to the b
 else if (params.get('still')) { // a render for Meka: a mid-game position with pit 4 selected (?still=late: near the end, both troughs full)
   if (params.get('still') === 'late') { state.pits = [0, 1, 0, 2, 1, 0, 0, 1, 1, 0, 1, 1]; state.stores = [18, 22]; }
   else { state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; }
-  layoutFromState(state); refreshStatic(); select(3); showScreen('play');
+  layoutFromState(state); refreshStatic(); if (!CLOSE) select(3); showScreen('play');
 } else if (params.get('lesson') && !params.get('stay')) { // ?lesson=1: the lesson straight away, as a new phone (with ?stay=home: Home, as a new phone, so Play opens it)
   openLesson('play');
 } else if (params.get('puzzle')) { // the shared link, and the render: straight to today's puzzle

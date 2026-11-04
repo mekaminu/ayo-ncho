@@ -64,8 +64,8 @@ test("a game played as she would have played it has nothing in the review", () =
 });
 
 test("from the far seat (a room) the words are from that seat", () => {
-  const g = randomGame("ncho", 0, "easy"); // seat 1 is the computer at easy: noisy enough to be reviewed
-  const plan = reviewPlan(g.moves, "ncho", g.rules, 0, 1); const rev = reviewOf(plan, plan.map((e) => rateMoves(e.before, "hard")), { you: 1 });
+  let rev = []; // seat 1 is the computer at easy: noisy enough to be reviewed — almost always; a random game now and then is clean, so try a few
+  for (let k = 0; k < 6 && !rev.length; k++) { const g = randomGame("ncho", 0, "easy"); const plan = reviewPlan(g.moves, "ncho", g.rules, 0, 1); rev = reviewOf(plan, plan.map((e) => rateMoves(e.before, "hard")), { you: 1 }); }
   assert.ok(rev.length > 0);
   for (const it of rev) { assert.ok(it.pit >= 6, "her pit is on the far seat's side"); assert.match(it.words, /^your pit [1-6]/); assert.match(it.playedWords, /^you played your pit [1-6]/); }
 });

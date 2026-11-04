@@ -228,6 +228,15 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .swatches{display:flex;gap:8px}
 .swatch{width:30px;height:30px;border-radius:50%;border:2px solid transparent;padding:0;cursor:pointer}
 .swatch[aria-pressed="true"]{border-color:var(--brass)}
+/* the seed sets as little seeds (L10): each swatch drawn like its seed under the lamp; a locked one keeps its look, dimmed, with the brass lock */
+.swatch.seed{position:relative;width:34px;height:34px;background-clip:padding-box}
+.swatch.seed[data-v="jobs"]{background:radial-gradient(ellipse 60% 48% at 38% 34%,#e6e2cf,#a9ab8d 55%,#6d6f55)}
+.swatch.seed[data-v="stones"]{background:radial-gradient(ellipse 62% 44% at 38% 34%,#b4b2ac,#85898b 55%,#55595b)}
+.swatch.seed[data-v="cowries"]{background:radial-gradient(ellipse 30% 22% at 36% 30%,#fffdf4 0 40%,transparent 41%),radial-gradient(ellipse 64% 46% at 45% 42%,#f6eedb,#ddc79d 60%,#9f8358)}
+.swatch.seed[data-v="kernels"]{background:repeating-linear-gradient(100deg,transparent 0 3px,rgba(160,116,72,.28) 3px 4px),radial-gradient(ellipse 58% 50% at 40% 36%,#7a573a,#45301f 58%,#22160d)}
+.swatch.seed svg{display:none;position:absolute;right:-5px;bottom:-5px;width:15px;height:15px;padding:2.5px;box-sizing:border-box;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6d58e,#c8932f 60%,#8a5a1c);box-shadow:0 0 0 1px rgba(246,213,142,.45)}
+.swatch.seed.locked{opacity:.72;border-style:dashed;border-color:rgba(243,233,215,.3)}
+.swatch.seed.locked svg{display:block}
 .note{font-size:11px;color:var(--muted);padding:0 4px}
 .choose{font:600 12px Inter,system-ui,sans-serif;color:var(--muted);background:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
 .legal{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:-6px}
@@ -501,7 +510,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
     <div class="group"><span class="eyebrow">Board</span>
       <div class="box">
         <div class="row"><div class="t"><b>Wood</b><span>mahogany · iroko · ebony</span></div><div class="swatches" data-set="finish"><button class="swatch" data-v="mahogany" aria-label="Mahogany" style="background:#7a3b1c"></button><button class="swatch" data-v="iroko" aria-label="Iroko" style="background:#a97a3d"></button><button class="swatch" data-v="ebony" aria-label="Ebony" style="background:#2a221c"></button></div></div>
-        <div class="row"><div class="t"><b>Seeds</b><span id="seedsSub">Job's tears · river stones unlock at 7 days played</span></div><div class="seg" data-set="seeds"><button class="segbtn" data-v="jobs">Job's tears</button><button class="segbtn" data-v="stones" disabled>Stones</button></div></div>
+        <div class="row"><div class="t"><b>Seeds</b><span id="seedsSub">Job's tears · river stones unlock at 7 days played</span></div><div class="swatches seeds" data-set="seeds"><button class="swatch seed" data-v="jobs" aria-label="Job's tears" title="Job's tears"></button><button class="swatch seed" data-v="stones" aria-label="River stones" title="River stones"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button><button class="swatch seed" data-v="cowries" aria-label="Cowries" title="Cowries"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button><button class="swatch seed" data-v="kernels" aria-label="Palm kernels" title="Palm kernels"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button></div></div>
         <div class="row"><div class="t"><b>Seed counts on pits</b><span>little numbers beside each pit</span></div><button class="sw" role="switch" data-set="badges" aria-checked="true" aria-label="Seed counts on pits"><i></i></button></div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 // The 3D board: geometry, materials, lights, camera. Pure scene-building; no game logic here.
 import * as THREE from 'three';
-import { woodTextures, seedTexture, stoneTexture, clothTexture } from './textures.js';
+import { woodTextures, seedTexture, stoneTexture, cowrieTexture, kernelTexture, clothTexture } from './textures.js';
 import { bowl } from './slots.js'; // the bowl's curve lives with the seeds that lie in it
 export { bowl };
 
@@ -140,16 +140,62 @@ export function seedMaterial(q = {}) {
   const tex = seedTexture(q);
   return new THREE.MeshStandardMaterial({ map: tex, color: 0xd9d3bf, roughness: 0.36, metalness: 0, bumpMap: tex, bumpScale: 0.0015 });
 }
-// Seed sets: Job's tears (the default) and river stones (unlocked by the calm streak). Looks only; the rules never change.
+// Seed sets: Job's tears (the default), river stones (unlocked by the calm streak), and the two sold as looks in the store (L10):
+// cowries and palm kernels. Looks only; the rules never change. `r` is each seed's half-size (long, high, across).
 export const SEED_SETS = {
-  jobs:   { name: "Job's tears", r: [0.0180, 0.0152, 0.0138] },
-  stones: { name: 'River stones', r: [0.0196, 0.0112, 0.0160] }, // flatter, a touch wider: a smooth pebble
+  jobs:    { name: "Job's tears", r: [0.0180, 0.0152, 0.0138] },
+  stones:  { name: 'River stones', r: [0.0196, 0.0112, 0.0160] }, // flatter, a touch wider: a smooth pebble
+  cowries: { name: 'Cowries', r: [0.0205, 0.0125, 0.0150] },     // longer, a domed back on a flat base
+  kernels: { name: 'Palm kernels', r: [0.0170, 0.0150, 0.0160] }, // rounder, knobbly
 };
 export function seedMaterialFor(set = 'jobs', q = {}) {
-  if (set !== 'stones') return seedMaterial(q);
-  const tex = stoneTexture(q);
-  return new THREE.MeshStandardMaterial({ map: tex, color: 0x8e969c, roughness: 0.42, metalness: 0, bumpMap: tex, bumpScale: 0.0012 });
+  if (set === 'stones') { const tex = stoneTexture(q); return new THREE.MeshStandardMaterial({ map: tex, color: 0x8e969c, roughness: 0.42, metalness: 0, bumpMap: tex, bumpScale: 0.0012 }); }
+  if (set === 'cowries') { const tex = cowrieTexture(q); return new THREE.MeshStandardMaterial({ map: tex, color: 0xf4ecdc, roughness: 0.2, metalness: 0, bumpMap: tex, bumpScale: 0.0018 }); } // glossy shell
+  if (set === 'kernels') { const tex = kernelTexture(q); return new THREE.MeshStandardMaterial({ map: tex, color: 0xffffff, roughness: 0.46, metalness: 0, bumpMap: tex, bumpScale: 0.0012 }); }
+  return seedMaterial(q);
 }
 export const SEED_R = SEED_SETS.jobs.r;
 export const seedGeometry = new THREE.SphereGeometry(1, 28, 20);
-export function seedGeometryFor(q = {}) { const [a, b] = q.seedSegs || [28, 20]; return a === 28 && b === 20 ? seedGeometry : new THREE.SphereGeometry(1, a, b); }
+// The unit shape of each set, scaled by its `r` (and each seed's own jitter) in game.js. It always spans -1..1 on every axis,
+// so the seed lies in its slot (slots.js treats it as the ellipsoid of half-sizes r) exactly as a round seed would.
+//   cowrie: the lower half pushed out to a flat base with rounded sides (|y|^0.3), the dome kept; then the whole squeezed so
+//           the base is at -1, the crown at +1 and the widest part low down (at -0.3), as a cowrie sits; the ends drawn in and
+//           a shallow groove pressed into the base along the slit
+//   kernel: the sphere pushed in and out a little by a smooth lumpy field, the same for every kernel (the jitter varies them)
+export function shapeVertex(set, x, y, z) {
+  if (set === 'cowries') {
+    let yy = y < 0 ? -Math.pow(-y, 0.3) : y;
+    yy = yy > 0 ? yy * 1.3 - 0.3 : yy * 0.7 - 0.3;
+    if (y < -0.2 && Math.abs(z) < 0.16) yy += 0.07 * (1 - Math.abs(z) / 0.16);
+    const zz = z * (1 - 0.16 * x * x);
+    return [x, Math.max(-1, Math.min(1, yy)), zz];
+  }
+  if (set === 'kernels') {
+    const k = 1 + 0.055 * Math.sin(3.1 * x + 1.2) * Math.cos(2.3 * z + 0.4) + 0.035 * Math.sin(4.7 * y + 2.1 * x);
+    const m = 1.09; // so the bumps never reach past -1..1
+    return [x * k / m, y * k / m, z * k / m];
+  }
+  return [x, y, z];
+}
+const shaped = {};
+// `over`: the shell lying on its back (a cowrie turned over shows the toothed slit, as about half of them do on a real board).
+export function seedGeometryFor(q = {}, set = 'jobs', over = false) {
+  const [a, b] = q.seedSegs || [28, 20]; over = over && set === 'cowries'; const key = `${set}:${a}:${b}:${over ? 1 : 0}`;
+  if (shaped[key]) return shaped[key];
+  const g = a === 28 && b === 20 && (set === 'jobs' || set === 'stones') ? seedGeometry : new THREE.SphereGeometry(1, a, b);
+  if (set === 'cowries' || set === 'kernels') {
+    const p = g.attributes.position;
+    for (let i = 0; i < p.count; i++) { const [x, y, z] = shapeVertex(set, p.getX(i), p.getY(i), p.getZ(i)); p.setXYZ(i, x, over ? -y : y, over ? -z : z); }
+    g.computeVertexNormals(); smoothSeam(g); g.computeBoundingSphere();
+  }
+  return (shaped[key] = g);
+}
+// A sphere's seam and poles are vertices made twice; once the shape is bent their normals differ and a hard line shows. Give
+// every copy of a point the same (summed) normal.
+function smoothSeam(g) {
+  const p = g.attributes.position, n = g.attributes.normal, at = new Map();
+  const r = (v) => Math.round(v * 1e5), key = (i) => `${r(p.getX(i))},${r(p.getY(i))},${r(p.getZ(i))}`; // -0 and 0 are one key
+  for (let i = 0; i < p.count; i++) { const k = key(i); const s = at.get(k) || [0, 0, 0]; s[0] += n.getX(i); s[1] += n.getY(i); s[2] += n.getZ(i); at.set(k, s); }
+  for (let i = 0; i < p.count; i++) { const [x, y, z] = at.get(key(i)); const l = Math.hypot(x, y, z) || 1; n.setXYZ(i, x / l, y / l, z / l); }
+  n.needsUpdate = true;
+}

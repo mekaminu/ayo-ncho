@@ -66,6 +66,10 @@
 #                  finds it): Continue, tap that pit: copper rings land on exactly the pits you would take and pale beaded rings on the pits
 #                  that go to them, and the one-time note says what the pale ring means (picture <out>); Esc clears them; a second tap shows
 #                  no note again; sowing it, the hand that carries their 4 wears a pale number (<out>-haul.png). --wide for the Mac
+#        --looks: the seed sets sold in the store (L10) — a close look at cowries and palm kernels on the board (?still=close&try=looks;
+#                  <out> cowries, <out>-kernels.png, <out>-jobs.png for comparison, <out>-board.png the whole board in cowries); then Settings
+#                  without the preview: cowries and palm kernels are locked with the lock, a tap says where they come from and the seeds stay
+#                  Job's tears; with ?try=looks a tap on palm kernels swaps every seed on the board in place (<out>-settings.png)
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 #        add --wake (with --smoke) to check keeping the screen on: a stand-in for the browser's wake lock records each request; during the
@@ -93,7 +97,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; legal = "--legal" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; story = story or reviewc; record = record or story
+out = sys.argv[1]; legal = "--legal" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -120,6 +124,39 @@ def watch(pg, errors, tag=""):
 def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it on this page
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+if looksc:  # the store's seed sets (L10): close renders of each, then the lock in Settings and the swap in place
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        def shot(seeds, name, still="close"):
+            ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2)
+            pg = ctx.new_page(); watch(pg, errors, seeds + ": ")
+            pg.add_init_script("localStorage.setItem('ayo.seeds', %s)" % json.dumps(seeds))
+            pg.goto("http://127.0.0.1:8766/web/index.html?still=%s&try=looks" % still, wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+            got = pg.evaluate("window.__ayo.seedSet"); assert got == seeds, ("the seed set drawn", got, seeds)
+            pg.screenshot(path=name, timeout=120000); print("looks:", seeds, "→", name); ctx.close()
+        shot("cowries", out); shot("kernels", out[:-4] + "-kernels.png"); shot("jobs", out[:-4] + "-jobs.png"); shot("cowries", out[:-4] + "-board.png", "1")
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "settings: ")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])", timeout=10000)
+        locked = pg.evaluate("[...document.querySelectorAll('[data-set=seeds] .swatch')].map(b=>[b.dataset.v, b.classList.contains('locked')])")
+        assert locked == [["jobs", False], ["stones", True], ["cowries", True], ["kernels", True]], locked
+        sub = pg.evaluate("document.querySelector('#seedsSub').textContent"); assert "cowries and palm kernels in the store" in sub, sub
+        pg.click("[data-set=seeds] [data-v=cowries]"); pg.wait_for_timeout(300)
+        t = pg.evaluate("[...document.querySelectorAll('.toast')].map(x=>x.textContent).join(' | ')"); assert "Cowries are a look from the store" in t, t
+        assert pg.evaluate("window.__ayo.seedSet") == "jobs", "a locked look is not drawn"
+        print("looks: locked ·", t)
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home&try=looks", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])", timeout=10000)
+        assert not pg.evaluate("document.querySelector('[data-set=seeds] [data-v=kernels]').classList.contains('locked')"), "?try=looks opens them"
+        pg.click("[data-set=seeds] [data-v=kernels]"); pg.wait_for_timeout(300)
+        assert pg.evaluate("window.__ayo.seedSet") == "kernels"
+        assert pg.evaluate("document.querySelector('[data-set=seeds] [data-v=kernels]').getAttribute('aria-pressed')") == "true"
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= 390, ("Settings scrolls sideways", W)
+        pg.evaluate("document.querySelector('[data-set=seeds]').scrollIntoView({block:'center'})"); pg.wait_for_timeout(200)
+        pg.screenshot(path=out[:-4] + "-settings.png", timeout=120000, animations="disabled")
+        b.close()
+    assert not errors, errors
+    print("looks: ok"); sys.exit(0)
 if legal:  # privacy, terms and support: Settings links to the server's pages, which open beside the game and read well on a phone
     import atexit; atexit.register(lambda: node.terminate())
     with sync_playwright() as p:
