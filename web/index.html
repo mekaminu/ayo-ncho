@@ -99,6 +99,7 @@ button{font-family:inherit}
 #home::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,9,6,.35) 0%,rgba(13,9,6,0) 25%,rgba(13,9,6,0) 45%,rgba(13,9,6,.92) 68%,#0d0906 100%)}
 #home > *{position:relative;pointer-events:auto}
 .homeTop{display:flex;justify-content:space-between;align-items:center;padding:calc(env(safe-area-inset-top,0px) + 54px) max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px))}
+.homeChips{display:flex;gap:10px}
 .wordmark{font-family:Fraunces,Georgia,serif;font-size:26px;font-weight:700;line-height:1.05}
 .homeBottom{padding:0 max(20px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 34px) max(20px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:12px}
 .gamePick{display:flex;gap:8px}
@@ -163,6 +164,57 @@ button{font-family:inherit}
 .puzzle #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 200px)}
 .puzzle .hud,.puzzle .bar{opacity:0;pointer-events:none}
 .puzzle #badges,.puzzle #hint{opacity:1}
+
+/* The store (L11), as approved 30 Oct with Gold at the top: the live board stays in view above it (a tap on a look puts it there) */
+#store{position:fixed;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
+#store::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,9,6,.62) 0%,rgba(13,9,6,.1) 16%,rgba(13,9,6,0) 30%,rgba(13,9,6,.9) 44%,#0d0906 52%)}
+#store > *{position:relative;pointer-events:auto}
+.storeHead{display:flex;align-items:center;gap:12px;padding:calc(env(safe-area-inset-top,0px) + 54px) max(20px,env(safe-area-inset-right,0px)) 0 max(20px,env(safe-area-inset-left,0px))}
+.storeHead .eyebrow{font-size:10px}
+.storeBody{max-height:60%;overflow:auto;-webkit-overflow-scrolling:touch;padding:12px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 26px) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:16px;overscroll-behavior:contain}
+.storeBody>*{flex:none}
+.storeBody .h{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:0 4px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.storeBody .h small{font-size:10px;letter-spacing:0;text-transform:none;color:#8f7d66;text-align:right}
+.goldCard{border-radius:18px;padding:14px 14px 12px;border:1px solid rgba(246,213,142,.5);background:radial-gradient(120% 140% at 0% 0%,rgba(246,213,142,.24),rgba(200,147,47,.1) 45%,rgba(24,15,9,.94) 80%);display:flex;flex-direction:column;gap:8px;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+.goldCard .top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.goldCard .nm{display:flex;align-items:center;gap:10px}
+.goldCard .nm span.medal{width:34px;height:34px;border-radius:50%;flex:none;background:radial-gradient(circle at 35% 30%,#f6d58e,#c8932f 60%,#8a5a1c);box-shadow:0 0 0 1px rgba(246,213,142,.5),0 4px 10px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;font:700 15px Fraunces,Georgia,serif;color:#2a1a0c}
+.goldCard b{font-family:Fraunces,Georgia,serif;font-size:19px;font-weight:700;display:block}
+.goldCard .nm span{font-size:11px;color:var(--muted)}
+.goldCard ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.goldCard li{font-size:12px;display:flex;align-items:center;gap:8px}
+.goldCard li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--brass);flex:none}
+.goldCard li.soon{color:var(--muted)}.goldCard li.soon::before{background:none;border:1px solid var(--muted);width:4px;height:4px}
+.goldCard li em{font-style:normal;font-size:10px;color:#8f7d66;letter-spacing:.04em}
+.nowCard{position:relative;border-radius:16px;overflow:hidden;border:1px solid rgba(230,183,111,.3);background:linear-gradient(120deg,#5a2512 0%,#8a3f1c 35%,#6a2c14 60%,#93451f 100%);padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.nowCard::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(100deg,rgba(0,0,0,0) 0 7px,rgba(0,0,0,.08) 7px 9px);pointer-events:none}
+.nowCard.trying{border-color:var(--brass);box-shadow:0 0 0 1px rgba(230,183,111,.35)}
+.nowCard .tag{font-size:10px;color:var(--brass);letter-spacing:.06em;text-transform:uppercase;position:relative}
+.nowCard b{font-family:Fraunces,Georgia,serif;font-size:17px;font-weight:700;position:relative}
+.nowCard span:last-child{font-size:11px;opacity:.85;position:relative}
+.nowCard.pop{animation:pop .4s ease-out}
+.shop{background:var(--card);border:1px solid rgba(243,233,215,.1);border-radius:16px;overflow:hidden}
+.shop.bundle{border-color:rgba(230,183,111,.35)}
+.shop .item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-top:1px solid rgba(243,233,215,.08);cursor:pointer}
+.shop .item:first-child{border-top:0}
+.shop .item.trying{background:rgba(230,183,111,.1);box-shadow:inset 3px 0 0 var(--brass)}
+.shop .item .who{display:flex;align-items:center;gap:12px;min-width:0;background:none;border:0;color:inherit;padding:0;text-align:left;cursor:pointer;flex:1}
+.shop .item .who .swatch{flex:none;cursor:inherit}
+.shop .item .lb{display:flex;flex-direction:column;gap:2px;min-width:0}
+.shop .item .lb b{font-size:14px;font-weight:600}
+.shop .item .lb span{font-size:11px;color:var(--muted)}
+.shop .item .lb i{font-style:normal;font-size:10px;color:var(--brass);letter-spacing:.05em;text-transform:uppercase}
+.sbtn{font:600 12px Inter,system-ui,sans-serif;border-radius:999px;padding:7px 12px;border:1px solid rgba(243,233,215,.18);background:none;color:var(--muted);flex:none;white-space:nowrap;cursor:pointer}
+.sbtn[data-state="on"],.sbtn[data-state="use"],.sbtn[data-state="yours"]{color:var(--brass);border-color:rgba(230,183,111,.5)}
+.sbtn[data-state="buy"]{color:#1a0f07;background:var(--brass);border-color:var(--brass)}
+.sbtn[data-state="earn"]{border-style:dashed}
+.storeFoot{display:flex;flex-direction:column;gap:4px;align-items:center;padding:0 10px;text-align:center}
+.storeFoot p{margin:0;font-size:11px;color:#8f7d66;line-height:1.5}
+.storeFoot button{font:500 13px Inter,system-ui,sans-serif;color:var(--muted);background:none;border:0;padding:8px;cursor:pointer}
+.wide #store{right:auto;width:min(46vw,440px)}
+.wide #store::before{position:fixed;inset:0;background:linear-gradient(90deg,rgba(13,9,6,.96) 0%,rgba(13,9,6,.9) 34%,rgba(13,9,6,0) 58%)}
+.wide .storeHead{padding-top:calc(env(safe-area-inset-top,0px) + 26px)}
+.wide .storeBody{max-height:none;flex:1;padding-bottom:24px}
 @media (prefers-reduced-motion:reduce){.pzCard,.pzRow span{animation:none}}
 /* the first game's lesson, in the puzzle's frame */
 .lsCard{gap:12px}
@@ -395,7 +447,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 .wide .puzzleTop{right:auto;width:min(38vw,360px);left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 34px)}
 .wide .puzzleBottom{right:auto;width:min(40vw,380px);left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
 .wide.puzzle #hint{top:calc(env(safe-area-inset-top,0px) + 24px)}
-@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#last8.new,#circling.new,#circling em.bump{animation:none}}
+@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#last8.new,#circling.new,#circling em.bump,.nowCard.pop{animation:none}}
 </style>
 </head>
 <body class="screen">
@@ -428,7 +480,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 <section id="home" aria-label="Home">
   <div class="homeTop">
     <div class="col"><span class="wordmark">Ayo &amp; Nchò</span><span class="eyebrow">Nigerian Mancala</span></div>
-    <button class="chip" id="homeSettings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    <span class="homeChips"><button class="chip" id="homeStore" aria-label="Store" title="Store · boards, seed sets and Gold"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1.2 11a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg></button><button class="chip" id="homeSettings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button></span>
   </div>
   <div class="homeBottom">
     <button class="dailyCard" id="puzzleCard" type="button"><span class="col"><span class="eyebrow brass" id="puzzleDay">Daily puzzle</span><b id="puzzleAsk">Capture 8 in one turn</b></span><span class="dailyRight"><span id="puzzleState">not yet played</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></button>
@@ -499,6 +551,22 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
   </div>
 </section>
 
+<!-- The store (L11), as approved 30 Oct, with Gold at the top: looks only, never wins; a tap on a look puts it on the live board above -->
+<section id="store" hidden aria-label="Store">
+  <div class="storeHead">
+    <button class="chip" id="storeBack" aria-label="Back"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button>
+    <div class="col"><span class="wordmark small">Store</span><span class="eyebrow">Looks only · never wins</span></div>
+  </div>
+  <div class="storeBody" id="storeBody">
+    <div class="goldCard" id="goldCard"><div class="top"><div class="nm"><span class="medal" aria-hidden="true">G</span><div class="col"><b>Gold</b><span id="goldSub">One upgrade, once · never a win bought</span></div></div><button class="sbtn" id="goldBtn" type="button" data-state="buy">Get the app</button></div><ul id="goldList"></ul></div>
+    <div class="nowCard" id="nowCard" role="status"><span class="tag" id="nowTag">Your board now</span><b id="nowTitle">Mahogany · Job's tears</b><span id="nowWords"></span></div>
+    <div class="group"><span class="h">Boards <small>tap one to see it on the board</small></span><div class="shop" id="shopBoards"></div></div>
+    <div class="group"><span class="h">Seed sets <small>tap one to pour it in</small></span><div class="shop" id="shopSeeds"></div></div>
+    <div class="group"><span class="h">Bundle</span><div class="shop bundle" id="shopBundle"></div></div>
+    <div class="storeFoot"><p id="storeNote"></p><button type="button" id="restoreBtn">Restore purchases</button></div>
+  </div>
+</section>
+
 <!-- Settings -->
 <section id="settings" hidden aria-label="Settings">
   <div class="setHead"><button class="chip" id="settingsBack" aria-label="Back"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2>Settings</h2></div>
@@ -518,6 +586,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
       <div class="box">
         <div class="row"><div class="t"><b>Board</b><span id="boardSub">mahogany · iroko · ebony</span></div><div class="swatches boards" data-set="finish"><button class="swatch" data-v="mahogany" aria-label="Mahogany" title="Mahogany" style="background:#7a3b1c"></button><button class="swatch" data-v="iroko" aria-label="Iroko" title="Iroko" style="background:#a97a3d"></button><button class="swatch" data-v="ebony" aria-label="Ebony" title="Ebony" style="background:#2a221c"></button><button class="swatch board" data-v="benin" aria-label="Benin bronze" title="Benin bronze"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button><button class="swatch board" data-v="grandpa" aria-label="Grandpa's board" title="Grandpa's board"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button></div></div>
         <div class="row"><div class="t"><b>Seeds</b><span id="seedsSub">Job's tears · river stones unlock at 7 days played</span></div><div class="swatches seeds" data-set="seeds"><button class="swatch seed" data-v="jobs" aria-label="Job's tears" title="Job's tears"></button><button class="swatch seed" data-v="stones" aria-label="River stones" title="River stones"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button><button class="swatch seed" data-v="cowries" aria-label="Cowries" title="Cowries"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button><button class="swatch seed" data-v="kernels" aria-label="Palm kernels" title="Palm kernels"><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></button></div></div>
+        <div class="row"><div class="t"><b>Store</b><span>more boards and seed sets, and Gold · looks only, never wins</span></div><div class="seg"><button class="segbtn" id="settingsStore" type="button">Open</button></div></div>
         <div class="row"><div class="t"><b>Seed counts on pits</b><span>little numbers beside each pit</span></div><button class="sw" role="switch" data-set="badges" aria-checked="true" aria-label="Seed counts on pits"><i></i></button></div>
       </div>
     </div>

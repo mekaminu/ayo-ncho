@@ -101,6 +101,7 @@ test("the back button steps back like the screens' own Back, and puts the app aw
   assert.equal(backStep(ui({ door: true })), "stay"); assert.equal(backStep(ui({ name: true, screen: "rooms" })), "stay");
   assert.equal(backStep(ui({ screen: "settings" })), "settingsBack");
   assert.equal(backStep(ui({ screen: "rooms" })), "roomsBack");
+  assert.equal(backStep(ui({ screen: "store" })), "storeBack");
   assert.equal(backStep(ui({ screen: "puzzle" })), "pzHome"); assert.equal(backStep(ui({ screen: "puzzle", busy: true })), "stay");
   assert.equal(backStep(ui({ screen: "home" })), "minimize");
   assert.equal(backStep(ui({ online: true })), "minimize"); assert.equal(backStep(ui({ online: true, gameover: true })), "minimize");

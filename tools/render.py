@@ -73,6 +73,11 @@
 #                  add --boards for the two boards (L10, slice 2): <out> the whole board in Benin bronze, <out>-grandpa.png Grandpa's board,
 #                  -benin-close / -grandpa-close the close look; the Settings checks then also cover the boards (locked, the tap's words,
 #                  a wood swapping in place with no new game, Grandpa's board swapping in place with ?try=looks)
+#        --store: the store screen (L11) — Home → the store chip: Gold at the top (what it opens, "Get the app" on the web link), the board
+#                  now, the boards and seed sets with what each button says; a tap on Benin bronze puts it on the live board above for a look
+#                  (<out>), a tap on cowries pours them in (<out>-seeds.png), a store button says it is bought in the app and the look stays
+#                  only a look; Use on iroko keeps it; Back puts the tried seeds back and keeps iroko; Settings → Board → Store opens it and
+#                  Back goes back to Settings; ?try=looks shows the looks as open for the visit. --wide for the Mac (<out> only)
 import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 #        add --wake (with --smoke) to check keeping the screen on: a stand-in for the browser's wake lock records each request; during the
@@ -100,7 +105,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; legal = "--legal" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; story = story or reviewc; record = record or story
+out = sys.argv[1]; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -182,6 +187,58 @@ if looksc:  # the store's seed sets (L10): close renders of each, then the lock 
         b.close()
     assert not errors, errors
     print("looks: ok"); sys.exit(0)
+if storec:  # the store screen (L11): Gold at the top, every look tried on the live board, the buttons' words, Back puts yours back
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []; W0 = 1180 if wide else 390
+        ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2)
+        pg = ctx.new_page(); watch(pg, errors)
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        def toasts(): return pg.evaluate("[...document.querySelectorAll('.toast')].map(x=>x.textContent).join(' | ')")
+        def states(sel): return pg.evaluate("[...document.querySelectorAll('%s .item')].map(i=>[i.dataset.id, i.querySelector('.sbtn').dataset.state, i.querySelector('.sbtn').textContent])" % sel)
+        def shot(path): pg.wait_for_timeout(1200); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(200); pg.screenshot(path=path, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.click("#homeStore"); pg.wait_for_selector("#store:not([hidden])", timeout=10000)
+        assert pg.evaluate("document.querySelector('#home').hidden"), "Home steps aside"
+        assert pg.evaluate("document.querySelector('#goldBtn').textContent") == "Get the app"
+        gold = pg.evaluate("[...document.querySelectorAll('#goldList li')].map(l=>l.textContent)"); assert len(gold) == 4 and "Papa Ike" in gold[0] and "coming" in gold[3], gold
+        assert states("#shopBoards") == [["mahogany", "on", "On the board"], ["iroko", "use", "Use"], ["ebony", "use", "Use"], ["benin", "buy", "Get the app"], ["grandpa", "buy", "Get the app"]], states("#shopBoards")
+        sd = states("#shopSeeds"); assert [x[:2] for x in sd] == [["jobs", "on"], ["stones", "earn"], ["cowries", "buy"], ["kernels", "buy"]], sd
+        assert pg.evaluate("document.querySelector('#nowTitle').textContent") == "Mahogany · Job's tears"
+        pg.click("#shopBoards .item[data-id=benin] .who"); pg.wait_for_timeout(400)
+        assert pg.evaluate("window.__ayo.finish") == "benin", "Benin bronze on the board for a look"
+        assert pg.evaluate("document.querySelector('#nowTag').textContent") == "Trying on the board"
+        assert pg.evaluate("localStorage.getItem('ayo.finish')") in (None, "mahogany"), "a look tried is never kept"
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= W0, ("the store scrolls sideways", W)
+        shot(out); print("store: benin on the board →", out)
+        if not wide:
+            pg.evaluate("document.querySelector('#shopSeeds').scrollIntoView({block:'center'})")
+            pg.click("#shopSeeds .item[data-id=cowries] .who"); pg.wait_for_timeout(400)
+            assert pg.evaluate("window.__ayo.seedSet") == "cowries", "cowries poured in for a look"
+            assert pg.evaluate("document.querySelector('#nowTitle').textContent") == "Benin bronze · Cowries"
+            shot(out[:-4] + "-seeds.png"); print("store: cowries →", out[:-4] + "-seeds.png")
+        pg.click("#shopSeeds .item[data-id=cowries] .sbtn"); pg.wait_for_timeout(300)
+        t = toasts(); assert "Cowries are bought in the app — the web link sells nothing" in t, t
+        assert pg.evaluate("window.__ayo.seedSet") == "cowries"
+        pg.click("#goldBtn"); pg.wait_for_timeout(300); assert "Gold is bought in the app" in toasts(), toasts()
+        pg.click("#restoreBtn"); pg.wait_for_timeout(300); assert "nothing to restore" in toasts(), toasts()
+        pg.click("#shopBoards .item[data-id=iroko] .sbtn"); pg.wait_for_timeout(400)
+        assert pg.evaluate("window.__ayo.finish") == "iroko" and pg.evaluate("localStorage.getItem('ayo.finish')") == "iroko", "Use keeps it"
+        assert states("#shopBoards")[1][1] == "on"
+        pg.click("#storeBack"); pg.wait_for_selector("#home:not([hidden])", timeout=10000)
+        assert pg.evaluate("window.__ayo.seedSet") == "jobs", "Back puts your own seeds back"
+        assert pg.evaluate("window.__ayo.finish") == "iroko"
+        pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])", timeout=10000)
+        pg.click("#settingsStore"); pg.wait_for_selector("#store:not([hidden])", timeout=10000)
+        pg.click("#shopBoards .item[data-id=grandpa] .who"); pg.wait_for_timeout(300); assert pg.evaluate("window.__ayo.finish") == "grandpa"
+        pg.click("#storeBack"); pg.wait_for_selector("#settings:not([hidden])", timeout=10000)
+        assert pg.evaluate("window.__ayo.finish") == "iroko", "back in Settings with your own board"
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home&try=looks", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.click("#homeStore"); pg.wait_for_selector("#store:not([hidden])", timeout=10000)
+        sub = pg.evaluate("document.querySelector('#shopSeeds .item[data-id=kernels] .lb span').textContent"); assert "open for this visit" in sub, sub
+        pg.click("#shopSeeds .item[data-id=kernels] .sbtn"); pg.wait_for_timeout(300)
+        assert pg.evaluate("window.__ayo.seedSet") == "kernels" and pg.evaluate("localStorage.getItem('ayo.seeds')") == "kernels"
+        b.close()
+    assert not errors, errors
+    print("store: ok"); sys.exit(0)
 if legal:  # privacy, terms and support: Settings links to the server's pages, which open beside the game and read well on a phone
     import atexit; atexit.register(lambda: node.terminate())
     with sync_playwright() as p:

@@ -13,6 +13,7 @@ import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solved
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink, inApp } from './app.js';
 import { parseOwned, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS, featureOpen, featureLockedWords, LOOKS, lookOpen, seedSetFor, lookLockedWords, seedsLine, finishFor, boardsLine } from './entitle.js';
+import { storeView, tapAction, restoreWords } from './store.js';
 import { reviewPlan, reviewOf, summaryWords, stepWords, OPEN_LINES, CLEAN_LINE, END_LINE } from './review.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
@@ -60,12 +61,13 @@ renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadow
 renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.15; renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.05, 20);
+const shop = { from: 'home', tryFinish: null, trySeeds: null }; // the store (L11): what is on the board for a look, never kept
 const finishId = () => finishFor(params.get('finish') || prefs.get('finish', 'mahogany'), { owned: owned(), preview: GOLD_PREVIEW }); // a store board only once it is yours (or ?try=looks)
 const finish = finishId();
 const board = buildBoard(scene, finish, Q); buildTable(scene, Q); buildLights(scene, Q.lite ? Q.shadow : phone || (window.devicePixelRatio || 1) > 2 ? 1024 : 2048);
 // seed set: Job's tears; river stones once the calm streak has unlocked them; cowries and palm kernels once bought (or ?try=looks)
 let streak = parseStreak(prefs.get('streak', null));
-const seedSetId = () => seedSetFor(prefs.get('seeds', 'jobs'), { stones: unlocked(streak, 'stones'), owned: owned(), preview: GOLD_PREVIEW });
+const seedSetId = () => shop.trySeeds || seedSetFor(prefs.get('seeds', 'jobs'), { stones: unlocked(streak, 'stones'), owned: owned(), preview: GOLD_PREVIEW });
 let SET = SEED_SETS[seedSetId()]; let seedMat = seedMaterialFor(seedSetId(), Q); const seedMats = { [seedSetId()]: seedMat }; let seedGeometry = seedGeometryFor(Q, seedSetId()), seedGeometryOver = seedGeometryFor(Q, seedSetId(), true);
 function applySeedSet() { // swap every seed's look and shape in place (no new game needed)
   const id = seedSetId(); SET = SEED_SETS[id]; seedMat = seedMats[id] = seedMats[id] || seedMaterialFor(id, Q); seedGeometry = seedGeometryFor(Q, id); seedGeometryOver = seedGeometryFor(Q, id, true);
@@ -1210,12 +1212,13 @@ $('#goNext').addEventListener('click', () => { const lv = $('#goNext').dataset.l
 
 // ---------- screens ----------
 const body = document.body;
-function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle'
+function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle' | 'store'
   if (which !== 'play' && review.on) endReview(false);
-  $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms'; $('#puzzle').hidden = which !== 'puzzle';
+  if (which !== 'store' && (shop.tryFinish || shop.trySeeds)) { shop.tryFinish = shop.trySeeds = null; applyLooks(); } // leaving the store puts your own look back
+  $('#store').hidden = which !== 'store'; $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms'; $('#puzzle').hidden = which !== 'puzzle';
   const board3d = which === 'play' || which === 'puzzle'; // the puzzle is played on the board, like a game, with the HUD and toolbar stepped aside
   body.classList.toggle('screen', !board3d); body.classList.toggle('playing', board3d); body.classList.toggle('puzzle', which === 'puzzle'); pitLayer.hidden = !board3d;
-  const wasIdle = idle; if (which === 'home') { paintHome(); idle = true; } else idle = which === 'rooms'; // the board turns slowly behind Home and the Rooms screen
+  const wasIdle = idle; if (which === 'home') { paintHome(); idle = true; } else idle = which === 'rooms' || which === 'store'; // the board turns slowly behind Home, the Rooms screen and the store
   if (board3d && wasIdle) { // …and swings back round to face you as the game starts
     const from = theta, to = baseTheta + Math.round((theta - baseTheta) / (2 * Math.PI)) * 2 * Math.PI;
     if (Math.abs(to - from) > 0.01) tween(650, (t) => { theta = from + (to - from) * t; }, easeInOut);
@@ -1253,6 +1256,65 @@ function paintSettings() {
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
   const two = $('.choose[data-mode="local"]'); two.setAttribute('aria-pressed', settings.mode === 'local'); two.textContent = settings.mode === 'local' ? 'Chosen' : 'Choose';
 }
+// ---------- the store (L11), as approved 30 Oct with Gold at the top (web/store.js): looks only, never wins ----------
+// A tap on a board or a seed set puts it on the live board above for a look; Back puts your own back. The web link sells
+// nothing ("Get the app"); inside the apps the prices and buying come from Apple's and Google's own stores (L12), "Soon" until then.
+const LOCK_SVG = '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg>';
+const WOOD_TONE = { mahogany: '#7a3b1c', iroko: '#a97a3d', ebony: '#2a221c' };
+const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+let storePrices = null; // L12: the stores' own price text by product id, once the apps can ask for it
+function storeCtx() {
+  return { owned: owned(), preview: GOLD_PREVIEW, stones: unlocked(streak, 'stones'), days: streak.days.length, need: MILESTONES[0].days,
+    finish: finishFor(prefs.get('finish', 'mahogany'), { owned: owned(), preview: GOLD_PREVIEW }), seeds: seedSetFor(prefs.get('seeds', 'jobs'), { stones: unlocked(streak, 'stones'), owned: owned(), preview: GOLD_PREVIEW }),
+    tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, inApp: inApp(), prices: storePrices };
+}
+let storeNow = null;
+function paintStore() {
+  const v = storeNow = storeView(storeCtx());
+  $('#goldSub').textContent = v.gold.sub; const gb = $('#goldBtn'); gb.textContent = v.gold.button; gb.dataset.state = v.gold.state;
+  $('#goldList').innerHTML = v.gold.opens.map((o) => `<li class="${o.ready ? '' : 'soon'}">${esc(o.what)}${o.ready ? '' : ' <em>coming</em>'}</li>`).join('');
+  const nc = $('#nowCard'); nc.classList.toggle('trying', v.now.trying); $('#nowTag').textContent = v.now.tag; $('#nowTitle').textContent = v.now.title; $('#nowWords').textContent = v.now.words;
+  const item = (r) => {
+    const sw = r.kind === 'board' ? `<span class="swatch board${r.state === 'buy' || r.state === 'earn' ? ' locked' : ''}" data-v="${r.id}"${WOOD_TONE[r.id] ? ` style="background:${WOOD_TONE[r.id]}"` : ''}>${LOCK_SVG}</span>` : `<span class="swatch seed${r.state === 'buy' || r.state === 'earn' ? ' locked' : ''}" data-v="${r.id}">${LOCK_SVG}</span>`;
+    return `<div class="item${r.trying ? ' trying' : ''}" data-kind="${r.kind}" data-id="${r.id}"><button type="button" class="who" aria-label="See ${esc(r.name)} on the board">${sw}<span class="lb"><b>${esc(r.name)}</b><span>${esc(r.sub)}</span>${r.trying ? '<i>on the board for a look</i>' : ''}</span></button><button type="button" class="sbtn" data-state="${r.state}">${esc(r.button)}</button></div>`;
+  };
+  $('#shopBoards').innerHTML = v.boards.map(item).join(''); $('#shopSeeds').innerHTML = v.seeds.map(item).join('');
+  $('#shopBundle').innerHTML = `<div class="item" data-id="bundle"><span class="who"><span class="lb"><b>${esc(v.bundle.name)}</b><span>${esc(v.bundle.sub)}</span></span></span><button type="button" class="sbtn" data-state="${v.bundle.state}">${esc(v.bundle.button)}</button></div>`;
+  $('#storeNote').textContent = v.note;
+}
+function applyLooks() { // what the board shows: a look being tried, else your own
+  const f = shop.tryFinish || finishId(); if (board.finish !== f) board.setFinish(f);
+  if (SEED_SETS[seedSetId()] !== SET) applySeedSet();
+}
+function openStore(from = 'home') { shop.from = from; shop.tryFinish = shop.trySeeds = null; applyLooks(); paintStore(); $('#storeBody').scrollTop = 0; showScreen('store'); click(1.2, 0.05); }
+function tryLook(kind, id) { // a tap on a row: that look on the board above, or (on your own one) back to yours
+  const v = storeCtx(); const mineNow = kind === 'board' ? v.finish : v.seeds;
+  const key = kind === 'board' ? 'tryFinish' : 'trySeeds'; shop[key] = id === mineNow ? null : id;
+  applyLooks(); paintStore(); const nc = $('#nowCard'); nc.classList.remove('pop'); void nc.offsetWidth; nc.classList.add('pop');
+  click(kind === 'board' ? 0.8 : 1.4, 0.07); buzz(8);
+}
+function storeTap(row) { // a tap on a row's button
+  const a = tapAction(row, storeCtx());
+  if (a.act === 'use') { // yours: kept on the board
+    if (row.kind === 'board') { prefs.set('finish', row.id); params.delete('finish'); shop.tryFinish = null; } else { prefs.set('seeds', row.id); shop.trySeeds = null; }
+    applyLooks(); paintStore(); click(1.2, 0.06); toast(`${row.name} on the board`); return;
+  }
+  if (a.act === 'try' && row.kind && !row.trying) tryLook(row.kind, row.id);
+  else if (a.act === 'buy') toast('Buying comes to the app soon', 2600); // L12 asks the store here
+  if (a.words) toast(a.words, 3600); click(0.8, 0.05);
+}
+$('#storeBody').addEventListener('click', (e) => {
+  const it = e.target.closest('.item'); if (!it || !storeNow) return;
+  const kind = it.dataset.kind, id = it.dataset.id;
+  const row = id === 'bundle' ? storeNow.bundle : (kind === 'board' ? storeNow.boards : storeNow.seeds).find((r) => r.id === id);
+  if (!row) return;
+  if (e.target.closest('.sbtn')) storeTap(row); else if (kind) tryLook(kind, id);
+});
+$('#goldBtn').addEventListener('click', () => { if (storeNow) storeTap({ ...storeNow.gold, id: 'gold', name: 'Gold' }); });
+$('#restoreBtn').addEventListener('click', () => { toast(restoreWords(inApp()), 3000); click(0.8, 0.05); });
+$('#storeBack').addEventListener('click', () => { const back = shop.from === 'settings' ? 'settings' : 'home'; if (back === 'settings') paintSettings(); showScreen(back); click(1, 0.05); });
+$('#homeStore').addEventListener('click', () => openStore('home'));
+$('#settingsStore').addEventListener('click', () => openStore('settings'));
 // ---------- the opponent's face reacts: a mood for a moment, then back to calm; blinks now and then while waiting ----------
 let mood = 'calm', moodTimer = null, blinkTimer = null;
 function react(next, ms = 2600) {
@@ -1675,7 +1737,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get finish() { return board.finish; }, get review() { return { done: review.done, seen: review.seen, total: review.total, on: review.on, k: review.k, playing: review.playing, items: review.items.map((i) => ({ index: i.index, pit: i.pit, played: i.played, gap: i.take.gap, kind: i.take.kind })), card: revBtn.hidden ? null : $('#goRevWords').textContent, locked: revBtn.classList.contains('locked'), bar: revBar.hidden ? null : $('#revWords').textContent, hint: $('#hint').textContent }; }, openReview, reviewStep, endReview, get rating() { return { ...rating }; }, get lesson() { return { on: lesson.on, k: lesson.k, phase: lesson.phase, pit: lesson.on && lesson.k < LESSON.length ? LESSON[lesson.k].pit : null, title: $('#pzAsk').textContent, top: $('#pzHow').textContent, card: $('#lsCard').hidden ? null : $('#lsWords').textContent, next: $('#lsNext').textContent, skip: $('#pzHome').textContent, kept: prefs.get('lesson', null), tutorial: prefs.get('tutorial', null) }; }, get nextUp() { return $('#goNext').hidden ? null : { text: $('#goNext').textContent, level: $('#goNext').dataset.level }; }, get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get finish() { return board.finish; }, get store() { return { open: !$('#store').hidden, tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, view: storeNow }; }, get review() { return { done: review.done, seen: review.seen, total: review.total, on: review.on, k: review.k, playing: review.playing, items: review.items.map((i) => ({ index: i.index, pit: i.pit, played: i.played, gap: i.take.gap, kind: i.take.kind })), card: revBtn.hidden ? null : $('#goRevWords').textContent, locked: revBtn.classList.contains('locked'), bar: revBar.hidden ? null : $('#revWords').textContent, hint: $('#hint').textContent }; }, openReview, reviewStep, endReview, get rating() { return { ...rating }; }, get lesson() { return { on: lesson.on, k: lesson.k, phase: lesson.phase, pit: lesson.on && lesson.k < LESSON.length ? LESSON[lesson.k].pit : null, title: $('#pzAsk').textContent, top: $('#pzHow').textContent, card: $('#lsCard').hidden ? null : $('#lsWords').textContent, next: $('#lsNext').textContent, skip: $('#pzHome').textContent, kept: prefs.get('lesson', null), tutorial: prefs.get('tutorial', null) }; }, get nextUp() { return $('#goNext').hidden ? null : { text: $('#goNext').textContent, level: $('#goNext').dataset.level }; }, get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
@@ -1690,7 +1752,7 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && !w
 start();
 // ---------- inside the store apps: the phone's back button, share sheet, haptics and keep-awake (web/app.js; nothing on the web link) ----------
 startApp(() => {
-  const screen = !$('#settings').hidden ? 'settings' : !$('#rooms').hidden ? 'rooms' : !$('#puzzle').hidden ? 'puzzle' : !$('#home').hidden ? 'home' : 'play';
+  const screen = !$('#store').hidden ? 'store' : !$('#settings').hidden ? 'settings' : !$('#rooms').hidden ? 'rooms' : !$('#puzzle').hidden ? 'puzzle' : !$('#home').hidden ? 'home' : 'play';
   const step = backStep({ rules: !$('#rules').hidden, shouts: !shoutMenu.hidden, door: !$('#knockCard').hidden || !$('#backCard').hidden, name: !$('#nameCard').hidden, gameover: !$('#gameover').hidden, screen, online, busy });
   if (step === 'shouts') toggleShoutMenu(false); else if (step !== 'stay' && step !== 'minimize') $('#' + step).click();
   return step;

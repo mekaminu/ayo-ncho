@@ -93,6 +93,7 @@ export function backStep(ui) {
   if (ui.shouts) return 'shouts';
   if (ui.door || ui.name) return 'stay';            // a question someone is waiting on: answer it on screen
   if (ui.screen === 'settings') return 'settingsBack';
+  if (ui.screen === 'store') return 'storeBack';
   if (ui.screen === 'rooms') return 'roomsBack';
   if (ui.screen === 'puzzle') return ui.busy ? 'stay' : 'pzHome';
   if (ui.screen === 'home') return 'minimize';
