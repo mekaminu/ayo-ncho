@@ -15,7 +15,7 @@ export const owns = (owned, item) => !!owned && owned.has(item);
 
 // A look at Gold before it can be bought, for that visit only (never kept), so Meka and the testers can try it now:
 // `?try=master` opens Papa Ike, `?try=review` Mama Ngozi's review, `?try=gold` all of Gold. Gone once purchases exist (L12).
-const PREVIEWS = ['master', 'review', 'gold', 'looks']; // ?try=looks: the store's looks (cowries, palm kernels) for the visit
+const PREVIEWS = ['master', 'review', 'gold', 'looks']; // ?try=looks: the store's looks (both boards, both seed sets) for the visit
 export function previewOf(search) {
   try { const t = new URLSearchParams(search || '').get('try'); return PREVIEWS.includes(t) ? t : null; } catch { return null; }
 }
@@ -46,7 +46,10 @@ export function featureLockedWords(what, inApp) {
 export const LOOKS = {
   cowries: { product: 'seeds_cowries', kind: 'seeds', name: 'Cowries' },
   kernels: { product: 'seeds_palm_kernels', kind: 'seeds', name: 'Palm kernels' },
+  benin: { product: 'board_benin_bronze', kind: 'board', name: 'Benin bronze' },
+  grandpa: { product: 'board_grandpa', kind: 'board', name: "Grandpa's board" },
 };
+export const WOODS = ['mahogany', 'iroko', 'ebony']; // the free boards
 export const BUNDLE = 'bundle_all';
 export function lookOpen(id, owned, preview = null) {
   const L = LOOKS[id]; if (!L) return true;
@@ -56,16 +59,29 @@ export function lookOpen(id, owned, preview = null) {
 // look once bought (or previewed) — else Job's tears. Anything unknown is Job's tears.
 export function seedSetFor(pref, { stones = false, owned = null, preview = null } = {}) {
   if (pref === 'stones') return stones ? 'stones' : 'jobs';
-  if (LOOKS[pref]) return lookOpen(pref, owned, preview) ? pref : 'jobs';
+  if (LOOKS[pref] && LOOKS[pref].kind === 'seeds') return lookOpen(pref, owned, preview) ? pref : 'jobs';
   return 'jobs';
 }
-// What a tap on a locked look says.
-export function lookLockedWords(name, inApp) {
-  return inApp ? `${name} are a look from the store — the store comes to the app soon` : `${name} are a look from the store, in the app — the web link sells nothing`;
+// The board to draw: a wood is always free; a board from the store once bought (or previewed); anything else is mahogany.
+export function finishFor(pref, { owned = null, preview = null } = {}) {
+  if (WOODS.includes(pref)) return pref;
+  if (LOOKS[pref] && LOOKS[pref].kind === 'board') return lookOpen(pref, owned, preview) ? pref : 'mahogany';
+  return 'mahogany';
+}
+// What a tap on a locked look says (a seed set is plural, a board is not).
+export function lookLockedWords(name, inApp, kind = 'seeds') {
+  const is = kind === 'board' ? 'is' : 'are';
+  return inApp ? `${name} ${is} a look from the store — the store comes to the app soon` : `${name} ${is} a look from the store, in the app — the web link sells nothing`;
+}
+// The Settings line under Board, in plain words.
+export function boardsLine({ owned = null, preview = null } = {}) {
+  const ids = Object.keys(LOOKS).filter((id) => LOOKS[id].kind === 'board');
+  const mine = ids.filter((id) => lookOpen(id, owned, preview)).map((id) => LOOKS[id].name), shop = ids.filter((id) => !lookOpen(id, owned, preview)).map((id) => LOOKS[id].name);
+  return ['mahogany · iroko · ebony', ...mine].join(' · ') + (shop.length ? ` · ${shop.join(' and ')} in the store` : '');
 }
 // The Settings line under Seeds, in plain words.
 export function seedsLine({ stones, days, need, owned = null, preview = null }) {
   const st = stones ? 'river stones (yours: 7 days played)' : `river stones at ${need} days played (${days} so far)`;
-  const shop = Object.keys(LOOKS).filter((id) => !lookOpen(id, owned, preview)).map((id) => LOOKS[id].name.toLowerCase());
+  const shop = Object.keys(LOOKS).filter((id) => LOOKS[id].kind === 'seeds' && !lookOpen(id, owned, preview)).map((id) => LOOKS[id].name.toLowerCase());
   return `Job's tears · ${st}` + (shop.length ? ` · ${shop.join(' and ')} in the store` : '');
 }

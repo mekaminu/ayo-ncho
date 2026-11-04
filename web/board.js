@@ -1,6 +1,6 @@
 // The 3D board: geometry, materials, lights, camera. Pure scene-building; no game logic here.
 import * as THREE from 'three';
-import { woodTextures, seedTexture, stoneTexture, cowrieTexture, kernelTexture, clothTexture } from './textures.js';
+import { woodTextures, bronzeTextures, grandpaTextures, roomTexture, seedTexture, stoneTexture, cowrieTexture, kernelTexture, clothTexture } from './textures.js';
 import { bowl } from './slots.js'; // the bowl's curve lives with the seeds that lie in it
 export { bowl };
 
@@ -31,10 +31,40 @@ function edgeDist(x, z) {
   return R - Math.sqrt(cx * cx + cz * cz);
 }
 
+// The boards: three woods free, and two sold as looks in the store (L10, slice 2) — Benin bronze (cast metal: it needs a room to
+// reflect) and Grandpa's board (old, worn wood). `FINISHES` lists them all; what may be drawn is web/entitle.js's call.
+export const FINISHES = {
+  mahogany: { name: 'Mahogany' }, iroko: { name: 'Iroko' }, ebony: { name: 'Ebony' },
+  benin: { name: 'Benin bronze', metal: true }, grandpa: { name: "Grandpa's board" },
+};
+const GEO = () => ({ BW, BL, R, pits: pitCenters, PIT_R, stores: storeCenters, SRX: STORE_RX, SRZ: STORE_RZ });
+let room = null; // the bronze's reflected room, made once
+// The material settings and textures for a finish (an unknown one is mahogany).
+export function boardLook(finish, q = {}) {
+  const f = FINISHES[finish] ? finish : 'mahogany';
+  if (f === 'benin') return { tex: bronzeTextures(q, GEO()), roughness: 0.42, metalness: 0.72, bumpScale: 0.0042, env: room || (room = roomTexture()), envMapIntensity: 0.85 };
+  if (f === 'grandpa') return { tex: grandpaTextures(q, GEO()), roughness: 0.44, metalness: 0, bumpScale: 0.0036 };
+  return { tex: woodTextures(f, q), roughness: 0.5, metalness: 0, bumpScale: 0.003 };
+}
+// How the carved top is shaded at a point, on top of the texture (the vertex colours, which may go above 1 to brighten):
+// every finish darkens with depth into a bowl (the lamp reaches less of it); Grandpa's board is worn pale round every rim and the
+// board's edge, where fifty years of hands went, and darker in the pit floors; the bronze is rubbed bright on the rims and
+// greener (the patina settles) down in the bowls. `c` is the depth carved here, `e` the distance in from the board's edge.
+export function topTone(finish, x, z, c, e) {
+  const ao = 1 - 0.62 * Math.pow(Math.min(1, c / PIT_D), 0.7);
+  let rim = 0; for (const [px, pz] of pitCenters) rim = Math.max(rim, Math.exp(-(((Math.hypot(x - px, z - pz) - PIT_R) / 0.008) ** 2)));
+  for (const [sx, sz] of storeCenters) rim = Math.max(rim, Math.exp(-(((Math.hypot((x - sx) / STORE_RX, (z - sz) / STORE_RZ) - 1) * STORE_RZ / 0.006) ** 2)));
+  if (finish === 'grandpa') {
+    const edge = e < 0.02 ? Math.min(1, 1 - e / 0.02) : 0, w = Math.max(rim, edge * 0.8), deep = Math.min(1, c / PIT_D);
+    const k = ao * (1 + 0.6 * w) * (1 - 0.22 * deep * deep); return [k * (1 + 0.06 * w), k * (1 + 0.02 * w), k * (0.94 - 0.04 * w)];
+  }
+  if (finish === 'benin') { const deep = Math.min(1, c / PIT_D), k = ao * (1 + 0.35 * rim); return [k * (1 - 0.22 * deep), k * (1 + 0.04 * deep), k * (1 + 0.02 * deep)]; }
+  return [ao, ao * 0.96, ao * 0.92];
+}
+
 export function buildBoard(scene, finish = 'mahogany', q = {}) {
-  const wood = woodTextures(finish, q);
-  const woodMat = new THREE.MeshStandardMaterial({ map: wood.map, bumpMap: wood.bump, bumpScale: 0.003, roughness: 0.5, metalness: 0 });
-  const group = new THREE.Group();
+  const woodMat = new THREE.MeshStandardMaterial({ roughness: 0.5, metalness: 0 });
+  const group = new THREE.Group(); let topMat, topMesh;
 
   // body: rounded rectangle, sits under the carved top
   {
@@ -60,12 +90,25 @@ export function buildBoard(scene, finish = 'mahogany', q = {}) {
     }
     g.computeVertexNormals();
     const uv = g.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setXY(i, pos.getX(i) / BW + 0.5, pos.getZ(i) / BL + 0.5);
-    const col = new Float32Array(pos.count * 3);
-    for (let i = 0; i < pos.count; i++) { const c = carve(pos.getX(i), pos.getZ(i)); const ao = 1 - 0.62 * Math.pow(Math.min(1, c / PIT_D), 0.7); col[i * 3] = ao; col[i * 3 + 1] = ao * 0.96; col[i * 3 + 2] = ao * 0.92; }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-    const topMat = woodMat.clone(); topMat.vertexColors = true;
-    const topMesh = new THREE.Mesh(g, topMat); topMesh.receiveShadow = true; group.add(topMesh);
+    g.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
+    topMat = new THREE.MeshStandardMaterial({ vertexColors: true });
+    topMesh = new THREE.Mesh(g, topMat); topMesh.receiveShadow = true; group.add(topMesh);
   }
+  // dress the board in a finish: textures, the material's feel and the top's shading; again in place when Settings changes it
+  let worn = null;
+  function setFinish(f) {
+    const L = boardLook(f, q), id = FINISHES[f] ? f : 'mahogany';
+    if (worn) { worn.map.dispose(); worn.bump.dispose(); }
+    for (const m of [woodMat, topMat]) {
+      Object.assign(m, { map: L.tex.map, bumpMap: L.tex.bump, bumpScale: L.bumpScale, roughness: L.roughness, metalness: L.metalness, envMap: L.env || null, envMapIntensity: L.envMapIntensity || 1 });
+      m.needsUpdate = true;
+    }
+    worn = L.tex;
+    const pos = topMesh.geometry.attributes.position, col = topMesh.geometry.attributes.color;
+    for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); const [r, g, b] = topTone(id, x, z, carve(x, z), edgeDist(x, z)); col.setXYZ(i, r, g, b); }
+    col.needsUpdate = true; look.finish = id;
+  }
+  const look = { finish: null };
   // invisible tap targets, one per pit
   const targets = [];
   pitCenters.forEach(([x, z], i) => {
@@ -85,8 +128,9 @@ export function buildBoard(scene, finish = 'mahogany', q = {}) {
   const may = pitCenters.map(([x, z]) => { const m = new THREE.Mesh(mayG, new THREE.MeshBasicMaterial({ color: 0xf0c27a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; m.position.set(x, BT + 0.0022, z); m.visible = false; m.renderOrder = 2; group.add(m); return m; });
 
+  setFinish(finish);
   scene.add(group);
-  return { group, targets, ring, glow, hover, woodMat, marks, may };
+  return { group, targets, ring, glow, hover, woodMat, marks, may, setFinish, get finish() { return look.finish; } };
 }
 
 // Where the seeds will go (shown on the first tap, from the engine's own events): a faint brass ring just inside the rim of
