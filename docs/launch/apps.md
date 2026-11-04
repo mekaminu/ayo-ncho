@@ -15,8 +15,9 @@ iPhone and iPad: iOS 15 or later, built with Xcode 26 (Capacitor 8 needs it).
 - `web/app.js` — what changes inside the app (nothing on the web link): rooms and invite links go to the live server,
   the phone's own haptics, share sheet and keep-awake stand in for the browser's, the Android back button steps back
   like each screen's Back (from Home it puts the app away; in a game with a friend it never leaves the room), the splash goes.
-- `android/` — the Android project (Capacitor's, with our icon, splash and dark theme). The icons and splash come from
-  `web/icon.svg` by `python3 tools/app-icons.py` (run it again when the icon changes, L6).
+- `android/` — the Android project (Capacitor's, with our icon, splash and dark theme). The icons and splash are cut from
+  a render of the real 3D board (one pit of Job's tears under lamp light, `tools/icon-scene.html`) by `python3 tools/app-icons.py`,
+  which also writes the web link's icons and the stores' (`docs/launch/store/icon-appstore-1024.png`, `icon-play-512.png`).
 - `ios/` — the iPhone and iPad project (Capacitor's, plugins through Swift Package Manager, no CocoaPods): our icon
   (1024, no transparency), the board on the dark wood as the launch screen, light status bar icons, both orientations on
   iPad, `ITSAppUsesNonExemptEncryption = NO` (the game uses only HTTPS, so App Store Connect asks no export questions).

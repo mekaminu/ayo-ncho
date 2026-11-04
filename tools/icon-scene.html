@@ -1,0 +1,61 @@
+<!doctype html>
+<!-- The app icon, cut from the real 3D board (L6): the game's own board.js, slots.js and textures.js, looking straight down into
+     one pit of Job's tears under a warm lamp, the carved mahogany around it falling away into the dark. tools/app-icons.py
+     opens this page in headless Chromium (served from the repo root, three.js from node_modules), waits for window.__done and
+     screenshots it at 1024 × 1024; every size for iOS, Android and the web is cut from that one picture.
+     ?n=9 seeds in the pit (default 9), ?finish=mahogany|iroko|ebony, ?seeds=jobs|stones. -->
+<html><head><meta charset="utf-8">
+<style>html,body{margin:0;background:#0d0906;overflow:hidden}canvas{display:block}</style>
+<script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script>
+</head><body>
+<script type="module">
+// Math.random seeds the wood grain and the seed speckle: fix it so every run of the icon is the same picture.
+{ let s = 20261104; Math.random = () => { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+const THREE = await import('three');
+const { buildBoard, buildTable, seedMaterialFor, seedGeometry, SEED_SETS, pitCenters, BT, PIT_R, PIT_D } = await import('/web/board.js');
+const { pour, place } = await import('/web/slots.js');
+
+const q = new URLSearchParams(location.search); const N = +(q.get('n') || 12), FINISH = q.get('finish') || 'mahogany', SET_ID = q.get('seeds') || 'jobs';
+const S = 1024; // the picture is drawn once at this size; the page is S × S
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(S, S); document.body.appendChild(renderer.domElement);
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = +(q.get('exp') || 1.0); renderer.outputColorSpace = THREE.SRGBColorSpace;
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d0906);
+
+const board = buildBoard(scene, FINISH, { woodW: 2048, woodH: 4096, anisotropy: 16 }) // the grain drawn finer: the icon looks at one pit from close; buildTable(scene, {});
+// The pit: the player's third (index 2), in the middle of its row, so the wood around it is the board's top, not its edge.
+const PIT = 2, [px, pz] = pitCenters[PIT];
+
+// Lamp light: the game's warm key from the upper left, but most of the light is a lamp right over the pit, its pool
+// falling off into the dark before the icon's corners; a low hemisphere so the shadows between seeds are not black.
+scene.add(new THREE.HemisphereLight(0xffe2c0, 0x1a0e07, 0.12));
+const lamp = new THREE.SpotLight(0xffdcb0, +(q.get('lamp') || 2.4), 1.6, +(q.get('cone') || 0.25), 0.9, 1.2);
+lamp.position.set(px - 0.11, BT + 0.62, pz + 0.16); lamp.target.position.set(px, BT - PIT_D * 0.5, pz); scene.add(lamp, lamp.target);
+lamp.castShadow = true; lamp.shadow.mapSize.set(2048, 2048); lamp.shadow.bias = -0.0002; lamp.shadow.normalBias = 0.002; lamp.shadow.camera.near = 0.2; lamp.shadow.camera.far = 1.4;
+const rim = new THREE.DirectionalLight(0xffb070, 0.35); rim.position.set(0.8, 0.9, -1.2); scene.add(rim);
+
+// The seeds, poured exactly as the game pours a pit (the k-th seed in the k-th spot), each its own size.
+const SET = SEED_SETS[SET_ID] || SEED_SETS.jobs; const mat = seedMaterialFor(SET_ID, { seedS: 512 });
+const dims = { a: (SET.r[0] + SET.r[2]) / 2 * 0.98, b: SET.r[1] };
+const spots = pour({ rx: PIT_R, rz: PIT_R, depth: PIT_D }, dims, 48, 3);
+let r = 7; const rnd = () => { r = (r * 9301 + 49297) % 233280; return r / 233280; };
+for (let k = 0; k < N; k++) {
+  const m = new THREE.Mesh(seedGeometry, mat); m.rotation.order = 'XZY';
+  const j = [0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2, 0.9 + rnd() * 0.2];
+  m.scale.set(SET.r[0] * j[0], SET.r[1] * j[1], SET.r[2] * j[2]);
+  const p = place(spots[k], px, pz, BT, PIT * 2.39996); p.y += SET.r[1] * (j[1] - 1);
+  m.position.set(p.x, p.y, p.z); m.rotation.set(p.rx, p.ry, p.rz); m.castShadow = m.receiveShadow = true; scene.add(m);
+}
+
+// The camera: almost straight down, a touch from the player's side so the near wall of the bowl reads as carved, framed so the
+// pit's rim is ~58% of the picture across — inside Android's adaptive-icon safe circle (66 of 108) and the web's maskable 80%.
+const camera = new THREE.PerspectiveCamera(30, 1, 0.02, 5);
+const FILL = +(q.get('fill') || 0.8); // the rim's share of the picture across: 0.8 for the whole icon, 0.5 for Android's adaptive foreground
+const h = (PIT_R * 2) / FILL / 2 / Math.tan(THREE.MathUtils.degToRad(15));
+camera.position.set(px + 0.012, BT + h * 0.985, pz + h * 0.17); camera.lookAt(px, BT - PIT_D * 0.35, pz);
+
+renderer.render(scene, camera); renderer.render(scene, camera);
+window.__done = true;
+</script>
+</body></html>
