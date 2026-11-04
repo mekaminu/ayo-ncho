@@ -6,7 +6,7 @@
 //   last — the id of the last game counted, so one game is never counted twice (a reload, a replay)
 // Online games and the daily puzzle are not counted: a friend is not an opponent with a record, and a puzzle is one move.
 
-export const LEVELS = ['easy', 'medium', 'hard'];
+export const LEVELS = ['easy', 'medium', 'hard', 'master'];
 
 const fresh = () => ({ w: 0, l: 0, d: 0, best: null, run: 0 });
 

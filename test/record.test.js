@@ -5,7 +5,7 @@ import { runLine, CHARACTERS, RUN_MOOD, MOODS } from "../web/characters.js";
 
 test("wins, losses and draws are counted per opponent, and the standing reads in plain words", () => {
   let d = parse(null);
-  assert.deepEqual(LEVELS, ["easy", "medium", "hard"]);
+  assert.deepEqual(LEVELS, ["easy", "medium", "hard", "master"]);
   for (const k of LEVELS) assert.equal(standing(d[k]), "", "nothing to say before the first game");
   let r = record(d, "medium", 27, 21, 1); d = r.data;
   assert.equal(r.outcome, "win"); assert.equal(r.counted, true); assert.equal(standing(d.medium), "you lead 1–0");

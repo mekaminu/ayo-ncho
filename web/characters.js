@@ -51,6 +51,11 @@ const LOOKS = {
   hard: { skin: '#6b3d1e', cloth: '#2d6a4f', grin: 0.45,
     hair: '<path d="M17 22c3-10 10-12 15-12s12 2 15 12v4H17z" fill="#e6b76f"/><path d="M17 22h30" stroke="#b8862b" stroke-width="2"/>',
     rest: '<path d="M27 37q5 2 10 0" stroke="#1a0f07" stroke-width="1.6" fill="none" stroke-linecap="round"/>', always: '<circle cx="20" cy="33" r="2" fill="#e6b76f"/><circle cx="44" cy="33" r="2" fill="#e6b76f"/>' },
+  // Papa Ike (Master): grey at the temples, a white beard and the red cap of a titled man, coral beads at the neck
+  master: { skin: '#5a3318', cloth: '#4a1f2e', grin: 0.3,
+    hair: '<path d="M19 27c0-4 1-7 3-9M45 27c0-4-1-7-3-9" stroke="#cfc6b8" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M20 19c2-7 7-10 12-10s10 3 12 10z" fill="#b3122b"/><path d="M20 19h24" stroke="#7d0c1e" stroke-width="1.6"/>',
+    rest: '<path d="M28 37q4 1.5 8 0" stroke="#1a0f07" stroke-width="1.6" fill="none" stroke-linecap="round"/><path d="M23 24.5l7-.5M34 24l7 .5" stroke="#cfc6b8" stroke-width="1.6" stroke-linecap="round"/>',
+    always: '<path d="M22 36c1 7 5 10 10 10s9-3 10-10c-2 3-5 4-10 4s-8-1-10-4z" fill="#e9e3d8"/><path d="M20 50q12 6 24 0" stroke="#e2603f" stroke-width="2.6" fill="none" stroke-dasharray="2.6 1.4" stroke-linecap="round"/>' },
 };
 
 // The face of a character in a mood (calm when the mood is unknown).
@@ -111,6 +116,22 @@ export const CHARACTERS = {
     },
     runs: { yours: { 3: 'Three in a row? Mama Ngozi is watching.', 5: 'Five. Now the market will talk.', more: (n) => `${n} in a row. The board is yours. For now.` },
             theirs: { 3: 'Three. Come back when the seeds listen to you.', 5: 'Five. Sit well; we are not finished.', more: (n) => `${n}. I am not counting. You are.` } },
+  },
+  master: {
+    name: 'Papa Ike', level: 'Master', bio: 'Mama Ngozi\'s old rival. They have not spoken since the final of 1987.',
+    lines: {
+      start: ['Sit. Count. Then count again.', 'Your move. Take your time; I have mine.', 'Mama Ngozi sent you? Hm.'],
+      capture: ['Seen from far away.', 'That was decided six moves ago.', 'Mm.'],
+      lost: ['A fair price.', 'Good. You are seeing further.', 'I lent you that. I will collect.'],
+      undo: ['Take it back. The board will wait.', 'Once more, then. Slowly.'],
+      win: ['The seeds go where they are sent.', 'Come back next week. Bring Mama Ngozi.'],
+      lose: ['So. The young ones count now.', 'Well played. Tell nobody at the market.'],
+      firstWin: ['Ah. You beat me. Mama Ngozi must never hear of it.'],
+      last8: ['Eight seeds. Everything was for this.', 'The last eight. I have been waiting.'],
+      circling: ['We walk in circles. One of us will tire first.', 'Round we go. I am not tired.'],
+    },
+    runs: { yours: { 3: 'Three. I will have to think now.', 5: 'Five. They will write songs. Short ones.', more: (n) => `${n} in a row. I am taking notes.` },
+            theirs: { 3: 'Three. Patience, my child.', 5: 'Five. Sit with the board a while.', more: (n) => `${n}. The board is a slow teacher.` } },
   },
 };
 for (const k in CHARACTERS) CHARACTERS[k].face = faceFor(k, 'calm');

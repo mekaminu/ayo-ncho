@@ -10,7 +10,8 @@ import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
-import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink } from './app.js';
+import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink, inApp } from './app.js';
+import { parseOwned, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS } from './entitle.js';
 import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './shouts.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
@@ -36,6 +37,7 @@ import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, m
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
+const GOLD_PREVIEW = previewOf(location.search); // ?try=master: Papa Ike open for this visit (until Gold can be bought)
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem('ayo.' + k, v); } catch {} } };
 // a new phone (nothing of the game kept on it): its first Play opens the lesson and it starts against Adaeze (web/lesson.js);
@@ -356,7 +358,7 @@ const settings = {
     const cap = prefs.get('rules.capture', ''); const relay = prefs.get('rules.relay', ''); const last8 = prefs.get('rules.last8', '');
     return { capture: cap ? +cap : base.capture, relay: relay ? relay === '1' : base.relay, last8: last8 ? last8 === '1' : base.last8 };
   },
-  get level() { return prefs.get('level', firstLevel(newPhone)); },
+  get level() { return playable(prefs.get('level', firstLevel(newPhone)), owned(), GOLD_PREVIEW); }, // a Gold opponent this phone cannot open falls back to Mama Ngozi
   get speed() { return prefs.get('speed', 'normal'); },
   get mode() { return prefs.get('mode', 'ai'); }, // 'ai': the chosen opponent · 'local': two of us on this phone
 };
@@ -373,7 +375,7 @@ async function passTurn() { // two of us: the player to move takes the near seat
   if (swingOn()) { const from = theta, to = swingTheta(theta, s); click(1.1, 0.04); await tween(700, (t) => { theta = from + (to - from) * t; }, easeInOut); }
   busy = false; refreshStatic();
 }
-const names = { easy: 'Adaeze', medium: 'Nnamdi', hard: 'Mama Ngozi' };
+const names = { easy: 'Adaeze', medium: 'Nnamdi', hard: 'Mama Ngozi', master: 'Papa Ike' };
 const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
 let stats = { biggest: 0, captures: 0, started: Date.now() };
@@ -1134,6 +1136,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle
 }
 let idle = true; // the home screen slowly turns the board
 function paintHome() {
+  paintGold();
   const g = settings.game;
   document.querySelectorAll('[data-game]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.game === g));
   document.querySelectorAll('.pill[data-level]').forEach((b) => b.setAttribute('aria-pressed', settings.mode !== 'local' && b.dataset.level === level));
@@ -1143,6 +1146,7 @@ function paintHome() {
   $('#continueBtn').disabled = !saved; $('#continueSub').textContent = saved ? saved.local ? localContinue(saved) : `${saved.stores[0] > saved.stores[1] ? 'you lead' : saved.stores[0] < saved.stores[1] ? 'you trail' : 'level'} ${saved.stores[0]} – ${saved.stores[1]} · ${saved.moves.length} moves in` : 'no game in progress';
 }
 function paintSettings() {
+  paintGold();
   const r = settings.rules();
   const set = (name, v) => document.querySelectorAll(`[data-set="${name}"] .segbtn, [data-set="${name}"] .swatch`).forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === String(v)));
   set('game', settings.game); set('capture', r.capture); set('relay', r.relay ? 1 : 0); set('finish', prefs.get('finish', 'mahogany')); set('seeds', seedSetId()); set('speed', settings.speed); set('starts', startsPref());
@@ -1176,6 +1180,10 @@ function sayText(text, mood = 'calm', ms = 2600) { // the opponent says these wo
   if (!text || params.get('still')) return;
   const b = $('#bubble'); b.textContent = text; b.hidden = false; clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => { b.hidden = true; }, ms);
 }
+// Gold (L7/L9): Master is locked with a small Gold mark until bought; ?try=master opens him for one visit (web/entitle.js).
+function owned() { return parseOwned(prefs.get('owned', '[]')); }
+function goldLocked(lv) { if (levelOpen(lv, owned(), GOLD_PREVIEW)) return false; toast(lockedWords(names[lv], inApp()), 3200); click(0.7, 0.05); return true; }
+function paintGold() { document.querySelectorAll('[data-level]').forEach((b) => { if (!GOLD_LEVELS.includes(b.dataset.level)) return; const shut = !levelOpen(b.dataset.level, owned(), GOLD_PREVIEW); b.classList.toggle('locked', shut); const row = b.closest('.row'); if (row) row.classList.toggle('locked', shut); }); }
 function toast(text, ms = 1800) { const t = document.createElement('div'); t.className = ms > 1800 ? 'toast long' : 'toast'; t.textContent = text; body.appendChild(t); setTimeout(() => t.remove(), ms); }
 
 // settings wiring: rules changes start a new game; everything else applies at once
@@ -1205,10 +1213,10 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
     }));
   }
 });
-document.querySelectorAll('.choose[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); mood = 'calm'; paintSettings(); refreshStatic(); click(1.2, 0.05); }));
+document.querySelectorAll('.choose[data-level]').forEach((b) => b.addEventListener('click', () => { if (goldLocked(b.dataset.level)) return; level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); mood = 'calm'; paintSettings(); refreshStatic(); click(1.2, 0.05); }));
 $('.choose[data-mode="local"]').addEventListener('click', () => { prefs.set('mode', 'local'); paintSettings(); click(1.2, 0.05); toast('Two of us on the next game'); });
 document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('click', () => { prefs.set('game.variant', b.dataset.game); prefs.set('rules.capture', ''); prefs.set('rules.relay', ''); prefs.set('rules.last8', ''); paintHome(); click(1.2, 0.05); }));
-document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); paintHome(); click(1.2, 0.05); }));
+document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { if (goldLocked(b.dataset.level)) return; level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); paintHome(); click(1.2, 0.05); }));
 $('.pill[data-mode="local"]').addEventListener('click', () => { prefs.set('mode', 'local'); paintHome(); click(1.2, 0.05); }); // two of us on this phone: no computer plays
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
 $('#playBtn').addEventListener('click', () => { if (lessonDueNow()) { openLesson('play'); click(1.3, 0.08); return; } newRound(); showScreen('play'); click(1.3, 0.08); }); // a new phone's first Play: the lesson first
@@ -1350,7 +1358,7 @@ $('#clipBtn').addEventListener('click', () => { recordClip(); click(1.3, 0.08); 
 function save() { if (online) return; prefs.set('game', JSON.stringify({ moves: state.moves, variant: state.variant, rules: state.rules, level, stats, local })); }
 function savedGame() { try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length) { const s = replay(g.moves, g.variant, g.rules); return s.over ? null : { ...s, local: !!g.local }; } } catch {} return null; }
 function resume() {
-  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = g.level || level; stats = g.stats || stats; local = !!g.local; seat(local ? seatOf(state) : 0); return !state.over; } } catch {}
+  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = playable(g.level || level, owned(), GOLD_PREVIEW); stats = g.stats || stats; local = !!g.local; seat(local ? seatOf(state) : 0); return !state.over; } } catch {}
   local = false; seat(0); return false;
 }
 function newRound() {

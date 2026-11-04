@@ -46,6 +46,8 @@
 #                  <out>-friend.png the friend's view (the far seat, pits nearest them) with the host's shout by his face. --wide for the host on a Mac
 #        --legal: Settings → the Privacy · Terms · Support links point at the server's pages and open beside the game (Settings stays);
 #                  each page is screenshot (<out> privacy, <out>-terms.png, <out>-support.png, <out>-settings.png) and must not scroll sideways
+#        --master: Home shows Papa Ike (Master) locked with the Gold mark (<out>-home.png); a tap says where he plays and does not choose him;
+#                  then ?try=master opens him for the visit: chosen, Play, your move, his reply from the worker within the budget (<out>)
 #        --puzzle: open today's daily puzzle (?puzzle=1), play the answer, check the result card says Solved, screenshot it; then Back to home
 #                  and check the Home card says solved (<out>-home.png); --wide for the Mac layout
 #        --last8: the last 8 (Nchò) — a saved game one move from the board's last 8 seeds (tools/last8pos.js finds it): Continue, the move is
@@ -88,7 +90,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; legal = "--legal" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; record = record or story
+out = sys.argv[1]; legal = "--legal" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -328,13 +330,13 @@ with sync_playwright() as p:
     if wakec: pg.add_init_script("""(() => { const log = []; window.__wakeLog = log; Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request(kind) { const ls = []; const s = { released: false, type: kind, addEventListener: (e, f) => { if (e === 'release') ls.push(f); }, release() { if (!s.released) { s.released = true; log.push('release'); ls.forEach((f) => f()); } return Promise.resolve(); } }; log.push('request:' + kind); return Promise.resolve(s); } } }); })()""")
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or masterc or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
     if record:
         pills = pg.evaluate("[...document.querySelectorAll('.pill[data-level]')].map(b=>[b.dataset.level, b.querySelector('small.rec').textContent])")
-        assert pills == [["easy", "you lead 4–2"], ["medium", "you trail 1–3"], ["hard", "you lead 2–1"]], pills
+        assert pills == [["easy", "you lead 4–2"], ["medium", "you trail 1–3"], ["hard", "you lead 2–1"], ["master", ""]], pills
         assert not pg.evaluate("document.querySelector('#continueBtn').disabled") and "moves in" in pg.evaluate("document.querySelector('#continueSub').textContent"), "the saved game should be there to continue"
         print("record: Home pills", pills)
         out2 = out[:-4] + "-home.png" if out.endswith(".png") else out + "-home.png"
@@ -670,6 +672,26 @@ with sync_playwright() as p:
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)
+    if masterc:  # Papa Ike: locked behind Gold on Home, then opened for one visit with ?try=master and played
+        pg.evaluate("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done')")
+        lk = pg.evaluate("document.querySelector('.pill[data-level=master]').classList.contains('locked')"); assert lk, "Master should be locked without Gold"
+        assert pg.evaluate("getComputedStyle(document.querySelector('.pill[data-level=master] .gold svg')).display") != "none", "the Gold lock shows"
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("Home scrolls sideways", W)
+        pg.screenshot(path=out[:-4] + "-home.png", timeout=120000, animations="disabled")
+        was = pg.evaluate("window.__ayo.level"); pg.click(".pill[data-level=master]"); pg.wait_for_timeout(300)
+        t = pg.evaluate("[...document.querySelectorAll('.toast')].map(x=>x.textContent).join(' | ')"); assert "Gold" in t and "in the app" in t, t
+        assert pg.evaluate("window.__ayo.level") == was, "a locked Master is not chosen"
+        print("master: locked ·", t)
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home&try=master", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        assert not pg.evaluate("document.querySelector('.pill[data-level=master]').classList.contains('locked')"), "?try=master opens him"
+        pg.click(".pill[data-level=master]"); assert pg.evaluate("window.__ayo.level") == "master"
+        assert "Papa Ike" in pg.evaluate("document.querySelector('#playSub').textContent")
+        pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy && window.__ayo.state.turn === 0", timeout=60000)
+        assert pg.evaluate("document.querySelector('#oppName').textContent") == "Papa Ike · Master", pg.evaluate("document.querySelector('#oppName').textContent")
+        t0 = time.time(); tap(pg, pg.evaluate("window.__ayo.legal")[0])
+        pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy && window.__ayo.state.turn === 0 || window.__ayo.state.over", timeout=240000)
+        print("master: move and reply in %.1f s" % (time.time() - t0), pg.evaluate("window.__ayo.state.moves"))
+        pg.wait_for_timeout(600); pg.screenshot(path=out, timeout=120000, animations="disabled")
     if smoke:
         before = pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         if take:  # the weakest opening move by the hard search's own rating, so her take is sure to come
