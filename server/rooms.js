@@ -22,6 +22,7 @@ import { randomUUID, randomBytes, createHmac, timingSafeEqual } from "node:crypt
 import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, RULES } from "../engine/ayo.js";
 import { isShout, mayShout } from "../web/shouts.js";
 import { callMessage, passGate } from "../web/call.js";
+import { cleanTag } from "../web/block.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
 export const CODE_LENGTH = 4;
@@ -69,7 +70,7 @@ export class Rooms {
   }
 
   // The host opens a room and takes seat 0. The friend's seat stays empty until join().
-  create({ variant = "ncho", rules = {}, name } = {}) {
+  create({ variant = "ncho", rules = {}, name, tag } = {}) {
     if (this.rooms.size >= this.maxRooms) fail("full", "too many rooms open right now, try again in a minute");
     if (!RULES[variant]) fail("variant", "unknown game");
     let code; let tries = 0;
@@ -77,8 +78,8 @@ export class Rooms {
     const t = this.now(); const rid = randomBytes(9).toString("base64url");
     const room = {
       code, rid, variant, rules: { ...RULES[variant], ...rules },
-      seats: [{ token: this.tokenFor(code, rid, 0), name: cleanName(name, "Host"), online: true, wantsRematch: false }, null],
-      knocks: [], // people at the door, oldest first: {id, name, at}
+      seats: [{ token: this.tokenFor(code, rid, 0), name: cleanName(name, "Host"), tag: cleanTag(tag), online: true, wantsRematch: false }, null],
+      knocks: [], // people at the door, oldest first: {id, name, tag, at}
       game: newGame(variant, rules), games: 0,
       createdAt: t, touchedAt: t,
     };
@@ -88,23 +89,25 @@ export class Rooms {
 
   // The friend joins by code and takes seat 1. A full room, or a code nobody opened, is refused.
   // (admit() is how the host's yes gets here; tests and trusted callers may seat a friend directly.)
-  join(code, { name } = {}) {
+  join(code, { name, tag } = {}) {
     const room = this.get(code);
     if (room.seats[1]) fail("taken", "that room already has two players");
-    room.seats[1] = { token: this.tokenFor(room.code, room.rid, 1), name: cleanName(name, "Friend"), online: true, wantsRematch: false };
+    room.seats[1] = { token: this.tokenFor(room.code, room.rid, 1), name: cleanName(name, "Friend"), tag: cleanTag(tag), online: true, wantsRematch: false };
     room.touchedAt = this.now();
     return { code: room.code, token: room.seats[1].token, seat: 1, room: this.snapshot(code) };
   }
 
   // Someone opened the invite link: they knock with their name and wait for the host's yes. Returns what the
   // knocker may know: their knock id, the host's name and whether the host is at the board right now.
-  knock(code, { name } = {}) {
+  // tag: the knocker's phone tag (web/block.js), shown to the host so a phone that blocked it turns the knock away by itself;
+  // hostTag goes back to the knocker, so a phone that blocked the host says so instead of knocking.
+  knock(code, { name, tag } = {}) {
     const room = this.get(code);
     if (room.seats[1]) fail("taken", "that room already has two players");
     if (room.knocks.length >= 20) fail("busy", "too many people at the door");
-    const k = { id: randomUUID(), name: cleanName(name, "Friend"), at: this.now() };
+    const k = { id: randomUUID(), name: cleanName(name, "Friend"), tag: cleanTag(tag), at: this.now() };
     room.knocks.push(k); room.touchedAt = k.at;
-    return { code: room.code, id: k.id, name: k.name, host: room.seats[0].name, hostOnline: room.seats[0].online };
+    return { code: room.code, id: k.id, name: k.name, ...(k.tag ? { tag: k.tag } : {}), host: room.seats[0].name, ...(room.seats[0].tag ? { hostTag: room.seats[0].tag } : {}), hostOnline: room.seats[0].online };
   }
   // The knocker went away before being answered.
   withdraw(code, id) {
@@ -118,7 +121,7 @@ export class Rooms {
     if (this.seatOf(room, token) !== 0) fail("host", "only the host decides who comes in");
     const i = room.knocks.findIndex((k) => k.id === id); if (i < 0) fail("noknock", "nobody is knocking with that name");
     const [k] = room.knocks.splice(i, 1);
-    const seated = this.join(code, { name: k.name });
+    const seated = this.join(code, { name: k.name, tag: k.tag });
     const turnedAway = room.knocks.splice(0); // the seat is gone: the others at the door are told so
     return { ...seated, knock: { id: k.id, name: k.name }, turnedAway: turnedAway.map((x) => ({ id: x.id, name: x.name })) };
   }
@@ -135,7 +138,8 @@ export class Rooms {
   // With a ticket (what the board holds of the room, sealed by this server), a room the server has forgotten — a restart, a
   // deploy — is rebuilt first (restored: true). A room rebuilt from an older ticket, before anyone has played in it, takes a
   // newer one from the other phone (upgraded: true, and the other board is sent the room).
-  rejoin(code, token, ticket) {
+  // tag: the phone's tag again (a room rebuilt after a restart has lost it; an older phone sends none).
+  rejoin(code, token, ticket, tag) {
     code = normaliseCode(code);
     let restored = false, upgraded = false;
     if (!this.rooms.has(code) && ticket) { this.restore(code, token, ticket); restored = true; }
@@ -143,6 +147,7 @@ export class Rooms {
     const seat = this.seatOf(room, token);
     if (!restored && ticket && room.restored) upgraded = this.upgrade(room, ticket);
     room.seats[seat].online = true; room.touchedAt = this.now();
+    const t = cleanTag(tag); if (t) room.seats[seat].tag = t;
     return { code: room.code, token, seat, room: this.snapshot(code), restored, upgraded };
   }
 
@@ -309,8 +314,8 @@ export class Rooms {
     const room = this.get(code);
     return {
       code: room.code, variant: room.variant, rules: { ...room.rules }, games: room.games,
-      players: room.seats.map((s, i) => s ? { seat: i, name: s.name, online: s.online, wantsRematch: s.wantsRematch } : null),
-      knocks: room.knocks.map((k) => ({ id: k.id, name: k.name })), // who is at the door (the host's board shows them; never shown to the knockers)
+      players: room.seats.map((s, i) => s ? { seat: i, name: s.name, ...(s.tag ? { tag: s.tag } : {}), online: s.online, wantsRematch: s.wantsRematch } : null), // tag: each phone's random tag, for block (web/block.js)
+      knocks: room.knocks.map((k) => ({ id: k.id, name: k.name, ...(k.tag ? { tag: k.tag } : {}) })), // who is at the door (the host's board shows them; never shown to the knockers)
       ask: room.ask ? { seat: room.ask.seat, n: room.ask.n } : null, // a "take it back?" waiting for its answer (a rejoin sees it)
       state: publicState(room.game),
       rid: room.rid, sig: this.seal(room), // the board keeps these with the moves, so the room can be rebuilt after a restart (ticketOf in web/online.js)

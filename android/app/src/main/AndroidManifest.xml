@@ -39,6 +39,15 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Video and voice at the board (web/call.js): asked only when both players have said yes to a call, never at start.
+         Capacitor's WebView asks Android for them when the page opens the camera or microphone (BridgeWebChromeClient). A phone
+         with no camera still installs the app (voice only), so neither is a required feature. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.front" android:required="false" />
+    <uses-feature android:name="android.hardware.microphone" android:required="false" />
     <!-- The daily-puzzle reminder (web/remind.js) is scheduled inexact: a reminder a few minutes late is fine, so the app never
          asks for "Alarms & reminders" (Play reviews apps that declare exact alarms). The notifications permission itself comes
          from the plugin and is asked only when the player switches the reminder on. -->

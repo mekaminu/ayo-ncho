@@ -56,8 +56,8 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   // someone at the door: they wait on their own socket; the host's board hears the knock and sees the door list
   const knockSocket = (ws, k) => {
     ws.knock = { code: k.code, id: k.id }; knockers.set(k.id, ws);
-    send(ws, { t: "knocked", code: k.code, id: k.id, host: k.host, hostOnline: k.hostOnline });
-    broadcast(k.code, { t: "knock", id: k.id, name: k.name });
+    send(ws, { t: "knocked", code: k.code, id: k.id, host: k.host, ...(k.hostTag ? { hostTag: k.hostTag } : {}), hostOnline: k.hostOnline });
+    broadcast(k.code, { t: "knock", id: k.id, name: k.name, ...(k.tag ? { tag: k.tag } : {}) }); // tag: the knocker's phone tag, for block (web/block.js)
     broadcast(k.code, { t: "room", room: rooms.snapshot(k.code) });
   };
   const answerDoor = (ws, m) => {
@@ -85,9 +85,9 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
       try {
         switch (m.t) {
           case "ping": return send(ws, { t: "pong" });
-          case "create": if (ws.room) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name }));
-          case "join": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return knockSocket(ws, rooms.knock(m.code, { name: m.name }));
-          case "rejoin": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token, m.ticket && typeof m.ticket === "object" ? m.ticket : null));
+          case "create": if (ws.room) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name, tag: m.tag }));
+          case "join": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return knockSocket(ws, rooms.knock(m.code, { name: m.name, tag: m.tag }));
+          case "rejoin": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token, m.ticket && typeof m.ticket === "object" ? m.ticket : null, m.tag));
           case "let": return answerDoor(ws, m);
           case "move": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.move(ws.room, ws.token, m.pit); return broadcast(ws.room, moveMessage(r)); }
           case "resign": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.resign(ws.room, ws.token); return broadcast(ws.room, resignMessage(r)); }

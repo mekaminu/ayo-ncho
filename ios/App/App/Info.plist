@@ -64,6 +64,10 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSCameraUsageDescription</key>
+	<string>Your camera is used only for video at the board with a friend, after you both say yes. The picture goes straight to their phone and is never recorded.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Your microphone is used only to talk at the board with a friend, after you both say yes. The sound goes straight to their phone and is never recorded.</string>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>LSApplicationCategoryType</key>

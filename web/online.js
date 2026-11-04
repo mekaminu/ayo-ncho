@@ -92,7 +92,8 @@ export const ERROR_TEXT = {
 };
 
 export class Online {
-  constructor(url, { WebSocketImpl = typeof WebSocket !== 'undefined' ? WebSocket : null, setTimeoutFn = (fn, ms) => setTimeout(fn, ms), clearTimeoutFn = (t) => clearTimeout(t) } = {}) {
+  constructor(url, { WebSocketImpl = typeof WebSocket !== 'undefined' ? WebSocket : null, setTimeoutFn = (fn, ms) => setTimeout(fn, ms), clearTimeoutFn = (t) => clearTimeout(t), tag = null } = {}) {
+    this.tag = tag; // this phone's random tag (web/block.js), sent with create / join / rejoin
     this.url = url; this.WS = WebSocketImpl; this.setTimeout = setTimeoutFn; this.clearTimeout = clearTimeoutFn;
     this.ws = null; this.status = 'closed'; this.seat = null; this.code = null; this.token = null; this.room = null;
     this.knock = null; // {code, id, host, hostOnline} while this board waits at the door
@@ -111,7 +112,11 @@ export class Online {
   rejoin(code, token, ticket = null) { this.held = ticket || null; this.ask({ t: 'rejoin', code: String(code || '').toUpperCase(), token }); }
   ask(intent) { this.intent = intent; if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(this.wire(intent))); else this.connect(); }
   // a rejoin carries the ticket, so a server that has restarted since can rebuild the room from it
-  wire(intent) { if (intent.t !== 'rejoin') return intent; const ticket = this.ticket(); return ticket ? { ...intent, ticket } : intent; }
+  // create / join / rejoin carry this phone's tag (web/block.js) when the board gave one; a rejoin also carries the ticket
+  wire(intent) {
+    const tagged = this.tag && ['create', 'join', 'rejoin'].includes(intent.t) ? { ...intent, tag: this.tag } : intent;
+    if (intent.t !== 'rejoin') return tagged; const ticket = this.ticket(); return ticket ? { ...tagged, ticket } : tagged;
+  }
   ticket() { return (this.room && ticketOf(this.room)) || this.held; }
   sealed(sig) { if (!this.room) return; if (sig) this.room.sig = sig; else delete this.room.sig; this.kept(); } // an older server sends no seal: keep no ticket rather than a stale one
   kept() { const ticket = ticketOf(this.room); if (ticket) { this.held = null; this.emit('ticket', { code: this.code, token: this.token, ticket }); } }
@@ -162,8 +167,8 @@ export class Online {
         this.emit('joined', { seat: m.seat, code: m.code, token: m.token, room: m.room }); return this.kept();
       case 'knocked':
         this.code = m.code; this.knock = { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline };
-        return this.emit('knocked', { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline });
-      case 'knock': return this.emit('knock', { id: m.id, name: m.name });
+        return this.emit('knocked', { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline, ...(m.hostTag ? { hostTag: m.hostTag } : {}) });
+      case 'knock': return this.emit('knock', { id: m.id, name: m.name, ...(m.tag ? { tag: m.tag } : {}) });
       case 'room': this.room = m.room; this.emit('room', { room: m.room, started: !!m.started, resync: !!m.resync }); return this.kept();
       case 'move': {
         let events = m.events, state = m.state; // an older server still sends the whole thing

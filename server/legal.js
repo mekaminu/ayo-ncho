@@ -75,7 +75,7 @@ ${body}
 function privacy(c) {
   return `<h1>Privacy</h1>
 <p class="date">Last updated ${UPDATED}</p>
-<p class="lead">${GAME} keeps your game on your own phone or computer. There are no accounts, no ads, no analytics and no cookies. The only things that ever reach our server are the name you type for a game with a friend, and that game's moves and shouts.</p>
+<p class="lead">${GAME} keeps your game on your own phone or computer. There are no accounts, no ads, no analytics and no cookies. The only things that ever reach our server are the name you type for a game with a friend, that game's moves and shouts, a random tag for your phone, and, if you both choose to talk, the few messages that connect your two phones. A video or voice call goes straight between the two phones and never through us.</p>
 <p>This page is for the game on the web (ayo-ncho.onrender.com) and the ${GAME} apps for Android, iPhone and iPad. It is run by ${c.seller}, who is responsible for your information under UK and EU data protection law. You can reach us at ${c.mail}.</p>
 
 <h2>What stays on your phone</h2>
@@ -83,18 +83,31 @@ function privacy(c) {
 <ul>
 <li>your settings (rules, wood, seeds, sound, speed and so on) and the game in progress;</li>
 <li>your record against each computer opponent, your daily puzzle results and the days you have played;</li>
-<li>the name you typed for games with friends, and, while you are in one, that game's seat and moves so you can rejoin it.</li>
+<li>the name you typed for games with friends, and, while you are in one, that game's seat and moves so you can rejoin it;</li>
+<li>your phone's tag (below) and the list of people you have blocked, with the names they used.</li>
 </ul>
 <p>None of this is sent to us, apart from your name and moves while you play a friend online (below). Clearing the site's data in your browser, or deleting the app, removes it all.</p>
 
 <h2>Playing with a friend online</h2>
-<p>When you open a room or knock on a friend's, our server receives the name you typed, your moves, any of the fixed shouts you send ("Oya, your move!" and the like) and a random code for your seat. Your friend sees your name. This is needed to run the game between you, and it is all it is used for.</p>
+<p>When you open a room or knock on a friend's, our server receives the name you typed, your moves, any of the fixed shouts you send ("Oya, your move!" and the like) a random code for your seat, and your phone's tag: a random string made on your phone the first time you play a friend, linked to nothing else (no account, no name, no device ID). Your friend's phone sees your name and your tag, so that if they block you their phone can turn your knocks away later. This is needed to run the game between you, and it is all it is used for.</p>
 <ul>
 <li>It is held only in the server's working memory, never written to a database or to disk.</li>
 <li>A room nobody joins is removed after 10 minutes; a game nobody has played for 6 hours is removed. A restart of the server also clears it (your phone keeps a sealed copy of your own game so you can carry on).</li>
 <li>Use a nickname if you like: the name does not have to be real.</li>
 </ul>
 <p>Playing the computer, the daily puzzle or two of you on one phone sends nothing to us at all.</p>
+
+<h2>Video and voice with a friend</h2>
+<p>In a game with a friend, either of you can ask to talk with the camera button. Nothing is switched on until you have both said yes, and only then does your phone ask for its camera and microphone (in the apps, your phone asks your permission the first time).</p>
+<ul>
+<li>The picture and sound go directly from your phone to your friend's (WebRTC, encrypted end to end between the two phones). They never pass through our server, and nothing is recorded by us or by the game.</li>
+<li>To connect the two phones, our server passes on a few small messages between them: the ask and the answer, and the technical details each phone needs to find the other, which include each phone's internet address. They are passed on at once and not kept.</li>
+<li>To find each other, the phones ask a public address service (STUN, run by Google), which sees each phone's internet address, as any website does.</li>
+<li>You can mute, turn your camera off, hide your friend's picture on your phone, or hang up at any time; leaving the board ends the call.</li>
+</ul>
+
+<h2>Blocking and reporting</h2>
+<p>The camera button's menu in a game with a friend has Block and Report a problem. Blocking someone ends the call, takes you out of the room, and from then on your phone turns their knocks away by itself; the list stays on your phone (Settings → Privacy), where you can unblock them. Report a problem opens the <a href="/support#report">support page</a>, which says what to send us; we read every report.</p>
 
 <h2>What our host and others see</h2>
 <ul>
@@ -116,7 +129,7 @@ function privacy(c) {
 <p>The game is free. If the apps later offer optional upgrades or new boards, they will be bought through Apple's App Store or Google Play only, under their terms. They handle the payment; we would learn only which item was bought, never your card or bank details.</p>
 
 <h2>Children</h2>
-<p>${GAME} is for everyone aged 13 and over, and families play it together. We do not knowingly collect personal information from children. The only thing a player can send us is a name for a game with a friend; we suggest children use a first name or a nickname, and the shouts are a fixed list so nothing can be typed to them.</p>
+<p>${GAME} is for everyone aged 13 and over, and families play it together. We do not knowingly collect personal information from children. The only thing a player can send us is a name for a game with a friend; we suggest children use a first name or a nickname, and the shouts are a fixed list so nothing can be typed to them. Video and voice only ever connect two people who are already playing each other, after both say yes; a younger child should talk at the board only with family and friends a parent knows.</p>
 
 <h2>Your rights</h2>
 <p>Under UK and EU data protection law you can ask what we hold about you, and ask us to correct or delete it. Because the game keeps your information on your own device, you can delete it yourself at any time (see above). Anything about an online game is gone from our server within hours; if you want it removed sooner, write to ${c.mail} with the room's four-letter code. We rely on our legitimate interest in running the game you asked to play. You can also complain to the Information Commissioner's Office (ico.org.uk) or your local data protection authority.</p>
@@ -144,6 +157,7 @@ function terms(c) {
 <ul>
 <li>Choose a name for online games that you would be happy for a child to read. We may close a room, or stop a name being used, if it is abusive.</li>
 <li>You let people into your room yourself. Only share your invite link with people you know.</li>
+<li>Video and voice at the board are for talking with the friend you are playing. Do not show or say anything to them that is abusive, threatening, sexual or unlawful, and do not record them without their permission. If someone does, hang up, block them from the camera button's menu, and report it (see the <a href="/support#report">support page</a>).</li>
 </ul>
 
 <h2>Purchases</h2>
@@ -173,6 +187,22 @@ function support(c) {
 <li>A room code works for 10 minutes until your friend joins, so open a new room if it has been longer.</li>
 <li>Your friend knocks with their name and you tap Let in: keep the game open on your screen until they knock.</li>
 <li>If your connection drops, the game reconnects by itself and puts you back in your seat.</li>
+</ul>
+
+<h2 id="report">Report a player</h2>
+<p>If someone you played was abusive, in what they showed or said on a call, their name, or anything else, first hang up and block them: open the camera button in the game and tap Block twice. Your phone then turns their knocks away and they cannot call you. Then write to ${c.mail} with:</p>
+<ul>
+<li>the name they used and the room's four-letter code (it is in the game's address, after ?room=);</li>
+<li>the date and roughly the time;</li>
+<li>what happened.</li>
+</ul>
+<p>Calls are never recorded, so we cannot see or hear them; what you tell us is what we act on. We read every report and act on it as soon as we can: we can close a room and stop a name being used. If anyone is in danger, call the police first.</p>
+
+<h2>Video or voice will not connect</h2>
+<ul>
+<li>Both of you must say yes, and each phone must allow the camera and microphone for the game (in a browser, for this site; in the apps, in the phone's settings for ${GAME}).</li>
+<li>Some mobile networks block a direct line between two phones; the game then says to try on Wi-Fi.</li>
+<li>With the lighter board on, the game sends voice only.</li>
 </ul>
 
 <h2>Can I play with no signal?</h2>

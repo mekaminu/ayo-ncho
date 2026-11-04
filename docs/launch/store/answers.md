@@ -2,7 +2,7 @@
 
 Each answer says why, from what the game actually does (the code in this repo, checked by `test/storepage.test.js`). Two moments matter:
 
-- **Today**: nothing is recorded about how people play; the only thing that leaves the phone is a game with a friend — the nickname typed, the moves and the eight fixed shouts — held in the server's memory for that game and dropped 10 minutes after a room nobody joined, or 6 hours after the last move.
+- **Today**: nothing is recorded about how people play; the only thing that leaves the phone is a game with a friend — the nickname typed, the moves, the eight fixed shouts and the phone's random tag (`web/block.js`) — held in the server's memory for that game and dropped 10 minutes after a room nobody joined, or 6 hours after the last move. Video and voice at the board (`web/call.js`, `web/talk.js`) go phone to phone with WebRTC, encrypted end to end between the two phones; the server only passes on the few messages that connect them (the ask, the answer, the network candidates) and keeps none of them.
 - **Once the Firebase project is wired in** (Launch L13, waits on Meka): game numbers and crash reports go to Google's Firebase from the apps, while Settings → Privacy → Share game numbers and crash reports is on. The wiring run must update the privacy labels and the Data safety form **before** that build goes to review. The answers for that day are below each "today" answer.
 
 Audience: **13 and over** in the store settings (Meka's yes, 3 Nov). Anyone can still play; this keeps the game out of Google's Families programme and Apple's Kids category, which restrict analytics.
@@ -14,26 +14,26 @@ Audience: **13 and over** in the store settings (Meka's yes, 3 Nov). Anyone can 
 | Parental Controls | No | none in the app |
 | Age Assurance | No | no age check |
 | Unrestricted Web Access | No | the privacy, terms and support links open in Safari, outside the app; there is no browser inside |
-| User-Generated Content | No | the only typed thing is a nickname, shown only to the friend you let in |
+| User-Generated Content | Yes | live video and voice between the two players of a room, after both say yes (nothing is posted or kept; the nickname is the only typed thing). Apple's guideline 1.2 asks for a way to block and to report: the camera button's menu has Block (two taps: their knocks are turned away on this phone, Settings → Privacy lists them with Unblock) and Report a problem (the support page's "Report a player", /support#report), and the terms forbid abuse |
 | Social Media | No | no feeds, profiles or followers |
-| Messaging and Chat | No | a friend in a room can send only one of eight fixed phrases (`web/shouts.js`); no typed or voice chat. If App Review reads the shouts as chat, answering Yes fits the 13+ audience anyway |
+| Messaging and Chat | Yes | video and voice at the board with the friend you let in (both must say yes; never with a stranger, since a room is only for the person its host lets in); otherwise a friend can send only one of eight fixed phrases (`web/shouts.js`), with no typed chat |
 | Advertising | No | no ads, no ad SDK |
 | Every content question (violence, horror, mature or suggestive themes, profanity or crude humour, alcohol/tobacco/drugs, sexual content, nudity, medical, health) | None | a board game; the opponents' lines are gentle teasing |
 | Gambling, simulated gambling, contests | None | no chance, no betting, nothing won but seeds |
 | Loot boxes | No | every purchase is a named, one-time item |
 
-Expected rating: **4+**. (13+ is the audience setting; the rating is what the content earns.)
+Expected rating: Apple works it out from the answers; with Messaging and Chat and User-Generated Content answered Yes it is likely to come out above 4+ (9+ or 13+), which fits the 13+ audience. (13+ is the audience setting; the rating is what the content earns.)
 
 ## Google Play — Content rating (IARC questionnaire)
 
 - Category: **Game** (not a casino or social app).
 - Violence, fear, sexuality, gambling (real or simulated), language, controlled substances, crude humour: **No** to each.
-- Do users interact or exchange content? **Yes** — online games with a friend you invite by code; the nickname and the eight fixed shouts are all that pass. Is it moderated? Only fixed phrases can be sent.
+- Do users interact or exchange content? **Yes** — online games with a friend you invite by code: the nickname, the eight fixed shouts, and live video and voice once both players say yes. Is it moderated? Calls are not recorded or monitored; players can block (Block in the camera button's menu) and report (the support page's "Report a player").
 - Does the app share the user's location? **No.**
 - Digital purchases? **Yes** (Gold and the looks).
 - Unrestricted internet access? **No.**
 
-Expected: **PEGI 3 / Everyone / USK 0**, with the notes "Users Interact" and "In-App Purchases".
+Expected: **PEGI 3 / Everyone / USK 0** or a step above for the live chat, with the notes "Users Interact" and "In-App Purchases".
 
 ## Google Play — Target audience and content
 
@@ -49,6 +49,8 @@ Expected: **PEGI 3 / Everyone / USK 0**, with the notes "Users Interact" and "In
 | Data type | Collected? | Linked to the person? | Used to track? | Purpose |
 |---|---|---|---|---|
 | User Content → **Gameplay Content** (the moves of a game with a friend, the fixed shouts, the nickname shown to the friend) | Yes | **No** — no account; a room is a code and two random seat tokens | No | App Functionality |
+
+Video and voice: **not collected** — the picture and sound go phone to phone, encrypted end to end, and never reach the developer (Apple counts as collected only data sent off the device to the developer or partners and kept longer than needed for the request). The phone's random tag rides with the gameplay content above (shown to the friend, held only for the game).
 
 Everything else: **Not collected.** (Settings, records, puzzle days, ratings and purchases stay on the phone; purchases go through Apple, which Apple declares itself.) A strict reading of Apple's definition ("kept longer than needed to serve the request in real time") might let a game held only for its own length count as not collected; declaring it is the safe side and costs nothing on the page.
 
@@ -76,7 +78,11 @@ Check that table against Firebase's own page for privacy labels on the day the w
 | Category → type | Collected | Ephemeral? | Required or optional | Purpose |
 |---|---|---|---|---|
 | Personal info → **Name** (the nickname typed for a game with a friend) | Yes | No (held for the game, up to 6 hours) | Optional — only for playing a friend | App functionality |
-| App activity → **Other actions** (the moves and shouts of a game with a friend) | Yes | No | Optional | App functionality |
+| App activity → **Other actions** (the moves and shouts of a game with a friend, and the phone's random tag) | Yes | No | Optional | App functionality |
+
+Video and voice at the board: **not collected** — Google does not count data sent end to end encrypted between users (WebRTC between the two phones) as collected. The connecting messages that pass the server (including each phone's internet address in the network candidates) are passed on at once and kept by nobody: ephemeral processing.
+
+Permissions the app declares for it: Android `CAMERA`, `RECORD_AUDIO`, `MODIFY_AUDIO_SETTINGS` (asked only when both players have said yes to a call; the camera and microphone are not required features, so phones without them install it); iOS `NSCameraUsageDescription` and `NSMicrophoneUsageDescription` with plain reasons. Play Console asks nothing more for these.
 
 **Once Firebase is wired** (add; all **collected, not shared**, **optional** — the switch in Settings → Privacy):
 

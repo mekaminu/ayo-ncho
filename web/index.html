@@ -425,6 +425,10 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 #callMenu .pill:hover{border-color:var(--brass)}#callMenu .pill:active{transform:scale(.95)}
 #callMenu .pill.off{color:var(--muted);border-style:dashed}
 #callMenu .pill.end{background:rgb(84,32,15);border-color:#d67048;color:#f6d9c8}
+#callMenu .pill.quiet{color:var(--muted);border-color:rgba(243,233,215,.18);box-shadow:none}
+#callMenu .pill.block{color:#e9a98a;border-color:rgba(214,112,72,.45);border-style:dashed;box-shadow:none}
+#callMenu .pill.block.armed{background:rgb(84,32,15);border-style:solid;border-color:#d67048;color:#f6d9c8}
+#blockedList .row{padding-left:26px}
 #callMenu .note{flex-basis:100%;text-align:center;font-size:12px;color:var(--muted);margin-top:2px}
 .wide #callMenu{left:auto;right:max(84px,calc(env(safe-area-inset-right,0px) + 84px));bottom:50%;transform:translateY(50%);width:min(32vw,320px);justify-content:flex-end}
 .cam{position:relative;flex:none;width:64px;height:64px;border-radius:50%;border:2px solid var(--brass);box-shadow:0 0 0 4px rgba(230,183,111,.14),0 8px 22px rgba(0,0,0,.55);background:#140c07;pointer-events:auto;animation:camIn .45s cubic-bezier(.3,1.4,.5,1)}
@@ -665,6 +669,8 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
     <div class="group"><span class="eyebrow">Privacy</span>
       <div class="box">
         <div class="row"><div class="t"><b>Share game numbers and crash reports</b><span>in the apps: how many games are started and finished, the lesson, the puzzle, invites, the store and purchases, and where the game broke if it does — never your name, your moves, a room code or anything you type<em id="teleNow"></em></span></div><button class="sw" role="switch" data-set="tele" aria-checked="true" aria-label="Share game numbers and crash reports"><i></i></button></div>
+        <div class="row"><div class="t"><b>Blocked on this phone</b><span>block someone from the camera button in a game with a friend: their knocks at your rooms are turned away and they cannot call you; only on this phone<em id="blockedNow"></em></span></div></div>
+        <div id="blockedList"></div>
       </div>
     </div>
     <button class="btn quiet" id="settingsRules">How to play · Credits</button>

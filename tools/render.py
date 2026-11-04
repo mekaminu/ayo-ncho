@@ -39,7 +39,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
-#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; and giving up: the host gives up from the shout row, both Game over cards say so): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -499,11 +499,11 @@ if online:
         assert host.evaluate(call)["chip"] == "Video or voice with Tete"
         if host.evaluate("window.__ayo.quality.tier.lite"):  # the lighter board offers voice only
             host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
-            assert host.evaluate(call)["menu"] == ["Voice with Tete"], host.evaluate(call)["menu"]; host.click("#callBtn")
+            assert host.evaluate(call)["menu"] == ["Voice with Tete", "Report a problem", "Block Tete"], host.evaluate(call)["menu"]; host.click("#callBtn")
             print("video: the lighter board offers voice only")
         for pg in (host, friend): pg.evaluate("window.__ayo.callLite = false")  # the check goes on as two phones on the full board
         host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
-        assert host.evaluate(call)["menu"] == ["Video with Tete", "Voice only"], host.evaluate(call)["menu"]
+        assert host.evaluate(call)["menu"] == ["Video with Tete", "Voice only", "Report a problem", "Block Tete"], host.evaluate(call)["menu"]
         host.click("#callMenu .pill[data-id=video]")
         friend.wait_for_selector("#callCard:not([hidden])", timeout=10000)
         hc = host.evaluate(call); fc = friend.evaluate(call)
@@ -523,7 +523,7 @@ if online:
         host.wait_for_timeout(1500); host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=outv, timeout=120000); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
         # the host mutes: Tete's board shows it on the host's bubble; Tete hides the host's picture on their own phone (the voice stays)
         host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
-        assert host.evaluate(call)["menu"] == ["Mute", "Camera off", "Hide Tete's picture", "Hang up"], host.evaluate(call)["menu"]
+        assert host.evaluate(call)["menu"] == ["Mute", "Camera off", "Hide Tete's picture", "Hang up", "Report a problem", "Block Tete"], host.evaluate(call)["menu"]
         host.click("#callMenu .pill[data-id=mic]")
         friend.wait_for_function("!document.querySelector('#theirMuted').hidden", timeout=10000)
         assert host.evaluate(call)["local"] == ["audio:off", "video"] and not host.evaluate("document.querySelector('#myMuted').hidden")
@@ -586,9 +586,40 @@ if online:
         print("give up: host's card", hc, "· Tete's card", fc[:2])
         out5 = out[:-4] + "-giveup.png" if out.endswith(".png") else out + "-giveup.png"
         friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out5, timeout=120000, animations="disabled")
+        friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        # block and report: the camera chip's menu ends with Report a problem and Block Tete (two taps); a block ends the room for this
+        # phone, and Tete's knocks at Meka's next room are turned away by themselves (Tete sees the usual "not let in")
+        assert host.evaluate("window.__ayo.tag") != friend.evaluate("window.__ayo.tag") and len(host.evaluate("window.__ayo.tag")) == 22
+        host.evaluate("document.querySelector('#gameover').hidden = true")  # the board behind the card, as after Close
+        host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+        assert host.evaluate(call)["menu"][-2:] == ["Report a problem", "Block Tete"], host.evaluate(call)["menu"]
+        rh = host.evaluate("(() => { const a = []; const o = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { a.push([this.href, this.target]); }; document.querySelector('#callMenu .pill[data-id=report]').click(); HTMLAnchorElement.prototype.click = o; return a; })()")
+        assert len(rh) == 1 and rh[0][0].endswith("/support#report") and rh[0][1] == "_blank", rh
+        host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+        host.click("#callMenu .pill[data-id=block]")
+        assert host.evaluate(call)["menu"][-1] in ("Tap again to block Tete", "Click again to block Tete") and host.evaluate("window.__ayo.room") is not None, host.evaluate(call)["menu"]
+        outb = out[:-4] + "-block.png" if out.endswith(".png") else out + "-block.png"
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(150); host.screenshot(path=outb, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        if not host.evaluate("document.querySelector('#callMenu .pill[data-id=block]').classList.contains('armed')"): host.click("#callMenu .pill[data-id=block]")  # the picture took longer than the 3 s: ask again
+        host.click("#callMenu .pill[data-id=block]")
+        host.wait_for_function("window.__ayo.room === null && !document.querySelector('#home').hidden", timeout=10000)
+        assert host.evaluate("window.__ayo.blocked") == ["Tete"], host.evaluate("window.__ayo.blocked")
+        friend.wait_for_function("window.__ayo.room && window.__ayo.room.friend && !window.__ayo.room.friend.online", timeout=20000)
+        print("block: Meka blocked Tete — left the room; Tete's board sees Meka gone")
+        host.click("#friendsBtn"); host.wait_for_function("window.__ayo.room && window.__ayo.room.code && window.__ayo.room.seat===0 && window.__ayo.room.code!=='%s'" % code, timeout=20000)
+        code2 = host.evaluate("window.__ayo.room.code")
+        friend.goto("http://127.0.0.1:8767/?capture=1&room=" + code2, wait_until="load")
+        friend.wait_for_function("['Meka did not let you in this time', 'Not let in this time'].includes(document.querySelector('#oppName').textContent)", timeout=30000)  # the same as any Not now
+        assert host.evaluate("document.querySelector('#knockCard').hidden") and host.evaluate("window.__ayo.room.knocks.length") == 0 and host.evaluate("window.__ayo.room.friend") is None
+        print("block: Tete knocked at Meka's next room", code2, "and was turned away without a card")
+        host.click("#roomsBack"); host.wait_for_selector("#home:not([hidden])", timeout=5000)
+        host.click("#homeSettings"); host.wait_for_selector("#settings:not([hidden])", timeout=5000)
+        assert host.evaluate("[...document.querySelectorAll('#blockedList .row b')].map(b=>b.textContent)") == ["Tete"] and host.evaluate("document.querySelector('#blockedNow').textContent") == " · 1"
+        host.click("#blockedList .choose"); assert host.evaluate("window.__ayo.blocked") == [] and host.evaluate("document.querySelector('#blockedNow').textContent") == " · nobody"
+        print("block: Settings → Privacy listed Tete; Unblock emptied it")
         b.close(); node.terminate()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
-    srv.shutdown(); print("wrote", out, out3, out2, outv1, outv, out4, out6, "and", out5); sys.exit(0)
+    srv.shutdown(); print("wrote", out, out3, out2, outv1, outv, out4, out6, out5, "and", outb); sys.exit(0)
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
     pg = b.new_page(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2 if not (wide or home) else 1, has_touch=countc)
