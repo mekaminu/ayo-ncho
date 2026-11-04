@@ -107,7 +107,7 @@ function privacy(c) {
 <ul>
 <li>No accounts and no sign-in.</li>
 <li>No advertising, and no tracking for advertising.</li>
-<li>No analytics or crash reports today. If we add them, this page will say so first, they will never include your name, and Settings will have a switch to turn them off.</li>
+<li>No analytics or crash reports today. The switch for them is already in Settings → Privacy (Share game numbers and crash reports), but nothing is recorded or sent. If the apps start sending them, this page will say so first and say what is sent; it will never include your name, your moves, a room code or anything you type, and the switch turns it off. The web link will not send them.</li>
 <li>We do not sell or rent anyone's information.</li>
 </ul>
 

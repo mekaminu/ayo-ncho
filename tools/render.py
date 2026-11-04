@@ -44,6 +44,9 @@
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
 #                  <out>-friend.png the friend's view (the far seat, pits nearest them) with the host's shout by his face. --wide for the host on a Mac
+#        --telemetry: game numbers and crash reports (L13) — with no sink nothing is recorded; with ?telemetry=test (a sink kept in memory)
+#        a move sends game_start once, the store sends store_open, the Settings → Privacy switch off sends nothing, on again sends;
+#        the words carry nothing typed (the name, the room code); a picture of the Privacy row (out-settings.png)
 #        --legal: Settings → the Privacy · Terms · Support links point at the server's pages and open beside the game (Settings stays);
 #                  each page is screenshot (<out> privacy, <out>-terms.png, <out>-support.png, <out>-settings.png) and must not scroll sideways
 #        --master: Home shows Papa Ike (Master) locked with the Gold mark (<out>-home.png); a tap says where he plays and does not choose him;
@@ -105,7 +108,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; story = story or reviewc; record = record or story
+out = sys.argv[1]; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -259,6 +262,39 @@ if storec:  # the store screen (L11): Gold at the top, every look tried on the l
         b.close()
     assert not errors, errors
     print("store: ok"); sys.exit(0)
+if telec:  # game numbers and crash reports (L13): nothing without a sink; with the test sink, only the fixed words, and the switch stops it
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2)
+        pg = ctx.new_page(); watch(pg, errors)
+        pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.name', 'Meka Secret')")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        t = pg.evaluate("window.__ayo.telemetry"); assert t["on"] and not t["recording"] and t["sent"] is None, ("no sink: nothing is recorded", t)
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&telemetry=test", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        assert pg.evaluate("window.__ayo.telemetry")["recording"]
+        pit = pg.evaluate("window.__ayo.legal")[0]; tap(pg, pit)
+        pg.wait_for_function("window.__ayo.state.moves.length >= 1", timeout=60000); pg.wait_for_function("!window.__ayo.busy && document.querySelector('#turn').textContent==='your move'", timeout=240000)
+        sent = pg.evaluate("window.__ayo.telemetry.sent"); starts = [e for e in sent if e["name"] == "game_start"]
+        assert len(starts) == 1 and starts[0]["params"]["first"] is True and starts[0]["params"]["game"] == "ncho" and starts[0]["params"]["platform"] == "web", sent
+        pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])"); pg.click("#homeStore"); pg.wait_for_selector("#store:not([hidden])"); pg.wait_for_timeout(200)
+        sent = pg.evaluate("window.__ayo.telemetry.sent"); assert sent[-1] == {"name": "store_open", "params": {"from": "home", "platform": "web"}}, sent
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home&telemetry=test", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])")
+        sw = "[data-set=tele]"; assert pg.evaluate("document.querySelector('%s').getAttribute('aria-checked')" % sw) == "true"
+        assert pg.evaluate("document.querySelector('#teleNow').textContent") == " · on"
+        pg.click(sw); assert pg.evaluate("localStorage.getItem('ayo.tele')") == "0" and pg.evaluate("document.querySelector('#teleNow').textContent") == " · off"
+        pg.click("#settingsStore"); pg.wait_for_selector("#store:not([hidden])"); pg.wait_for_timeout(200)
+        assert pg.evaluate("window.__ayo.telemetry.sent") == [], "the switch off sends nothing"
+        pg.click("#storeBack"); pg.wait_for_selector("#settings:not([hidden])"); pg.click(sw); pg.click("#settingsStore"); pg.wait_for_selector("#store:not([hidden])"); pg.wait_for_timeout(200)
+        sent = pg.evaluate("window.__ayo.telemetry.sent"); assert [e["name"] for e in sent] == ["store_open"] and sent[0]["params"]["from"] == "settings", sent
+        pg.click("#storeBack"); pg.wait_for_selector("#settings:not([hidden])")
+        pg.locator("[data-set=tele]").scroll_into_view_if_needed(); pg.wait_for_timeout(300)
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("Settings scrolls sideways", W)
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(200); pg.screenshot(path=out, animations="disabled")
+        allsent = json.dumps(pg.evaluate("window.__ayo.telemetry.sent")); assert "Meka" not in allsent and "Secret" not in allsent
+        b.close()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("telemetry: ok · wrote", out); sys.exit(0)
 if legal:  # privacy, terms and support: Settings links to the server's pages, which open beside the game and read well on a phone
     import atexit; atexit.register(lambda: node.terminate())
     with sync_playwright() as p:

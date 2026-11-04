@@ -36,6 +36,7 @@ import { mayAsk as mayAskBack, backWords, planReturn, undoPlan, undoWords } from
 import { narrowOf, feedWords, onlyLead } from './feed.js';
 import { circling as circlingOf, began as beganCircling, circlingRest, circlingWords, beganWords as circlingBegan, endedCircling, endedWords as circlingEnded, CALLING } from './circling.js';
 import { makeWake, wakeNote } from './wake.js';
+import { makeTelemetry, memorySink, resultOf, teleNote } from './telemetry.js';
 import { STEPS as LESSON, DONE as LESSON_DONE, startState as lessonStart, eyebrow as lessonEyebrow, SKIP as LESSON_SKIP, replyWords as lessonReply, wrongPit as LESSON_WRONG, isNewPhone, lessonDue, firstLevel, nextUp } from './lesson.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
@@ -434,6 +435,18 @@ const wakeCheck = () => wake.check({ on: wakeOn(), board: body.classList.contain
 const wakePoke = () => { wake.poke(); wakeCheck(); };
 for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, wakePoke, true);
 document.addEventListener('visibilitychange', wakeCheck); setInterval(wakeCheck, 15000);
+// game numbers and crash reports (L13, web/telemetry.js): one switch in Settings → Privacy; no sink until Firebase exists, so
+// nothing is recorded today; ?telemetry=test keeps what would be sent in memory for the visit
+const teleOn = () => prefs.get('tele', '1') === '1';
+const teleSink = new URLSearchParams(location.search).get('telemetry') === 'test' ? memorySink() : null;
+const tele = makeTelemetry({ on: teleOn, sink: teleSink, platform: inApp() ? platform() : 'web' });
+addEventListener('error', (e) => tele.crash('error', e.error, e.filename, e.lineno));
+addEventListener('unhandledrejection', (e) => tele.crash('rejection', e.reason));
+const teleVs = () => online ? 'friend' : local ? 'local' : level;
+function teleStart(s) { // a game's first move, whoever made it (never the puzzle or the lesson)
+  if (puzzle.on || s.moves.length !== 1) return; const first = prefs.get('tele.first', null) === null; if (first) prefs.set('tele.first', 'started');
+  tele.track('game_start', { game: s.variant, vs: teleVs(), first }, online ? null : `s:${stats.started}`);
+}
 const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : local ? LNAMES[them] : levelLabel(level);
 const defaultMe = $('#meName').textContent;
 const myName = () => prefs.get('name', '') || defaultMe || 'Player';
@@ -496,12 +509,12 @@ $('#roomsBack').addEventListener('click', () => { if (friend) return leaveRoom()
 $('#roomStatus').addEventListener('click', () => { if (rooms.state === 'error' || rooms.state === 'idle') { if (net) { net.leave(); net = null; } openRoom(); } });
 $('#codeField').addEventListener('input', (e) => { const c = cleanCode(e.target.value); if (e.target.value !== c) e.target.value = c; $('#joinBtn').disabled = c.length !== 4; if ($('#joinNote').classList.contains('bad')) { $('#joinNote').textContent = ''; $('#joinNote').className = 'note'; } });
 $('#joinCard').addEventListener('submit', (e) => { e.preventDefault(); const code = cleanCode($('#codeField').value); if (code.length === 4 && !(net && net.seat === null && roomWanted === code)) joinByCode(code); });
-$('#copyBtn').addEventListener('click', async () => { if (!net || !net.code) return; const link = inviteLink(net.code, publicBase()); try { await navigator.clipboard.writeText(link); toast('Link copied'); click(1.3, 0.06); } catch { toast(link); } });
+$('#copyBtn').addEventListener('click', async () => { if (!net || !net.code) return; tele.track('invite_sent', { how: 'copy' }); const link = inviteLink(net.code, publicBase()); try { await navigator.clipboard.writeText(link); toast('Link copied'); click(1.3, 0.06); } catch { toast(link); } });
 $('#shareLinkBtn').addEventListener('click', async () => {
-  if (!net || !net.code) return; const link = inviteLink(net.code, publicBase());
+  if (!net || !net.code) return; tele.track('invite_sent', { how: 'share' }); const link = inviteLink(net.code, publicBase());
   try { if (navigator.share) await navigator.share({ title: 'Ayo & Nchò', text: inviteText(net.code), url: link }); else { await navigator.clipboard.writeText(link); toast('Link copied'); } } catch {}
 });
-$('#waBtn').addEventListener('click', () => click(1.3, 0.06));
+$('#waBtn').addEventListener('click', () => { click(1.3, 0.06); if (net && net.code) tele.track('invite_sent', { how: 'whatsapp' }); });
 $('#roomsName').addEventListener('click', () => askName("That's me").then(() => { if (net && !friend && net.seat !== null) { net.leave(); net = null; prefs.set('room', 'null'); openRoom(); toast('A new room, with your new name'); } }));
 // the door (host's side): the first person knocking is shown; Let in seats them, Not now sends them away; the next knock follows
 let doorId = null;
@@ -625,7 +638,7 @@ function sendMove(pit) { if (busy || !net || !net.move(pit)) return; busy = true
 async function showMove({ seat, pit, events, state: pub }) {
   if (backAsk.pending && seat === them) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).gone); } // playing on is a no
   hideBackCard();
-  const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; deselect(); $('#undo').disabled = true;
+  const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; deselect(); $('#undo').disabled = true; teleStart(state);
   if (seat === them) { select(pit); await wait(550); deselect(); }
   else { hideExplain(); const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
   tipFor(events);
@@ -707,13 +720,13 @@ function startOnline(code, { stay = false } = {}) {
     if (location.search !== '?room=' + code) history.replaceState(null, '', inviteLink(code, location.pathname)); // the address becomes the invite link (a reload comes back to this seat)
     syncRoom(room); $('#gameover').hidden = !state.over; if (state.over) gameOver();
     if (roomsShowing()) { if (friend) showScreen('play'); else { paintCode(code); paintRoomStatus(); if (!back) { click(1.4, 0.08); setTimeout(() => click(1.8, 0.08), 120); } } } // the tiles fill in on the Rooms screen
-    if (knocking) { knocking = false; toast(`${friend ? friend.name : 'Your friend'} let you in — ${state.turn === you ? 'your move' : 'they start'}`); click(1.5, 0.1); setTimeout(() => click(2, 0.1), 120); buzz(20); }
+    if (knocking) { knocking = false; tele.track('invite_joined', { as: 'friend' }, `j:${code}`); toast(`${friend ? friend.name : 'Your friend'} let you in — ${state.turn === you ? 'your move' : 'they start'}`); click(1.5, 0.1); setTimeout(() => click(2, 0.1), 120); buzz(20); }
     else if (back) toast('Back at the board'); else if (!friend && !roomsShowing()) toast(`Room ${code} — share this page's link`);
   });
   on('room', ({ room, started, resync }) => {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
-    if (!had && friend) { if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
+    if (!had && friend) { tele.track('invite_joined', { as: 'host' }, `j:${net && net.code}`); if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
     if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); awayNote('rematch'); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
@@ -1053,7 +1066,7 @@ async function sowEvents(events, prevStores, pace) {
 
 async function play(pit) {
   const { state: next, events } = applyMove(state, pit);
-  const prevStores = state.stores; const mover = state.turn; const before = state; state = next; busy = true; deselect(); $('#undo').disabled = true;
+  const prevStores = state.stores; const mover = state.turn; const before = state; state = next; busy = true; deselect(); $('#undo').disabled = true; teleStart(state);
   if (mover === you) {
     hideExplain(); // their last move is old news once you have played
     const got = state.stores[mover] - prevStores[mover]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === mover).length; // two of us: the biggest turn by either
@@ -1105,7 +1118,7 @@ async function puzzlePlay(pit) { // one move: the engine's events on the board, 
   await animate(r.events, prevStores);
   busy = false; puzzle.got = r.got; refreshStatic();
   const rec = recordDaily(daily, p.key, p.variant, r.got, p.target); daily = rec.data; prefs.set('daily', JSON.stringify(daily));
-  paintPuzzleResult(r.got, rec.entry, rec.firstSolve);
+  paintPuzzleResult(r.got, rec.entry, rec.firstSolve); if (!lesson.on) tele.track('puzzle_play', { game: p.variant, solved: r.got >= p.target, shown: false });
 }
 function paintPuzzleResult(got, e, firstSolve) {
   const p = puzzle.p; const hit = got >= p.target;
@@ -1193,7 +1206,7 @@ async function lessonNext() {
   busy = false; if (!lesson.on) return; refreshStatic(); lesson.k += 1; lessonStep();
 }
 function lessonDone() { // the end: kept as done (the first-game tips are then not needed), and the game against the chosen opponent offered
-  lesson.phase = 'done'; prefs.set('lesson', 'done'); tipStep = 3; prefs.set('tutorial', '3');
+  lesson.phase = 'done'; prefs.set('lesson', 'done'); tipStep = 3; prefs.set('tutorial', '3'); tele.track('lesson_end', { how: 'done', step: 3 });
   const name = names[level]; lessonTop(LESSON_DONE.title, LESSON_DONE.words(name));
   $('#lsWords').textContent = 'Sowing, a capture of 4 and a relay: that is most of the game.'; $('#lsNext').textContent = `Play ${name}`; $('#pzHome').textContent = 'Back to home';
   $('#lsCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
@@ -1202,6 +1215,7 @@ function lessonDone() { // the end: kept as done (the first-game tips are then n
 function endLesson(playNow) { // Skip, Back to home, or Play: the board goes to the game (from Home's Play) or back home (from Settings)
   if (busy || !lesson.on) return; const was = lesson.phase;
   lesson.on = false; lesson.phase = 'idle'; puzzle.on = false; puzzle.played = false; body.classList.remove('lesson');
+  if (was !== 'done') tele.track('lesson_end', { how: 'skipped', step: lesson.k + 1 });
   if (!prefs.get('lesson', null)) prefs.set('lesson', 'skipped');
   if (prefs.get('level', null) === null) prefs.set('level', level); // a new phone keeps Easy from now on (it is no longer new)
   $('#lsCard').hidden = true; $('#pzHome').textContent = 'Back to home'; $('#puzzle').setAttribute('aria-label', 'Daily puzzle'); deselect();
@@ -1252,7 +1266,7 @@ function paintSettings() {
   $('#boardSub').textContent = boardsLine({ owned: owned(), preview: GOLD_PREVIEW });
   $('#seedsSub').textContent = seedsLine({ stones, days: streak.days.length, need: MILESTONES[0].days, owned: owned(), preview: GOLD_PREVIEW });
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
-  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : '';
+  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : '';
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})`;
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
@@ -1282,6 +1296,7 @@ async function buyIt(row) { // ask the store; the look you were trying becomes y
   try {
     const r = await sales.buy(row.product);
     if (r.ok) {
+      tele.track('purchase', { product: row.product });
       if (row.kind === 'board' && shop.tryFinish === row.id) { prefs.set('finish', row.id); params.delete('finish'); shop.tryFinish = null; }
       if (row.kind === 'seeds' && shop.trySeeds === row.id) { prefs.set('seeds', row.id); shop.trySeeds = null; }
       [1.5, 2.0, 2.6].forEach((p, k) => setTimeout(() => click(p, 0.08), k * 140)); buzz([12, 60, 12]);
@@ -1312,7 +1327,7 @@ function applyLooks() { // what the board shows: a look being tried, else your o
   const f = shop.tryFinish || finishId(); if (board.finish !== f) board.setFinish(f);
   if (SEED_SETS[seedSetId()] !== SET) applySeedSet();
 }
-function openStore(from = 'home') { shop.from = from; shop.tryFinish = shop.trySeeds = null; applyLooks(); paintStore(); $('#storeBody').scrollTop = 0; showScreen('store'); click(1.2, 0.05); }
+function openStore(from = 'home') { tele.track('store_open', { from }); shop.from = from; shop.tryFinish = shop.trySeeds = null; applyLooks(); paintStore(); $('#storeBody').scrollTop = 0; showScreen('store'); click(1.2, 0.05); }
 function tryLook(kind, id) { // a tap on a row: that look on the board above, or (on your own one) back to yours
   const v = storeCtx(); const mineNow = kind === 'board' ? v.finish : v.seeds;
   const key = kind === 'board' ? 'tryFinish' : 'trySeeds'; shop[key] = id === mineNow ? null : id;
@@ -1378,6 +1393,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
       else prefs.set(name, on ? '1' : '0');
       if (name === 'sound') { paintSound(); click(1, 0.08); }
       if (name === 'wake') wakeCheck();
+      if (name === 'tele') $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`;
     });
   } else {
     el.querySelectorAll('[data-v]').forEach((b) => b.addEventListener('click', () => {
@@ -1429,6 +1445,8 @@ function gameOver() {
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   const word = paintRecord(a, b); paintRating(a, b); paintStory(); startReview();
+  if (!puzzle.on) { const first = prefs.get('tele.first', null) === 'started'; if (first) prefs.set('tele.first', 'finished');
+    tele.track('game_end', { game: state.variant, vs: teleVs(), result: resultOf(state, you), ended: state.resigned != null ? 'gave_up' : endedCircling(state) ? 'circling' : 'played', moves: state.moves.length, first }, online ? `e:${net && net.code}:${state.moves.join('')}` : `e:${stats.started}`); }
   if (!online && !puzzle.on) { starts = recordStart(starts, startKey(local), firstMover(state.moves, state.first || 0), state.winner); prefs.set('starts', JSON.stringify(starts)); }
   $('#gameover').hidden = false; if (!online) prefs.set('game', 'null');
   if (word) sayText(word.text, word.mood); else say(win ? 'lose' : 'win'); // a run or a first win is worth their word more than the usual line
@@ -1763,7 +1781,7 @@ else if (params.get('still')) { // a render for Meka: a mid-game position with p
   showScreen('home'); if (tipStep === 0) $('#playBtn').addEventListener('click', () => showTip(TIPS[0]), { once: true });
 }
 
-window.__ayo = { get finish() { return board.finish; }, get store() { return { open: !$('#store').hidden, tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, view: storeNow }; }, get review() { return { done: review.done, seen: review.seen, total: review.total, on: review.on, k: review.k, playing: review.playing, items: review.items.map((i) => ({ index: i.index, pit: i.pit, played: i.played, gap: i.take.gap, kind: i.take.kind })), card: revBtn.hidden ? null : $('#goRevWords').textContent, locked: revBtn.classList.contains('locked'), bar: revBar.hidden ? null : $('#revWords').textContent, hint: $('#hint').textContent }; }, openReview, reviewStep, endReview, get rating() { return { ...rating }; }, get lesson() { return { on: lesson.on, k: lesson.k, phase: lesson.phase, pit: lesson.on && lesson.k < LESSON.length ? LESSON[lesson.k].pit : null, title: $('#pzAsk').textContent, top: $('#pzHow').textContent, card: $('#lsCard').hidden ? null : $('#lsWords').textContent, next: $('#lsNext').textContent, skip: $('#pzHome').textContent, kept: prefs.get('lesson', null), tutorial: prefs.get('tutorial', null) }; }, get nextUp() { return $('#goNext').hidden ? null : { text: $('#goNext').textContent, level: $('#goNext').dataset.level }; }, get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
+window.__ayo = { get telemetry() { return { on: teleOn(), recording: tele.recording, sent: teleSink ? teleSink.log.slice() : null, note: $('#teleNow').textContent }; }, get finish() { return board.finish; }, get store() { return { open: !$('#store').hidden, tryFinish: shop.tryFinish, trySeeds: shop.trySeeds, view: storeNow }; }, get review() { return { done: review.done, seen: review.seen, total: review.total, on: review.on, k: review.k, playing: review.playing, items: review.items.map((i) => ({ index: i.index, pit: i.pit, played: i.played, gap: i.take.gap, kind: i.take.kind })), card: revBtn.hidden ? null : $('#goRevWords').textContent, locked: revBtn.classList.contains('locked'), bar: revBar.hidden ? null : $('#revWords').textContent, hint: $('#hint').textContent }; }, openReview, reviewStep, endReview, get rating() { return { ...rating }; }, get lesson() { return { on: lesson.on, k: lesson.k, phase: lesson.phase, pit: lesson.on && lesson.k < LESSON.length ? LESSON[lesson.k].pit : null, title: $('#pzAsk').textContent, top: $('#pzHow').textContent, card: $('#lsCard').hidden ? null : $('#lsWords').textContent, next: $('#lsNext').textContent, skip: $('#pzHome').textContent, kept: prefs.get('lesson', null), tutorial: prefs.get('tutorial', null) }; }, get nextUp() { return $('#goNext').hidden ? null : { text: $('#goNext').textContent, level: $('#goNext').dataset.level }; }, get wake() { wakeCheck(); return { held: wake.held, wanted: wake.wanted, supported: wake.supported, log: wake.log.slice() }; }, wakeIdle: (ms) => { wakeSkew += ms; }, get feed() { const n = narrowOf(state, you); return { narrow: n, rings: board.may.map((m, i) => m.visible && m.material.opacity > 0.2 ? i : -1).filter((i) => i >= 0), barred: badges.map((b, i) => b.classList.contains('barred') ? i : -1).filter((i) => i >= 0), hint: $('#hint').textContent, selected }; }, get count() { return { pit: counting.pit, shown: !counting.el.hidden, text: counting.el.textContent, words: counting.words, hint: $('#hint').textContent, log: counting.log.slice(), done: counting.el.classList.contains('done') }; }, get hover() { return { cursor: canvas.style.cursor, ring: board.hover.visible && board.hover.material.opacity > 0.2, pit: mouse.pit, at: board.hover.visible ? [board.hover.position.x, board.hover.position.z] : null, sel: board.ring.visible ? [board.ring.position.x, board.ring.position.z] : null, op: board.hover.material.opacity }; }, get away() { return { count: away.count, words: away.words, title: document.title, icon: (document.querySelector('link[rel="icon"]') || {}).href || '' }; }, get handLog() { return hands.log.slice(); }, get hand() { return { sow: hands.sow.el.hidden ? null : hands.sow.el.textContent, haul: hands.haul.el.hidden ? null : hands.haul.el.textContent, at: hands.sow.el.hidden ? null : hands.sow.el.getBoundingClientRect().toJSON() }; }, get story() { return story ? { words: $('#goStoryWords').textContent, hidden: $('#goStory').hidden, biggest: story.biggest, forGood: story.forGood, final: story.final } : null; }, watchBigTurn, react, get busy() { return busy; }, get seeds() { return seeds.map((m) => [m.position.x, m.position.y, m.position.z, sim.has(m) ? 1 : 0]); }, get room() { return net ? { code: net.code, seat: net.seat, status: net.status, friend, knock: net.knock, knocks: (net.room && net.room.knocks) || [] } : null; }, pitAt: (i) => { v3.set(pitCenters[i][0], BT, pitCenters[i][1]).project(camera); return [(v3.x * 0.5 + 0.5) * canvas.clientWidth, (-v3.y * 0.5 + 0.5) * canvas.clientHeight]; }, get mood() { return mood; }, get quality() { return { ...quality, tier: Q, physics: PHYS.physics, physicsReason: PHYS.reason }; }, get streak() { return streak; }, get record() { return records; }, get level() { return level; }, get seat() { return you; }, get local() { return local; }, get theta() { return theta; }, get tweens() { return tweens.length; }, get seedSet() { return seedSetId(); }, get state() { return state; }, get legal() { return legalMoves(state); }, tryPit: (i) => puzzle.p ? attempt(puzzle.p, i).got : null, get puzzle() { return puzzle.p ? { on: puzzle.on, played: puzzle.played, got: puzzle.got, key: puzzle.p.key, target: puzzle.p.target, answer: puzzle.p.answer, daily } : null; }, get selected() { return selected; }, get path() { return path; }, get explain() { return theirs ? { pit: theirs.pit, name: theirs.name, words: $('#lastWords').textContent, order: theirs.path.order, captures: theirs.path.captures, end: theirs.path.end, moves: theirs.before.moves.length } : null; }, get replaying() { return replaying; }, get circling() { return { on: !circEl.hidden, left: $('#circlingLeft').textContent, words: $('#circlingWords').textContent, ripples: circ.ripples, first: circ.first || null, isNew: circEl.classList.contains('new'), calling: circEl.classList.contains('calling'), eyebrow: $('#goEyebrow').textContent }; }, get last8() { return { on: !last8El.hidden, words: $('#last8Words').textContent, hops: last8.hops, lit: badges.filter((b) => b.classList.contains('last')).length, isNew: last8El.classList.contains('new') }; }, get hurry() { return { on: hurry.on, playing: hurry.depth > 0, words: hurry.words, hint: $('#hint').textContent }; }, hurryNow, replayLast, get take() { return take ? { pit: take.pit, played: take.played, kind: take.take.kind, gap: take.take.gap, words: $('#takeWords').textContent, order: take.path.order, captures: take.path.captures, end: take.path.end, moves: take.before.moves.length } : null; }, playTake, rate: (s) => aiRate(s || state, 'hard'), get marks() { const M = board.marks; return { steps: M.steps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), caps: M.caps.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), gifts: M.gifts.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), risk: M.risk.map((m, i) => m.visible ? i : -1).filter((i) => i >= 0), end: M.end.visible }; }, get answer() { return answer; }, clip: () => recordClip(false), shout: (id) => sendShout(id), hitTest: (x, y) => { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); return ray.intersectObjects(board.targets).map((h) => h.object.userData.pit); } };
 
 // the render loop stops while the tab is hidden and restarts when it comes back; only ever one loop at a time
 let frames = 0, last = performance.now(), running = false;
