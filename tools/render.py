@@ -75,6 +75,9 @@ from playwright.sync_api import sync_playwright
 #                  Player 2 (the HUD names them, the move just played is explained for them; picture <out>), Player 2 plays and it swings on,
 #                  Undo takes one move back and turns back to whoever played it; Home says "Two of us · …" under Continue; with Settings →
 #                  Feel → Pass the phone off the seat still passes but the board stays. --wide for the Fold open / the Mac
+#        --review: as --record with ?try=review, then Mama Ngozi's review: the moves she would change must match web/review.js
+#                  run in node with the engine's search over the same moves (<out>-card.png); tap the card, step 1 plays her move,
+#                  the board ends at the engine's position (<out>), Next plays step 2, Done brings the card and the end of the game back
 #        --story: as --record, then "how the game went" on the Game over card: the line and its words must be there and match
 #                  web/story.js run in node over the same moves; a tap on it plays the biggest turn on the board and the card comes
 #                  back with the board as the game ended (<out> is the card with the line drawn in). --wide for the Mac
@@ -90,7 +93,7 @@ from playwright.sync_api import sync_playwright
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; legal = "--legal" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; record = record or story
+out = sys.argv[1]; legal = "--legal" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -331,7 +334,7 @@ with sync_playwright() as p:
     if wakec: pg.add_init_script("""(() => { const log = []; window.__wakeLog = log; Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request(kind) { const ls = []; const s = { released: false, type: kind, addEventListener: (e, f) => { if (e === 'release') ls.push(f); }, release() { if (!s.released) { s.released = true; log.push('release'); ls.forEach((f) => f()); } return Promise.resolve(); } }; log.push('request:' + kind); return Promise.resolve(s); } } }); })()""")
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or masterc or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or record or local or masterc or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -368,7 +371,11 @@ with sync_playwright() as p:
         assert ch == "+%d" % (want - 1180) and why == "+%d for beating Mama Ngozi (1600)" % (want - 1180), (ch, why)
         kr = json.loads(pg.evaluate("localStorage.getItem('ayo.rating')")); assert kr == {"r": want, "n": 15, "last": saved["stats"]["started"], "change": want - 1180}, kr
         print("rating: 1180 →", want, "·", why)
-        if not story:
+        if not story:  # without ?try=review the review is there but locked behind Gold
+            pg.wait_for_function("window.__ayo.review.done", timeout=120000); rv = pg.evaluate("window.__ayo.review")
+            assert rv["locked"] and rv["card"].endswith("· in Gold"), rv["card"]
+            pg.click("#goReview"); pg.wait_for_timeout(200); assert not pg.evaluate("window.__ayo.review.on") and not pg.evaluate("document.querySelector('#gameover').hidden"), "a locked review does not open"
+            print("review: locked —", rv["card"])
             pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300)
             pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
             pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
@@ -380,6 +387,40 @@ with sync_playwright() as p:
             if pg.evaluate("window.__ayo.state.turn") == 0: tap(pg, pg.evaluate("window.__ayo.legal")[0])
             pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy", timeout=60000)
             print("steady: Auntie Bisi chosen on Home, played and answered", pg.evaluate("window.__ayo.state.moves"))
+        if reviewc:  # Mama Ngozi's review (Gold), opened with ?try=review: the moves she would change match node, then step through them
+            pg.wait_for_function("window.__ayo.review.done", timeout=180000); rv = pg.evaluate("window.__ayo.review")
+            js = "Promise.all([import('%s'), import('%s')]).then(([r, ai]) => { const moves = %s; const plan = r.reviewPlan(moves, 'ncho', {}, 0, 0); const items = r.reviewOf(plan, plan.map((e) => ai.rateMoves(e.before, 'hard'))); console.log(JSON.stringify({ total: plan.length, items: items.map((i) => ({ index: i.index, pit: i.pit, played: i.played, gap: i.take.gap, kind: i.take.kind })), card: r.summaryWords(items), first: items.length ? r.stepWords(items[0], 0, items.length) : null })); })" % (os.path.join(root, "web", "review.js"), os.path.join(root, "engine", "ai.js"), json.dumps(end["moves"] + [end["pit"]]))
+            want = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", js]).decode())
+            assert rv["total"] == want["total"] and rv["items"] == want["items"], (rv, want)
+            assert not rv["locked"] and rv["card"] == want["card"], (rv["card"], want["card"])
+            print("review:", rv["card"], "of", rv["total"], "moves looked at")
+            assert want["items"], "the scripted game should give her something to say"
+            outc = out[:-4] + "-card.png" if out.endswith(".png") else out + "-card.png"
+            pg.wait_for_timeout(1200); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=outc, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            stores = pg.evaluate("window.__ayo.state.stores")
+            pg.click("#goReview"); pg.wait_for_function("window.__ayo.review.on && window.__ayo.review.playing", timeout=5000)
+            assert pg.evaluate("document.querySelector('#gameover').hidden"), "the card steps aside for the review"
+            assert pg.evaluate("window.__ayo.review.bar") == want["first"], (pg.evaluate("window.__ayo.review.bar"), want["first"])
+            pg.wait_for_function("window.__ayo.review.hint.startsWith('Mama Ngozi: ') && window.__ayo.marks.steps.length > 0", timeout=20000)
+            print("review: step 1 —", pg.evaluate("window.__ayo.review.hint"))
+            pg.wait_for_function("!window.__ayo.review.playing", timeout=120000)
+            # the board ends at the engine's position after her move
+            js2 = "import('%s').then((e) => { const moves = %s; const it = %s; const before = e.replay(moves.slice(0, it.index), 'ncho', {}, 0); console.log(JSON.stringify(e.applyMove(before, it.pit).state.pits)); })" % (os.path.join(root, "engine", "ayo.js"), json.dumps(end["moves"] + [end["pit"]]), json.dumps(want["items"][0]))
+            pits = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", js2]).decode())
+            badges = pg.evaluate("[...document.querySelectorAll('#badges .badge')].slice(0, 12).map((b) => +b.textContent.replace(/[^0-9]/g, '') || 0)")
+            if len(badges) == 12: assert badges == pits, ("the board after her move", badges, pits)
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            if len(want["items"]) > 1:
+                pg.click("#revNext"); pg.wait_for_function("window.__ayo.review.k === 1", timeout=5000); pg.wait_for_function("!window.__ayo.review.playing", timeout=120000)
+                assert pg.evaluate("window.__ayo.review.bar").startswith("2 of %d · move %d" % (len(want["items"]), want["items"][1]["index"] + 1))
+                print("review: step 2 played")
+            pg.click("#revDone"); pg.wait_for_function("!window.__ayo.review.on && !document.querySelector('#gameover').hidden", timeout=10000)
+            assert pg.evaluate("window.__ayo.state.stores") == stores and pg.evaluate("document.querySelector('#myScore').textContent") == str(stores[0]), "the board did not come back to the end of the game"
+            W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("scrolls sideways", W)
+            print("review: Done brings the card back, the game as it ended")
+            b.close()
+            if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+            srv.shutdown(); print("wrote", out); sys.exit(0)
         if story:
             pg.wait_for_timeout(2200)  # the line draws in, the marks pop
             js = "import('%s').then(async (m) => { const s = m.gameStory(%s, 'ncho', {}, 0); console.log(JSON.stringify({ words: m.storyWords(s, { me: 'You', them: 'Mama Ngozi' }), biggest: s.biggest })); })" % (os.path.join(root, "web", "story.js"), json.dumps(end["moves"] + [end["pit"]]))

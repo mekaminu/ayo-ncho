@@ -76,7 +76,7 @@ test("Gold: Master is locked until bought, ?try=master opens him for a visit, th
   assert.equal(parseOwned("not json").size, 0); assert.equal(parseOwned('{"gold":1}').size, 0);
   for (const lv of ["easy", "medium", "hard"]) assert.equal(levelOpen(lv, none), true);
   assert.equal(levelOpen("master", none), false); assert.equal(levelOpen("master", gold), true);
-  assert.equal(previewOf("?try=master"), "master"); assert.equal(previewOf("?try=gold"), null); assert.equal(previewOf(""), null);
+  assert.equal(previewOf("?try=master"), "master"); assert.equal(previewOf("?try=gold"), "gold"); assert.equal(previewOf("?try=nonsense"), null); assert.equal(previewOf(""), null);
   assert.equal(levelOpen("master", none, previewOf("?room=AB&try=master")), true);
   assert.equal(playable("master", none), "hard", "a locked Master falls back to Mama Ngozi"); assert.equal(playable("master", gold), "master");
   assert.match(lockedWords("Papa Ike", false), /in the app/); assert.match(lockedWords("Papa Ike", true), /Gold/);

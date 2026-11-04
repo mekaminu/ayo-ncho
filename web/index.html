@@ -261,6 +261,37 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .streak.rating[hidden]{display:none}
 .streak.rating .rv{width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6d58e,#c8932f 60%,#8a5a1c)}
 @media (prefers-reduced-motion:reduce){.record{animation:none}}
+/* Mama Ngozi's review (Gold): a line on the Game over card, then a panel under the board stepping through the moves she would change */
+#gameover .review{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:var(--soft);border:1px solid var(--line);color:var(--fg);font:inherit;text-align:left;cursor:pointer;width:100%;animation:recIn .4s cubic-bezier(.3,1.4,.5,1) .25s backwards;transition:border-color .15s,transform .15s}
+#gameover .review[hidden]{display:none}
+#gameover .review .face.s{width:28px;height:28px;margin:0;flex:none;border:1px solid rgba(230,183,111,.4)}
+#gameover .review .col{gap:2px;min-width:0;flex:1}
+#gameover .review .eyebrow{display:flex;align-items:center;gap:5px}
+#gameover .review .gold{display:none;width:14px;height:14px;padding:1px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6d58e,#c8932f 60%,#8a5a1c);box-sizing:border-box}
+#gameover .review.locked .gold{display:inline-block}
+#gameover .review b{font-size:13px;font-weight:600;line-height:1.3}
+#gameover .review .go{width:14px;height:14px;flex:none;color:var(--brass);opacity:.35;transition:opacity .2s}
+#gameover .review.ready .go{opacity:.95}#gameover .review.ready{border-color:rgba(230,183,111,.45)}
+#gameover .review.locked{border-style:dashed}
+#gameover .review:hover{border-color:var(--brass)}#gameover .review:active{transform:scale(.98)}
+#gameover .review.pop{animation:revPop .45s cubic-bezier(.3,1.6,.5,1)}
+@keyframes revPop{40%{transform:scale(1.04);border-color:var(--brass)}}
+#review{display:flex;flex-direction:column;gap:7px;width:min(92vw,460px);box-sizing:border-box;background:rgba(13,9,6,.82);border:1px solid rgba(230,183,111,.55);border-radius:16px;padding:9px 11px 10px;animation:rise .3s ease-out;font:500 12px Inter,system-ui,sans-serif;color:var(--fg)}
+#review[hidden]{display:none}
+#review .top{display:flex;align-items:center;gap:8px}
+#review .face.s{width:26px;height:26px;margin:0;flex:none;border:1px solid rgba(230,183,111,.5)}
+#review .top b{color:var(--brass);font-weight:600;font-size:12px}
+#review .top i{font-family:Fraunces,serif;font-style:italic;font-size:12px;color:var(--muted)}
+#revWords{line-height:1.4}
+#review .btns{display:flex;gap:6px}
+#review .btns button{flex:1;min-height:36px;border-radius:999px;border:1px solid rgba(230,183,111,.4);background:rgba(230,183,111,.08);color:var(--fg);font:600 12px Inter,system-ui,sans-serif;cursor:pointer;transition:transform .15s,border-color .15s,opacity .15s}
+#review .btns button:hover{border-color:var(--brass)}#review .btns button:active{transform:scale(.95)}
+#review .btns button:disabled{opacity:.35;cursor:default;transform:none}
+#review .btns .done{background:var(--brass);color:#1a120b;border-color:var(--brass)}
+.wide body.reviewing #words{left:24px;transform:none;top:calc(env(safe-area-inset-top,0px) + 150px);bottom:auto} /* on the Mac the review sits down the left, under her card, clear of the board */
+.wide #review{width:min(300px,28vw)}
+body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewing #circling{display:none}
+@media (prefers-reduced-motion:reduce){#gameover .review,#review{animation:none}}
 .story{display:flex;flex-direction:column;gap:4px;padding:8px 10px 9px;border-radius:12px;background:var(--soft);border:1px solid var(--line);color:var(--fg);font:inherit;text-align:left;cursor:pointer;width:100%}
 .story:hover{border-color:rgba(230,183,111,.5)}.story:active{transform:scale(.98)}.story:disabled{cursor:default;transform:none}
 .story svg{width:100%;height:auto;display:block;overflow:visible}
@@ -357,7 +388,8 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 <div id="pits" role="group" aria-label="The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back"></div>
 <div class="hud top"><div class="who"><span class="face" id="oppFace"></span><div class="col"><span class="name" id="oppName">Nnamdi · Medium</span><span class="sub" id="oppSub">waiting</span></div></div><div class="col r"><span class="score" id="oppScore">0</span><span class="lab">captured</span></div></div>
 <div id="hint" role="status"></div>
-<div id="words"><button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
+<div id="words"><div id="review" hidden role="group" aria-label="Mama Ngozi's review"><div class="top"><span class="face s" id="revFace" aria-hidden="true"></span><span class="col"><b>Mama Ngozi's review</b><i id="revSay" hidden></i></span></div><span id="revWords" role="status"></span><div class="btns"><button type="button" id="revPrev" aria-label="The move before">‹ Back</button><button type="button" id="revAgain" aria-label="Play it again">Again</button><button type="button" id="revNext" aria-label="The next move">Next ›</button><button type="button" id="revDone" class="done">Done</button></div></div>
+<button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
 <button id="take" hidden type="button" title="Play Mama Ngozi's move through, slowly"><span class="face s" id="takeFace" aria-hidden="true"></span><b id="takeName">Mama Ngozi</b><span id="takeWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>show</i></button>
 <div id="last8" hidden role="status"><b>Last 8</b><span id="last8Words"></span></div>
 <div id="circling" hidden role="status"><b>Circling</b><span><em id="circlingLeft"></em> <span id="circlingWords"></span></span></div></div>
@@ -509,6 +541,8 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
   <div class="mini"><div><span>Biggest turn</span><b id="goBig">0 seeds</b></div><div><span>Captures</span><b id="goCaps">0</b></div><div><span>Time</span><b id="goTime">0:00</b></div></div>
   <!-- how the game went: the lead move by move (web/story.js), the move that won it and the biggest turn; tap to watch that turn -->
   <button class="story" id="goStory" type="button" hidden><span class="head"><span class="eyebrow">How it went</span><span class="key"><i class="k up"></i><span id="goStoryMe">you</span><i class="k dn"></i><span id="goStoryThem">Nnamdi</span></span></span><svg id="goStorySvg" viewBox="0 0 300 64" aria-hidden="true"></svg><span class="words"><span id="goStoryWords">You led for good from move 31</span><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></span></button>
+  <!-- Mama Ngozi's review of the whole game (Gold, web/review.js): how many moves she would have played differently; tap to step through them on the board -->
+  <button class="review" id="goReview" type="button" hidden><span class="face s" id="goRevFace" aria-hidden="true"></span><span class="col"><span class="eyebrow">Mama Ngozi's review <span class="gold" title="Gold" aria-label="part of Gold"><svg viewBox="0 0 12 12" width="100%" height="100%" aria-hidden="true"><path d="M3.5 5.5V4a2.5 2.5 0 0 1 5 0v1.5" fill="none" stroke="#2a1a0c" stroke-width="1.3"/><rect x="2.5" y="5.2" width="7" height="5" rx="1.2" fill="#2a1a0c"/></svg></span></span><b id="goRevWords">going over the game…</b></span><svg class="go" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></button>
   <!-- your record against this opponent, kept on this phone; their word when you are on a run or have beaten them for the first time -->
   <div class="record" id="goRecord" hidden><span class="face s" id="goRecFace"></span><span class="col"><b id="goRecLine">you lead 4–2 · best win 30–18</b><i id="goRecSay" hidden>“Three in a row? Mama Ngozi is watching.”</i></span></div>
   <!-- your rating against the computer (web/rating.js): the number ticks from before to after, the change in brass or ember -->
