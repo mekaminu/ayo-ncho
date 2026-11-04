@@ -1,0 +1,80 @@
+{
+  "about": "The store pages' words for the App Store and Google Play (Launch L15). Edit here, then run `node tools/store-text.js` to rewrite listing.md; test/storepage.test.js checks every limit and every claim against the game's code.",
+  "name": "Ayo & Nchò: Nigerian Mancala",
+  "apple": {
+    "subtitle": "Oware & Awalé board game in 3D",
+    "promotionalText": "The Nigerian seed game on a carved 3D board. Learn it in a minute, then play Mama Ngozi, a friend on WhatsApp, or today's puzzle. No ads.",
+    "keywords": "okwe,ayoayo,bao,kalah,african,nigeria,igbo,yoruba,seeds,strategy,family,puzzle,offline,2 player",
+    "primaryCategory": "Games › Board",
+    "secondaryCategory": "Games › Strategy",
+    "whatsNew": "The first release: Nchò and Ayo on a carved 3D board, five opponents, two of you on one phone, a friend online, and a new puzzle every day."
+  },
+  "google": {
+    "title": "Ayo & Nchò: Nigerian Mancala",
+    "shortDescription": "Nigeria's seed game on a carved 3D board. Learn it in a minute. No ads.",
+    "category": "Game › Board",
+    "tags": ["Board", "Strategy", "Offline", "Single player", "Multiplayer"],
+    "whatsNew": "The first release: Nchò and Ayo on a carved 3D board, five opponents, two of you on one phone, a friend online, and a new puzzle every day."
+  },
+  "description": [
+    "Ayo & Nchò is the seed-and-board game Nigerian families have played for generations, on a carved wooden board in real 3D. Sow the seeds, count the pits, take the fours.",
+    "",
+    "Two games, the rules you grew up with",
+    "• Nchò: relay sowing, captures of 4 and the last 8.",
+    "• Ayo: captures of 2 or 3, close kin to Oware and Awalé.",
+    "• Change the rules in Settings: capture on 4 or on 2 and 3, relay or a single lap, the last 8 on or off.",
+    "",
+    "A board you can almost touch",
+    "Carved mahogany, iroko or ebony under a warm lamp. The hand lifts every seed, drops it in its pit, and it bounces and settles where it lands; every capture is scooped into your trough. The knock of seed on wood is made on your phone as each one lands.",
+    "",
+    "Opponents with something to say",
+    "Adaeze, nine years old and already sure she is winning. Auntie Bisi, who counts every pit twice. Nnamdi, your quick cousin. Mama Ngozi, thirty years at the market. Each has a face that reacts and a word for every moment, and the game keeps your record against each of them and a rating that shows how far you have come.",
+    "",
+    "Learn as you play",
+    "• A one-minute lesson on the board for your first game.",
+    "• Tap a pit once to see where every seed will land, what you would capture and what it leaves open; tap again to sow.",
+    "• After their move, see what they just did, and watch it again slowly.",
+    "• Mama Ngozi tells you when a better pit was there, and shows you.",
+    "• Press and hold a pit to count its seeds one by one.",
+    "",
+    "Play together",
+    "• Two of you on one phone: the board turns to face whoever is to move.",
+    "• A friend online: open a room, send its four-letter code on WhatsApp, and let them in when they knock. Eight quick shouts go across the board, and you can ask to take a move back. Playing a friend needs a connection.",
+    "",
+    "A puzzle every day",
+    "One position, the same for everyone, one move to capture as much as you can. Share your result, and keep a run of days going. Seven days played earns the river stones seed set.",
+    "",
+    "No signal? No problem",
+    "Against the computer, two of you on one phone, the lesson and the daily puzzle all play with no connection. A lighter board keeps slower phones smooth.",
+    "",
+    "Gold, bought once",
+    "One upgrade, bought once: Papa Ike, the Master, Mama Ngozi's old rival and the strongest player in the game; and Mama Ngozi's review of your whole game, move by move on the board.",
+    "",
+    "Looks for the board",
+    "The Benin bronze board and Grandpa's board, cowrie and palm kernel seeds. Looks only: they never change how the seeds fall or who wins.",
+    "",
+    "No ads. No coins. No accounts. Nothing you can buy wins a game. Your games, records and settings stay on your phone."
+  ],
+  "screenshots": [
+    { "caption": "Sow every seed by hand", "shows": "a relay turn mid-sow, the brass count over the hand", "from": "docs/render-2026-11-03-hand.png" },
+    { "caption": "See where your seeds will land", "shows": "the path marks and capture rings after the first tap", "from": "docs/render-2026-10-29-path.png" },
+    { "caption": "Learn it in one minute", "shows": "the first-game lesson, step 2 (a capture of 4)", "from": "docs/render-2026-11-03-lesson.png" },
+    { "caption": "Play a friend on WhatsApp", "shows": "the Rooms screen with its four-letter code", "from": "docs/render-2026-10-29-rooms.png" },
+    { "caption": "A new puzzle every day", "shows": "the daily puzzle's result card, solved", "from": "docs/render-2026-10-29-puzzle.png" },
+    { "caption": "Opponents with character", "shows": "the Game over card with the record and rating", "from": "docs/render-2026-11-04-rating.png" },
+    { "caption": "Two of you, one phone", "shows": "two of us, the board turned to Player 2", "from": "docs/render-2026-10-30-twoofus.png" },
+    { "caption": "Carved boards, real seeds", "shows": "the store with Benin bronze on the board", "from": "docs/render-2026-11-04-store.png" }
+  ],
+  "reviewNotes": [
+    "No sign-in or account. Against the computer, two players on one phone, the lesson and the daily puzzle play offline.",
+    "To try a game with a friend you need a second device or a browser: in the app tap With friends, then open the invite link (https://ayo-ncho.onrender.com/?room=CODE) or type the four-letter code on the second device, and tap Let in when it knocks. The game server may take up to a minute to answer the first time if nobody has played for a while.",
+    "In-app purchases (all non-consumable): Gold opens Papa Ike (Home → the Master pill) and Mama Ngozi's review (the line with her face on the Game over card after a game against the computer). The boards and seed sets are looks only (Home → the bag beside Settings, or Settings → Board). Restore purchases is at the bottom of the store screen.",
+    "The app sends nothing to us except the moves, the nickname typed and the fixed shouts of a game with a friend, held in the server's memory for that game only."
+  ],
+  "links": {
+    "privacy": "https://ayo-ncho.onrender.com/privacy",
+    "terms": "https://ayo-ncho.onrender.com/terms",
+    "support": "https://ayo-ncho.onrender.com/support",
+    "marketing": "https://ayo-ncho.onrender.com"
+  }
+}
