@@ -318,7 +318,7 @@ if telec:  # game numbers and crash reports (L13): nothing without a sink; with 
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("telemetry: ok · wrote", out); sys.exit(0)
-if langc:  # French (L18, slice 1): a phone in French opens in French; Settings → Language switches in place and back; a move plays
+if langc:  # French (L18, slices 1–3): a phone in French opens in French; Settings → Language switches in place and back; a move plays
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []
         def phone(w, h, loc):
@@ -359,6 +359,41 @@ if langc:  # French (L18, slice 1): a phone in French opens in French; Settings 
         print("  fr hint:", h, "| their move:", lw)
         pg.screenshot(path=out[:-4] + "-board.png", animations="disabled")
         pg.mouse.click(x, y); pg.wait_for_function("window.__ayo.state.moves.length >= 3", timeout=60000); pg.wait_for_function("!window.__ayo.busy", timeout=240000)
+        ctx.close()
+        # slice 3: the cards — a French phone one move from beating Mama Ngozi a third time running: Home's record and rating
+        # lines, then the Game over card (top line, title, how it went, the record, the rating) and the share words, all French
+        end = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "endgame.js"), "7", "ncho"]).decode())
+        saved = {"moves": end["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "hard", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 7 * 60 * 1000}}
+        rec = {"easy": {"w": 4, "l": 2, "d": 1, "best": [31, 17], "run": 1}, "hard": {"w": 2, "l": 1, "d": 0, "best": [26, 22], "run": 2}, "last": 1}
+        ctx, pg = phone(390, 844, "fr-FR")
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.record', %s); localStorage.setItem('ayo.rating', %s); localStorage.setItem('ayo.level', 'hard'); }" % (json.dumps(json.dumps(saved)), json.dumps(json.dumps(rec)), json.dumps(json.dumps({"r": 1180, "n": 14, "last": 0, "change": 12}))))
+        pg.add_init_script("window.__shared = []; navigator.share = async (d) => { window.__shared.push(d.text); }; navigator.canShare = () => false;")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        ENG = r"(?<![^\W\d_])(you|your|lead|trail|best|win|wins|draws?|moves?|game|rating|for|beating|led|from|biggest|swing|seeds?|way|level|last|of|the|and|she|would|played|differently|in)(?![^\W\d_])"
+        rl = pg.evaluate("document.querySelector('#ratingText').textContent"); assert rl == "Votre classement 1180 · +12 à la dernière partie", rl
+        pills = pg.evaluate("[...document.querySelectorAll('.pill[data-level] small.rec')].map(e=>e.textContent).filter(Boolean)"); assert pills == ["vous menez 4–2", "vous menez 2–1"], pills
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+        tap(pg, end["pit"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.over", timeout=240000); pg.wait_for_selector("#gameover:not([hidden])", timeout=10000); pg.wait_for_timeout(2500)
+        card = pg.evaluate("[...['#goEyebrow','#goTitle','#goBig','#goStoryWords','#goRecLine','#goRatingWhy','#goRevWords']].map(q => { const e = document.querySelector(q); return e && !e.closest('[hidden]') ? e.textContent : ''; })")
+        print("  fr card:", " | ".join(card))
+        for line in card: assert not re.search(ENG, line.replace("Mama Ngozi", "").replace("Nchò", "").replace("Gold", "")), ("English on the French card", line, card)
+        assert card[1] == "Vous gagnez" and card[0].startswith("Nchò · ") and " coups" in card[0] and "vous menez" in card[4], card
+        pg.click("#shareBtn"); pg.wait_for_function("window.__shared.length >= 1", timeout=10000)
+        sh = pg.evaluate("window.__shared[0]"); assert sh.startswith("Ayo & Nchò — J’ai battu Mama Ngozi "), sh
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-cards.png", animations="disabled")
+        ctx.close()
+        # the puzzle's result card in French
+        ctx, pg = phone(390, 844, "fr-FR")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&puzzle=1", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.wait_for_function("window.__ayo.puzzle && window.__ayo.puzzle.on && !window.__ayo.busy", timeout=30000)
+        pz = pg.evaluate("window.__ayo.puzzle"); legal = pg.evaluate("window.__ayo.legal"); worst = min(legal, key=lambda q: pg.evaluate("window.__ayo.tryPit(%d)" % q))
+        tap(pg, worst)
+        pg.wait_for_selector("#pzCard:not([hidden])", timeout=120000); pg.wait_for_timeout(600)
+        pc = pg.evaluate("['#pzEyebrow','#pzBadge','#pzBest','#pzRun','#pzAgain'].map(q => document.querySelector(q).textContent)")
+        print("  fr puzzle:", " | ".join(pc))
+        assert pc[0] == "Vous avez pris" and " sur " in pc[2] and pc[4] in ("Réessayer", "Le rejouer"), pc
+        for line in pc: assert not re.search(r"(?<![^\W\d_])(short|Nothing|captured|of|in a row|day|none|yet|Try|again|Solved)(?![^\W\d_])", line), ("English on the puzzle card", pc)
+        pg.click("#pzShare"); pg.wait_for_timeout(400)
         ctx.close()
         ctx, pg = phone(390, 844, "en-GB")  # an English phone stays English
         pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)

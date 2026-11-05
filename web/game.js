@@ -56,6 +56,7 @@ const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?
 const langPref = () => params.get('lang') || prefs.get('lang', 'auto');
 const i18n = makeI18n({ doc: document, lang: pickLang(langPref(), navigator.languages || [navigator.language]) }).start();
 window.__i18n = i18n;
+const tLines = (s) => s.split('\n').map((l) => i18n.t(l)).join('\n'); // words that leave the page (share, clipboard) in its language, line by line
 // block and report (web/block.js): this phone's random tag, sent with a room's create / join / rejoin, and who it has blocked
 const myTag = phoneTag(prefs); const blocked = new Blocked(prefs);
 // a new phone (nothing of the game kept on it): its first Play opens the lesson and it starts against Adaeze (web/lesson.js);
@@ -1401,7 +1402,7 @@ function closePuzzle() { // Back to home: the board goes back to your game (or a
   if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
 }
 async function sharePuzzle() {
-  const p = puzzle.p; const text = shareText(p, puzzle.got) + (linkable() ? `\n${publicBase()}?puzzle=1` : '');
+  const p = puzzle.p; const text = tLines(shareText(p, puzzle.got)) + (linkable() ? `\n${publicBase()}?puzzle=1` : '');
   try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast('Result copied'); } } catch {}
 }
 $('#puzzleCard').addEventListener('click', () => { openPuzzle(); click(1.3, 0.08); });
@@ -1773,7 +1774,7 @@ $('#replayBtn').addEventListener('click', async () => {
 });
 function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); $('#myScore').textContent = s.stores[you]; $('#oppScore').textContent = s.stores[them]; }
 $('#shareBtn').addEventListener('click', async () => {
-  const a = state.stores[you], b = state.stores[them]; const text = local ? localShare(state) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`;
+  const a = state.stores[you], b = state.stores[them]; const text = tLines(local ? localShare(state) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`);
   try {
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/png')); const file = blob && new File([blob], 'ayo-ncho.png', { type: 'image/png' });
     if (navigator.share && file && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ text, files: [file] });
@@ -1803,7 +1804,7 @@ async function recordClip(deliver = true) {
   const blob = rec ? await new Promise((res) => { rec.onstop = () => res(new Blob(chunks, { type: rec.mimeType || type })); rec.stop(); }) : null;
   const ms = Math.round(performance.now() - t0); $('#rec').hidden = true;
   layoutFromState(state); refreshStatic(); busy = false; clipping = false; musicCheck(); selected = null; if (wasOver) $('#gameover').hidden = false;
-  const caption = clipCaption(turn, online || local ? oppLabel() : names[level], state.variant);
+  const caption = tLines(clipCaption(turn, online || local ? oppLabel() : names[level], state.variant));
   if (deliver) await deliverClip(blob, caption);
   return { size: blob ? blob.size : 0, type: blob ? blob.type : null, ms, turn: { index: turn.index, seeds: turn.seeds, relays: turn.relays, drops: turn.drops } };
 }

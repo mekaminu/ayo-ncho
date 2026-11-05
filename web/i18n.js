@@ -8,8 +8,11 @@
 // toasts, the status words and the lines on Home and Settings built from parts. Slice 2: the words the board builds as it
 // plays (the hint line, where the seeds go and what it leaves open, their move explained, her take, last 8, circling, feed
 // them, the count by touch, the mouse, undo, hurry, the lesson, the pits' labels for screen readers): each part of a line
-// joined by " · " or " — " is its own phrase or pattern, so the line is French only when every part is. The cards, the
-// opponents' lines, the store, rooms and calls follow in later slices.
+// joined by " · " or " — " is its own phrase or pattern, so the line is French only when every part is. Slice 3: the cards —
+// Game over (its top line, the title, how the game went, the record, the rating, the next opponent offered), Mama Ngozi's
+// review (the card line and each step, her lines in it), the puzzle's result, the lesson's end, Home's record and rating
+// lines, and the words that are shared (the result, the puzzle, the clip's caption), which game.js passes through t().
+// The opponents' lines, the store, rooms and calls follow in later slices.
 
 export const LANGS = ['auto', 'en', 'fr'];
 
@@ -374,6 +377,26 @@ export const FR = {
   'Skip the lesson': 'Passer la leçon',
   'In the lesson, play the lit pit': 'Pendant la leçon, jouez le trou éclairé',
   'Finish': 'Terminer',
+  // the cards (slice 3): Game over, how the game went, the record, the rating, the review, the puzzle's result, the lesson's end
+  'You gave up': 'Vous avez abandonné',
+  'you gave up': 'vous avez abandonné',
+  'Level the whole way': 'À égalité tout du long',
+  'Level at the end': 'À égalité à la fin',
+  'every move as she would have played it': 'chaque coup comme elle l’aurait joué',
+  'one move she would have played differently': 'un coup qu’elle aurait joué autrement',
+  'in Gold': 'dans Gold',
+  'Nothing captured': 'Rien de pris',
+  '1 day': '1 jour',
+  'Reminder on': 'Rappel activé',
+  'about a minute': 'environ une minute',
+  'Learn Nchò · done': 'Apprendre le Nchò · terminé',
+  'One move. Your pits are on the right. 2s and 3s behind your last seed count too.': 'Un seul coup. Vos trous sont à droite. Les 2 et les 3 derrière votre dernière graine comptent aussi.',
+  'Ayo & Nchò daily': 'Ayo & Nchò, l’énigme du jour',
+  'Sit. We go over it together.': 'Asseyez-vous. On la revoit ensemble.',
+  'Let us count it again, slowly.': 'Recomptons-la, lentement.',
+  'Every seed has a reason. Look.': 'Chaque graine a sa raison. Regardez.',
+  'Nothing to change. I would have played it the same.': 'Rien à changer. Je l’aurais jouée pareil.',
+  'That is all. Next game, count twice.': 'C’est tout. À la prochaine partie, comptez deux fois.',
 };
 // French sets a thin space before : ; ? ! so they never start a line
 for (const k in FR) FR[k] = FR[k].replace(/ ([:;?!])/g, '\u00a0$1');
@@ -385,14 +408,17 @@ const look = (s) => LOOK_FR[s.toLowerCase()] || s;
 const DAYS = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };
 const MONTHS = { Jan: 'janv.', Feb: 'févr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'août', Sep: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'déc.' };
 const lv = (s) => LEVELS[s] || s;
+const pl = (n, one, many) => `${n} ${n === '1' ? one : many}`;
+const OPPS = 'Adaeze|Auntie Bisi|Nnamdi|Mama Ngozi|Papa Ike';
+const at = (g) => (g === 'Ayo' ? 'à l’Ayo' : 'au Nchò');
 const who = (s) => FR[s] || s; // a name stays a name; "Player 2" becomes "Joueur 2"
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
 export const PATTERNS = [
   [/^vs (.+?) · (Easy|Steady|Medium|Hard|Master)(?: · (.+) starts)?$/, (m) => `contre ${m[1]} · ${lv(m[2])}` + (m[3] ? ` · ${who(m[3])} commence` : '')],
-  [/^(.+?) · (Easy|Steady|Medium|Hard|Master)$/, (m) => `${m[1]} · ${lv(m[2])}`],
+  [/^(.+?) · (Easy|Steady|Medium|Hard|Master)$/, (m) => `${need(m[1])} · ${lv(m[2])}`],
   [/^(Player [12]) starts · on this phone$/, (m) => `${who(m[1])} commence · sur ce téléphone`],
   [/^(.+) starts — the loser goes first$/, (m) => `${who(m[1])} commence — le perdant joue en premier`],
-  [/^(.+) wins$/, (m) => `${who(m[1])} gagne`],
+  [/^([^·—:]+?) wins$/, (m) => `${who(m[1])} gagne`],
   [/^Play again — (.+) is ready$/, (m) => `Rejouer — ${m[1]} est prêt`],
   [/^(Nchò|Ayo) · (\d+) moves?$/, (m) => `${m[1]} · ${m[2]} coup${m[2] === '1' ? '' : 's'}`],
   [/^(\d+) seeds?$/, (m) => `${m[1]} graine${m[1] === '1' ? '' : 's'}`],
@@ -452,6 +478,49 @@ export const PATTERNS = [
   [/^([^·—:]+?) starts$/, (m) => `${who(m[1])} commence`],
   [/^Learn Nchò · (\d+) of (\d+)$/, (m) => `Apprendre le Nchò · ${m[1]} sur ${m[2]}`],
   [/^([^·—:]+?) sows one of hers…$/, (m) => `${m[1]} sème un des siens…`],
+  // the cards (slice 3)
+  [/^(\d+) moves?$/, (m) => pl(m[1], 'coup', 'coups')],
+  [/^(Easy|Steady|Medium|Hard|Master)$/, (m) => lv(m[1])],
+  [/^([^·—:]+?) gave up$/, (m) => `${who(m[1])} a abandonné`],
+  [/^([^·—:]+?) gave up after move (\d+)$/, (m) => (m[1] === 'you' ? 'vous avez abandonné' : `${who(m[1])} a abandonné`) + ` après le coup ${m[2]}`],
+  [/^([^·—:]+?) led from the start$/, (m) => (m[1] === 'You' ? 'Vous avez mené' : `${who(m[1])} a mené`) + ' dès le début'],
+  [/^([^·—:]+?) led for good from move (\d+)$/, (m) => (m[1] === 'You' ? 'Vous avez mené' : `${who(m[1])} a mené`) + ` pour de bon dès le coup ${m[2]}`],
+  [/^biggest swing: move (\d+), (\d+) seeds? (your|.+?'s) way$/, (m) => `plus grand basculement : coup ${m[1]}, ${pl(m[2], 'graine', 'graines')} ${m[3] === 'your' ? 'pour vous' : 'pour ' + who(m[3].slice(0, -2))}`],
+  [/^you (lead|trail) (\d+)–(\d+)$/, (m) => `vous ${m[1] === 'lead' ? 'menez' : 'êtes mené'} ${m[2]}–${m[3]}`],
+  [/^(new )?best win (\d+)–(\d+)$/, (m) => `${m[1] ? 'nouvelle ' : ''}meilleure victoire ${m[2]}–${m[3]}`],
+  [/^(\d+) draws?$/, (m) => pl(m[1], 'nul', 'nuls')],
+  [/^Ready for (.+?)\? Play (him|her) next$/, (m) => `Prêt pour ${m[1]} ? Jouez contre ${m[2] === 'him' ? 'lui' : 'elle'} ensuite`],
+  [/^([+−±]\d+) for (beating|losing to|a draw with) (.+?) \((\d+)\)$/, (m) => `${m[1]} pour ${{ beating: 'votre victoire sur', 'losing to': 'votre défaite contre', 'a draw with': 'un nul avec' }[m[2]]} ${m[3]} (${m[4]})`],
+  [/^(\d+) of 10 games, it is still finding you$/, (m) => `${m[1]} parties sur 10, le classement se cale encore`],
+  [/^Your rating (\d+)$/, (m) => `Votre classement ${m[1]}`],
+  [/^([+−±]\d+) last game$/, (m) => `${m[1]} à la dernière partie`],
+  [/^(\d+) more games? to settle$/, (m) => `encore ${pl(m[1], 'partie', 'parties')} pour se caler`],
+  [/^(Player [12]) leads (\d+) – (\d+)$/, (m) => `${who(m[1])} mène ${m[2]} – ${m[3]}`],
+  [/^level (\d+) – (\d+)$/, (m) => `égalité ${m[1]} – ${m[2]}`],
+  [/^(\d+) moves? in$/, (m) => `${pl(m[1], 'coup joué', 'coups joués')}`],
+  [/^going over the game… (\d+) of (\d+)$/, (m) => `elle revoit la partie… ${m[1]} sur ${m[2]}`],
+  [/^(\d+) moves she would have played differently$/, (m) => `${m[1]} coups qu’elle aurait joués autrement`],
+  [/^(.+?)'s review: (.+?)(\. Step through them on the board)?$/, (m) => `La revue de ${m[1]} : ${need(m[2])}${m[3] ? '. Les parcourir sur le plateau' : ''}`],
+  [/^(\d+) of (\d+)$/, (m) => `${m[1]} sur ${m[2]}`],
+  [/^move (\d+)$/, (m) => `coup ${m[1]}`],
+  [/^you played ((?:your|their) pit \d)(?: \(took (\d+)\))?$/, (m) => `vous avez joué ${need(m[1])}` + (m[2] ? ` (pris ${m[2]})` : '')],
+  [/^([^·—:]+?)'s move, played through$/, (m) => `Le coup de ${who(m[1])}, joué jusqu’au bout`],
+  [/^“(.+)”$/, (m) => `« ${need(m[1])} »`],
+  [/^([^·—:“]+?): “(.+)”$/, (m) => `${who(m[1])} : « ${need(m[2])} »`],
+  [/^(\d+) short$/, (m) => `il en manque ${m[1]}`],
+  [/^(\d+) in a row$/, (m) => `${m[1]} d’affilée`],
+  [/^the move captures (\d+)$/, (m) => `le coup prend ${m[1]}`],
+  [/^(\d+) of (\d+) seeds$/, (m) => `${m[1]} graines sur ${m[2]}`],
+  [/^([^·—:]+?)'s move captures$/, (m) => `Le coup de ${who(m[1])} prend`],
+  [/^(\d\d:00) each day$/, (m) => `${m[1]} chaque jour`],
+  [/^Remind me each day at (\d\d:00)$/, (m) => `Me le rappeler chaque jour à ${m[1]}`],
+  [new RegExp(`^Play (${OPPS})$`), (m) => `Jouer contre ${m[1]}`],
+  // the words that are shared (the share sheet, the clipboard): game.js puts them through t() line by line
+  [/^captured (\d+)\/(\d+)$/, (m) => `pris ${m[1]}/${m[2]}`],
+  [/^Ayo & Nchò — I (beat|drew with|lost to) (.+?) (\d+)–(\d+) in (\d+) moves\.$/, (m) => `Ayo & Nchò — ${{ beat: 'J’ai battu', 'drew with': 'J’ai fait match nul avec', 'lost to': 'J’ai perdu contre' }[m[1]]} ${m[2]} ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}.`],
+  [/^Ayo & Nchò — (Player [12]) beat (Player [12]) (\d+)–(\d+) in (\d+) moves, both on one phone\.$/, (m) => `Ayo & Nchò — ${who(m[1])} a battu ${who(m[2])} ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}, tous deux sur un seul téléphone.`],
+  [/^Ayo & Nchò — (Player [12]) and (Player [12]) drew (\d+)–(\d+) in (\d+) moves, both on one phone\.$/, (m) => `Ayo & Nchò — ${who(m[1])} et ${who(m[2])} ont fait match nul ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}, tous deux sur un seul téléphone.`],
+  [/^My best turn against (.+?) at (Nchò|Ayo): (.+)\. Ayo & Nchò — Nigerian Mancala in 3D\.$/, (m) => `Mon meilleur tour contre ${who(m[1])} ${at(m[2])} : ${m[3].split(', ').map(clipBit).join(', ')}. Ayo & Nchò — le mancala nigérian en 3D.`],
   [/^([^·—:]+?) plays you for real now\. Tap a pit once to see where its seeds go, twice to sow\.$/, (m) => `${m[1]} joue contre vous pour de vrai maintenant. Touchez un trou une fois pour voir où vont ses graines, deux fois pour semer.`],
 ];
 // a pit named from the seat looking at it: "your pit 3" → "votre trou 3", "their pit 3" → "le trou 3 d'en face"; the screen
@@ -459,6 +528,12 @@ export const PATTERNS = [
 function pitFr(m) {
   const mine = m[1].toLowerCase() === 'your'; const s = mine ? `votre trou ${m[2]}` : `le trou ${m[2]} d’en face`;
   return (m[1][0] === 'Y' || m[1][0] === 'T' ? cap(s) : s) + (m[3] ? ` (touche ${m[3]})` : '');
+}
+// a part of the clip's caption: "3 relays", "8 seeds captured", "12 seeds sown"
+function clipBit(b) {
+  const m = /^(\d+) (relays?|seeds? captured|seeds? sown)$/.exec(b); if (!m) throw NO;
+  const one = m[1] === '1';
+  return m[2].startsWith('relay') ? `${m[1]} relais` : `${m[1]} graine${one ? '' : 's'} ${m[2].endsWith('captured') ? 'prise' : 'semée'}${one ? '' : 's'}`;
 }
 const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 const NO = Symbol('no French');
@@ -473,7 +548,8 @@ export function translate(s, lang) {
   if (!core) return s;
   if (Object.prototype.hasOwnProperty.call(FR, core)) return m[1] + FR[core] + m[3];
   const one = whole(core); if (one !== null) return m[1] + one + m[3];
-  const out = sub(core);
+  const pe = /^(·\s)?(.+?)(\s·)?$/.exec(core);
+  const out = (pe[1] || pe[3]) ? ((r) => r === null ? null : (pe[1] || '') + r + (pe[3] || ''))(sub(pe[2])) : sub(core);
   return out === null || out === core ? s : m[1] + out + m[3];
 }
 // A line put together from parts: the whole line first, then its parts split on " — ", then each of those on " · ". French
