@@ -355,6 +355,8 @@ export const FR = {
   'move with no capture and it ends': 'coup sans prise et c’est fini',
   'moves with no capture and it ends': 'coups sans prise et c’est fini',
   'hurrying…': 'on accélère…',
+  'Setting up the board — four seeds to each pit': 'On met le plateau en place — quatre graines par trou',  // setting up the board (web/deal.js)
+  'setting up…': 'met en place…',
   'tap the board to hurry': 'touchez le plateau pour accélérer',
   'click the board or press Space to hurry': 'cliquez sur le plateau ou appuyez sur Espace pour accélérer',
   'They have no seeds': 'L’autre côté n’a plus de graines',

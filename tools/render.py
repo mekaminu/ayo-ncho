@@ -154,6 +154,9 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  Adaeze's move; every position is checked against node (stateAt); the end keeps it done and Play Adaeze starts the game; then
 #                  Settings → Learn to play opens it again and Skip goes home. Pictures: <out> (step 2 asking, the capture ring), <out>-after.png
 #                  (the 4 in your trough and the card), <out>-done.png. --wide for the Mac
+#        --deal: setting up the board — as --win, then Play again on the Game over card: the seeds in both troughs are dealt back
+#                  four to each pit (<out> mid-deal), the counts tick, Mama Ngozi's opening waits for the board to be set, and
+#                  every seed ends where the new game says. Then Home → Play on a set board deals nothing
 #        --win: the win, on the board — a saved game one move from beating Mama Ngozi (tools/endgame.js finds it): Continue, the winning
 #                  move; before the Game over card rises the winning trough's seeds jump in a wave (<out> mid-wave), the lamp warms and the
 #                  score glints; then the card rises with the lamp back as it was. --wide for the Mac
@@ -161,7 +164,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; winc = "--win" in sys.argv; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1065,6 +1068,25 @@ with sync_playwright() as p:
         assert (w["peak"] > 1.02 or w["samples"] < 3) and abs(w["lamp"] - k0) < 1e-6, ("the lamp warmed and came back", w, k0)
         assert pg.evaluate("window.__ayo.state.stores") == end["scores"], "the game ended as the engine said"
         print("win: %d seeds jumped, lamp up to x%.2f, then the card" % (w["hops"], w["peak"]))
+        if dealc:
+            d0 = pg.evaluate("window.__ayo.deal")
+            pg.evaluate("window.__dealPace = 8"); pg.click("#rematch")  # slowed for the picture: a software-rendered page draws a frame or two a second
+            pg.wait_for_function("window.__ayo.deal.live && window.__ayo.deal.flown >= 8", timeout=120000, polling=20)
+            assert pg.evaluate("window.__ayo.state.moves.length") == 0 and pg.evaluate("window.__ayo.busy"), "her opening waits for the board to be set"
+            assert pg.evaluate("document.querySelector('#gameover').hidden"), "the card goes as the deal starts"
+            assert pg.evaluate("window.__ayo.deal.inAir") > 0, "seeds in the air"
+            assert pg.evaluate("document.querySelector('#hint').textContent") in ("Setting up the board — four seeds to each pit", "click the board or press Space to hurry"), pg.evaluate("document.querySelector('#hint').textContent")
+            assert pg.evaluate("document.querySelector('#oppSub').textContent") == "setting up…"
+            mid = pg.evaluate("[+document.querySelector('#myScore').textContent, +document.querySelector('#oppScore').textContent]")
+            assert sum(mid) < sum(end["scores"]), ("the troughs' numbers tick down as the seeds leave", mid)
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(200); pg.screenshot(path=out[:-4] + "-deal.png", timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.keyboard.press("Space")  # a key hurries the deal like a turn, and plays no pit
+            pg.wait_for_function("!window.__ayo.deal.live", timeout=120000)
+            d = pg.evaluate("window.__ayo.deal"); e = d["end"]  # the board as the deal left it (her opening may already be under way)
+            assert d["deals"] == d0["deals"] + 1 and d["flown"] - d0["flown"] == 48, ("every seed dealt once", d0, d)
+            assert e["pits"] == [4] * 12 and e["stores"] == [0, 0] and e["badges"] == [4] * 12 and e["scores"] == [0, 0] and e["moves"] == 0, e
+            pg.wait_for_function("window.__ayo.state.moves.length >= 1", timeout=240000)  # the loser starts: Mama Ngozi opens once the board is set
+            print("deal: 48 seeds dealt back four to a pit, then her opening")
     if record:
         pills = pg.evaluate("[...document.querySelectorAll('.pill[data-level]')].map(b=>[b.dataset.level, b.querySelector('small.rec').textContent])")
         assert pills == [["easy", "you lead 4–2"], ["steady", ""], ["medium", "you trail 1–3"], ["hard", "you lead 2–1"], ["master", ""]], pills
@@ -1195,7 +1217,7 @@ with sync_playwright() as p:
         pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])")
         pg.click(".pill[data-mode=local]")
         sub = pg.evaluate("document.querySelector('#playSub').textContent"); assert sub == "Player 2 starts · on this phone", sub
-        pg.click("#playBtn"); pg.wait_for_timeout(1500)
+        pg.click("#playBtn"); pg.wait_for_timeout(1500); pg.wait_for_function("!window.__ayo.deal.live", timeout=60000)  # the game left on the board is dealt back first
         st = pg.evaluate("window.__ayo.state"); assert st["turn"] == 1 and st["first"] == 1 and pg.evaluate("window.__ayo.seat") == 1, st
         assert pg.evaluate("document.querySelector('#meName').textContent") == "Player 2", pg.evaluate("document.querySelector('#meName').textContent")
         th = pg.evaluate("window.__ayo.theta"); assert abs(abs(th) % (2 * 3.14159265) - 3.14159265) < 0.05, th
