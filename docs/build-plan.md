@@ -64,6 +64,8 @@ Status key: `[ ]` open · `[~]` started, what remains noted · `[x]` done · `[!
 
 ## Needs Meka
 
+- [!] A friend's iPhone (Safari, iOS 26, 5 Nov) gets a black screen on the game link and the invite link; a Chrome test with an iPhone's screen and name starts fine, so it is something only Safari's own engine does. Since 5 Nov night, instead of staying black the page says "The board couldn't start" after 12 s, with Try again and a line of small print giving the error and the phone's browser (docs/render-2026-11-05-bootfail.png). Ask him to open the link again, wait for that screen and send a screenshot: a run then fixes the exact error. (Older iPhones, iOS before 16.4, also failed outright; es-module-shims now covers them.)
+
 - [!] Launch (3 Nov): open the Apple Developer account ($99 a year) and the Google Play developer account ($25 once), as yourself or as a company (the audit recommends a company if you have one; as yourself, EU store pages show an address or P.O. box, a phone and an email)
 - [!] Launch (3 Nov): yes or no to an always-on server, $7 a month on Render, so an online game never waits a minute to start (render.yaml stays `plan: free` until he says yes)
 - [!] Launch (3 Nov): 12 or more people with Android phones and Google accounts for Google's 14-day closed test — once they have the app, ask each to go through the checklist in docs/launch/slow-phones.md (about 25 minutes: speed, battery, heat, Papa Ike's thinking time) and send the answers to a run

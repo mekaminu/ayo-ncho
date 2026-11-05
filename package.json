@@ -29,6 +29,7 @@
     "@capgo/native-purchases": "^8.9.6",
     "@fontsource/fraunces": "^5.3.0",
     "@fontsource/inter": "^5.3.0",
+    "es-module-shims": "^2.8.4",
     "three": "^0.170.0"
   }
 }
