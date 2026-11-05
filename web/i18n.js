@@ -153,6 +153,7 @@ export const FR = {
   'Seed sets': 'Jeux de graines',
   'tap one to pour it in': 'touchez-en un pour le verser',
   'Bundle': 'Lot',
+  'coming': 'bientôt', // a Gold line not built yet (the store's Gold card)
   'Restore purchases': 'Restaurer les achats',
   'Asking the store…': 'On demande à la boutique…',
   // Settings

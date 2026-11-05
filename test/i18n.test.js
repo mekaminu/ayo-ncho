@@ -188,3 +188,8 @@ test("Home's lines: the puzzle card and the calm streak", async () => {
   for (let n = 1; n <= 16; n++) { const days = [...Array(n).keys()].map((k) => day(k + 1)); lines.push(homeLine({ days }, day(n)), homeLine({ days }, day(n + 1))); }
   for (const l of lines) { const f = translate(l, "fr"); assert.notEqual(f, l, "in French: " + l); assert.ok(!/ days?\b| played| more /.test(f), f); }
 });
+
+test("the store's Gold card: a line not built yet says « bientôt » (seen in the French store pictures, 5 Nov)", () => {
+  assert.equal(translate("coming", "fr"), "bientôt");
+  assert.equal(translate("coming", "en"), "coming");
+});

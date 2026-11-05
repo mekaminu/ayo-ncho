@@ -19,7 +19,7 @@ img{display:block;box-shadow:0 0 0 2px rgba(230,183,111,.38),0 30px 80px rgba(0,
 const q = new URLSearchParams(location.search), W = innerWidth, H = innerHeight, share = +q.get('share'), cap = +q.get('cap');
 const capH = Math.round(H * (1 - share)), t = document.getElementById('t'), im = document.getElementById('im');
 document.getElementById('cap').style.cssText = `height:${capH}px;padding:0 ${Math.round(W * 0.07)}px;gap:${Math.round(W * cap * 0.32)}px`;
-t.style.fontSize = Math.round(W * cap) + 'px'; t.textContent = q.get('caption');
+t.style.fontSize = Math.round(W * cap) + 'px'; t.textContent = q.get('caption'); if (q.get('lang')) document.documentElement.lang = q.get('lang');
 const rule = document.getElementById('rule'); rule.style.width = Math.round(W * cap * 1.1) + 'px'; rule.style.height = Math.max(3, Math.round(W * cap * 0.06)) + 'px';
 im.onload = async () => {
   await document.fonts.ready;

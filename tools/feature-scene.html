@@ -23,7 +23,9 @@ canvas{display:block;position:absolute;inset:0;width:1024px;height:500px}
 const THREE = await import('three');
 const { buildBoard, buildTable, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, BT, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D } = await import('/web/board.js');
 const { pour, place } = await import('/web/slots.js');
-const q = new URLSearchParams(location.search); const FINISH = q.get('finish') || 'mahogany', SET_ID = q.get('seeds') || 'jobs';
+const q = new URLSearchParams(location.search);
+if (q.get('lang') === 'fr') { document.documentElement.lang = 'fr'; document.querySelector('#name p').textContent = 'Mancala nigérian en 3D'; } // the French store page's banner
+const FINISH = q.get('finish') || 'mahogany', SET_ID = q.get('seeds') || 'jobs';
 const W = 1024, H = 500, DPR = 2;
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(DPR); renderer.setSize(W, H); document.body.prepend(renderer.domElement);

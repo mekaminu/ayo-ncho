@@ -18,14 +18,22 @@ Play's feature graphic — all cut from the real game, never drawn by hand.
      play-tablet  2560 × 1600  Google Play 10" tablet, 16:10
    and play-feature-1024x500.jpg, Google's feature graphic, from tools/feature-scene.html (the board itself, drawn by board.js).
 3. A contact sheet, docs/launch/store/shots/sheet.jpg, for Meka to look at all of them at once, and README.md saying what goes where.
+
+    python3 tools/store-shots.py --lang=fr  the same for the French store pages (idea 5 Nov, from L18): each check plays as in
+   English (its words still prove the feature) and the picture is taken with the game turned French in place, as Settings →
+   Language → Français does it (RENDER_LANG=fr in tools/render.py); framed under the French captions of listing-fr.json, the
+   feature graphic's line in French, into docs/launch/store/shots-fr/ (renders in docs/launch/store/src-fr/, kept out of git).
 """
 import sys, os, json, subprocess, shutil, http.server, threading, functools, urllib.parse
 from playwright.sync_api import sync_playwright
 from PIL import Image
 
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-store = os.path.join(root, "docs", "launch", "store"); src = os.path.join(store, "src"); outd = os.path.join(store, "shots")
-listing = json.load(open(os.path.join(store, "listing.json")))
+LANG = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--lang=")), "en"); assert LANG in ("en", "fr"), LANG
+FR = LANG == "fr"; sfx = "-fr" if FR else ""
+store = os.path.join(root, "docs", "launch", "store"); src = os.path.join(store, "src" + sfx); outd = os.path.join(store, "shots" + sfx)
+english = json.load(open(os.path.join(store, "listing.json")))  # what each picture shows (the README), and the English captions
+listing = json.load(open(os.path.join(store, "listing-fr.json"))) if FR else english
 # Each screenshot: its short name and the render.py check that plays it (the picture is that check's <out>).
 FLOWS = [("sow", ["--smoke", "--hand"]), ("path", ["--smoke", "--path"]), ("lesson", ["--lesson"]), ("friend", ["--online"]),
          ("puzzle", ["--puzzle"]), ("rating", ["--record"]), ("twoofus", ["--local"]), ("store", ["--store"])]
@@ -45,7 +53,7 @@ def render(only):
             print(f"render {name} ({kind}) …", flush=True)
             for attempt in (1, 2):  # a check that times out once under SwiftShader at the larger size gets one more go
                 r = subprocess.run(["python3", os.path.join(root, "tools", "render.py"), out, *flags, *extra], cwd=root,
-                                   env={**os.environ, "RENDER_SCALE": scale}, capture_output=True, text=True, timeout=900)
+                                   env={**os.environ, "RENDER_SCALE": scale, **({"RENDER_LANG": "fr"} if FR else {})}, capture_output=True, text=True, timeout=900)
                 if r.returncode == 0 and os.path.exists(out): break
                 print(f"  again ({r.stdout.strip().splitlines()[-1:] or r.stderr.strip().splitlines()[-1:]})", flush=True)
             if r.returncode != 0 or not os.path.exists(out):
@@ -74,14 +82,14 @@ def frame():
             for i, (name, _) in enumerate(FLOWS):
                 img = os.path.join(src, f"{i+1:02d}-{name}-{kind}.png")
                 if not os.path.exists(img): sys.exit(f"missing {img}: run tools/store-shots.py without --frame first")
-                q = urllib.parse.urlencode({"img": "/" + os.path.relpath(img, root), "caption": listing["screenshots"][i]["caption"], "cap": cap, "share": share})
+                q = urllib.parse.urlencode({"img": "/" + os.path.relpath(img, root), "caption": listing["screenshots"][i]["caption"], "cap": cap, "share": share, "lang": LANG})
                 pg.goto(f"{base}/tools/store-frame.html?{q}", wait_until="load"); pg.wait_for_function("window.__done === true", timeout=30000)
                 assert pg.evaluate("window.__fit"), f"{fmt} {name}: the caption does not fit in two lines"
                 pg.screenshot(path=tmp); path = os.path.join(outd, f"{fmt}-{i+1:02d}-{name}.jpg"); jpeg(tmp, path, (w, h)); made.append(path)
                 print("framed", os.path.relpath(path, root), flush=True)
             pg.close()
         pg = b.new_page(viewport={"width": 1024, "height": 500}, device_scale_factor=2)
-        pg.goto(f"{base}/tools/feature-scene.html", wait_until="load"); pg.wait_for_function("window.__done === true", timeout=180000)
+        pg.goto(f"{base}/tools/feature-scene.html" + ("?lang=fr" if FR else ""), wait_until="load"); pg.wait_for_function("window.__done === true", timeout=180000)
         pg.evaluate("document.fonts.ready"); pg.wait_for_timeout(300)
         pg.screenshot(path=tmp); feat = os.path.join(outd, "play-feature-1024x500.jpg"); jpeg(tmp, feat, (1024, 500)); made.append(feat)
         print("feature graphic", os.path.relpath(feat, root)); b.close()
@@ -103,6 +111,7 @@ def sheet():  # every picture small on one page, for Meka
     S.save(os.path.join(outd, "sheet.jpg"), "JPEG", quality=82, optimize=True)
 
 def readme():
+    if FR: return readme_fr()
     L = ["# The store pictures", "", "Made by `python3 tools/store-shots.py` from the real game (do not edit by hand; run it again after the look changes).",
          "Every picture is a JPEG with no transparency, at exactly the size its store asks for. `sheet.jpg` shows them all at once.", "",
          "| Where it goes | Files | Size |", "|---|---|---|",
@@ -113,6 +122,20 @@ def readme():
          "| Play Console → Main store listing → Feature graphic | `play-feature-1024x500.jpg` | 1024 × 500 |", "",
          "Upload them in this order (the first two or three are the ones people see in search):", ""]
     for i, s in enumerate(listing["screenshots"]): L.append(f"{i+1}. **{s['caption']}** — {s['shows']}")
+    open(os.path.join(outd, "README.md"), "w").write("\n".join(L) + "\n")
+
+def readme_fr():
+    L = ["# The store pictures in French", "",
+         "Made by `python3 tools/store-shots.py --lang=fr` from the real game in French (do not edit by hand). The same eight screens as",
+         "`../shots/`, the same sizes, under the French captions of `../listing-fr.json`. `sheet.jpg` shows them all at once.", "",
+         "| Where it goes (French, fr-FR) | Files | Size |", "|---|---|---|",
+         "| App Store Connect → the French localisation → iPhone 6.9\" Display | `ios-6.9-01-…` to `-08-…` | 1320 × 2868 |",
+         "| App Store Connect → the French localisation → iPad 13\" Display | `ios-13-01-…` to `-08-…` | 2752 × 2064 |",
+         "| Play Console → Main store listing → Manage translations → French → Phone screenshots | `play-phone-01-…` to `-08-…` | 1080 × 1920 |",
+         "| Play Console → … → French → 10-inch tablet screenshots (7-inch takes the same) | `play-tablet-01-…` to `-08-…` | 2560 × 1600 |",
+         "| Play Console → … → French → Feature graphic | `play-feature-1024x500.jpg` | 1024 × 500 |", "",
+         "In this order, as the English:", ""]
+    for i, s in enumerate(listing["screenshots"]): L.append(f"{i+1}. **{s['caption']}** — {english['screenshots'][i]['shows']}")
     open(os.path.join(outd, "README.md"), "w").write("\n".join(L) + "\n")
 
 if __name__ == "__main__":

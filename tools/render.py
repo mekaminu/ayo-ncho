@@ -103,6 +103,26 @@ if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py):
             k["style"] = (k.get("style") or "") + ".toast{display:none!important}"; return f(self, *a, **k)
         return g
     _P.screenshot = _calm(_P.screenshot); _Lc.screenshot = _calm(_Lc.screenshot)
+if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/store-shots.py --lang=fr): each check plays as written, in
+    # English, so its own words still prove the feature; for the picture alone the game is put into French the way a player does it
+    # (Settings → Language → Français, which turns the page in place, at once, nothing replayed) and back to Auto straight after
+    from playwright.sync_api import Page as _P, Locator as _Lc
+    # (the stored choice and the legal links' addresses are put back as they were, so the rest of the check sees no difference)
+    _TO_FR = """() => { const b = document.querySelector('[data-set=lang] [data-v=fr]'); if (!b || document.documentElement.lang === 'fr') return false;
+      window.__wasLang = { pref: localStorage.getItem('ayo.lang'), hrefs: [...document.querySelectorAll('.legal a')].map((a) => a.getAttribute('href')) };
+      b.click(); return document.documentElement.lang === 'fr' || 'no'; }"""
+    _BACK = """() => { const w = window.__wasLang; document.querySelector('[data-set=lang] [data-v=auto]').click();
+      if (w.pref === null) localStorage.removeItem('ayo.lang'); else localStorage.setItem('ayo.lang', w.pref);
+      document.querySelectorAll('.legal a').forEach((a, i) => { if (w.hrefs[i] === null) a.removeAttribute('href'); else a.setAttribute('href', w.hrefs[i]); }); }"""
+    def _french(f, page_of):
+        def g(self, *a, **k):
+            pg = page_of(self); r = pg.evaluate(_TO_FR)
+            assert r != "no", "Settings → Language → Français did not turn the page French"
+            try: return f(self, *a, **k)
+            finally:
+                if r is True: pg.evaluate(_BACK)
+        return g
+    _P.screenshot = _french(_P.screenshot, lambda s: s); _Lc.screenshot = _french(_Lc.screenshot, lambda s: s.page)
 #        add --music (with --smoke) to check the music (L17): off on a new phone, Settings → Feel → Music on starts it (bars on the
 #                  clock, the audio running), the speaker on the board silences it and says so under the switch, it keeps playing on
 #                  Home, and off takes every note off the clock
@@ -801,7 +821,7 @@ if online:
         host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
         assert host.evaluate(call)["menu"][-2:] == ["Report a problem", "Block Tete"], host.evaluate(call)["menu"]
         rh = host.evaluate("(() => { const a = []; const o = HTMLAnchorElement.prototype.click; HTMLAnchorElement.prototype.click = function () { a.push([this.href, this.target]); }; document.querySelector('#callMenu .pill[data-id=report]').click(); HTMLAnchorElement.prototype.click = o; return a; })()")
-        assert len(rh) == 1 and rh[0][0].endswith("/support#report") and rh[0][1] == "_blank", rh
+        assert len(rh) == 1 and rh[0][0].endswith("/support?lang=en#report") and rh[0][1] == "_blank", rh  # in the game's language (L18)
         host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
         host.click("#callMenu .pill[data-id=block]")
         assert host.evaluate(call)["menu"][-1] in ("Tap again to block Tete", "Click again to block Tete") and host.evaluate("window.__ayo.room") is not None, host.evaluate(call)["menu"]
