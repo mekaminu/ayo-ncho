@@ -1,0 +1,74 @@
+{
+  "about": "The store pages' words in French (Launch L18, the last slice) for the App Store's and Google Play's French listing (fr-FR; the same words serve French (Canada), fr-CA, if it is added). Line for line the English in listing.json: the same paragraphs, bullets, names and numbers. Written with plain spaces; tools/store-text.js puts the non-breaking spaces French wants before : ; ? ! and inside « » when it writes listing-fr.md, and test/storepage-fr.test.js checks every limit, the store's rules and every claim against the game.",
+  "locale": { "apple": "French (fr-FR)", "google": "French – fr-FR" },
+  "name": "Ayo & Nchò : Mancala nigérian",
+  "apple": {
+    "subtitle": "Jeu d’awalé et d’oware en 3D",
+    "promotionalText": "Le jeu de graines nigérian sur un plateau sculpté en 3D. Apprenez-le en une minute, puis affrontez Mama Ngozi, un ami sur WhatsApp ou l’énigme du jour. Sans pub.",
+    "keywords": "okwe,ayoayo,bao,kalah,nigeria,igbo,yoruba,graines,stratégie,famille,énigme,hors ligne,2 joueurs",
+    "whatsNew": "La première version : Nchò et Ayo sur un plateau sculpté en 3D, cinq adversaires, à deux sur un téléphone, un ami en ligne et une nouvelle énigme chaque jour."
+  },
+  "google": {
+    "title": "Ayo & Nchò : Mancala nigérian",
+    "shortDescription": "Le jeu de graines du Nigeria sur un plateau sculpté en 3D. Sans pub.",
+    "whatsNew": "La première version : Nchò et Ayo sur un plateau sculpté en 3D, cinq adversaires, à deux sur un téléphone, un ami en ligne et une nouvelle énigme chaque jour."
+  },
+  "description": [
+    "Ayo & Nchò est le jeu de graines et de plateau auquel les familles nigérianes jouent depuis des générations, sur un plateau de bois sculpté en vraie 3D. Semez les graines, comptez les trous, prenez les 4.",
+    "",
+    "Deux jeux, les règles de votre enfance",
+    "• Nchò : semis en relais, prises de 4 et les 8 dernières graines.",
+    "• Ayo : prises de 2 ou 3, proche parent de l’oware et de l’awalé.",
+    "• Changez les règles dans Réglages : prise sur 4 ou sur 2 et 3, relais ou un seul tour, les 8 dernières graines ou non.",
+    "",
+    "Un plateau qu’on croirait toucher",
+    "Acajou, iroko ou ébène sculptés sous une lampe chaude. La main soulève chaque graine, la dépose dans son trou, où elle rebondit et se pose là où elle tombe ; chaque prise est ramassée dans votre réserve. Le bruit de la graine sur le bois est créé par votre téléphone, à chaque graine qui tombe.",
+    "",
+    "Des adversaires qui ont leur mot à dire",
+    "Adaeze, neuf ans et déjà sûre de gagner. Auntie Bisi, qui compte chaque trou deux fois. Nnamdi, votre cousin vif. Mama Ngozi, trente ans au marché. Chacun a un visage qui réagit et un mot pour chaque moment, et le jeu garde votre bilan contre chacun d’eux et un classement qui montre le chemin parcouru.",
+    "",
+    "Apprendre en jouant",
+    "• Une leçon d’une minute sur le plateau pour votre première partie.",
+    "• Touchez un trou une fois pour voir où tombera chaque graine, ce que vous prendriez et ce que vous laissez ouvert ; touchez encore pour semer.",
+    "• Après le coup de l’adversaire, voyez ce qu’il vient de faire, et revoyez-le lentement.",
+    "• Mama Ngozi vous dit quand un meilleur trou était là, et vous le montre.",
+    "• Appuyez longuement sur un trou pour compter ses graines une à une.",
+    "",
+    "Jouer ensemble",
+    "• À deux sur un téléphone : le plateau se tourne vers celui qui doit jouer.",
+    "• Un ami en ligne : ouvrez une salle, envoyez son code de quatre lettres sur WhatsApp, et ouvrez la porte quand on frappe. Huit cris rapides traversent le plateau, et vous pouvez demander à reprendre un coup. Jouer avec un ami demande une connexion.",
+    "",
+    "Une énigme chaque jour",
+    "Une position, la même pour tout le monde, un seul coup pour prendre le plus possible. Partagez votre résultat et enchaînez les jours. Sept jours de jeu débloquent les galets.",
+    "",
+    "Pas de réseau ? Aucun problème",
+    "Contre l’ordinateur, à deux sur un téléphone, la leçon et l’énigme du jour se jouent sans connexion. Un plateau allégé garde les téléphones plus lents fluides.",
+    "",
+    "Gold, acheté une fois",
+    "Une seule amélioration, achetée une fois : Papa Ike, le Maître, vieux rival de Mama Ngozi et le joueur le plus fort du jeu ; et la revue de Mama Ngozi, toute votre partie coup par coup sur le plateau.",
+    "",
+    "Des looks pour le plateau",
+    "Le plateau en bronze du Bénin et le plateau de grand-père, des graines de cauris et de noix de palme. Que l’apparence : ils ne changent jamais la chute des graines ni qui gagne.",
+    "",
+    "Pas de pub. Pas de pièces. Pas de compte. Rien de ce que vous achetez ne gagne une partie. Vos parties, vos bilans et vos réglages restent sur votre téléphone."
+  ],
+  "screenshots": [
+    { "caption": "Semez chaque graine à la main" },
+    { "caption": "Voyez où tomberont vos graines" },
+    { "caption": "Apprenez en une minute" },
+    { "caption": "Jouez avec un ami sur WhatsApp" },
+    { "caption": "Une nouvelle énigme chaque jour" },
+    { "caption": "Des adversaires de caractère" },
+    { "caption": "À deux, sur un seul téléphone" },
+    { "caption": "Bois sculpté, vraies graines" }
+  ],
+  "preview": {
+    "captions": ["Voyez où ira chaque graine", "Semez chaque graine à la main", "Des adversaires qui répliquent", "Des indices qui expliquent", "Ayo & Nchò · Mancala nigérian"]
+  },
+  "links": {
+    "privacy": "https://ayo-ncho.onrender.com/privacy?lang=fr",
+    "terms": "https://ayo-ncho.onrender.com/terms?lang=fr",
+    "support": "https://ayo-ncho.onrender.com/support?lang=fr",
+    "marketing": "https://ayo-ncho.onrender.com/?lang=fr"
+  }
+}
