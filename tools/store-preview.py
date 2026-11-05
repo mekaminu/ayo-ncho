@@ -4,6 +4,9 @@ own clip is (the board drawn by board.js, every seed moved by the engine's event
     python3 tools/store-preview.py                  both recordings, then the three videos (about 40 minutes in SwiftShader)
     python3 tools/store-preview.py --only=phone     just one recording (phone | ipad), then the videos
     python3 tools/store-preview.py --encode         the videos again from the frames already recorded
+    python3 tools/store-preview.py --lang=fr        the same video with the game in French (?lang=fr, as Settings → Language →
+                                                    Français), under listing-fr.json's captions, into docs/launch/store/preview-fr/
+                                                    (frames in docs/launch/store/src-fr/, kept out of git) — idea 5 Nov, from L18
 
 What it plays (docs/launch/store/listing.json "preview" holds the captions): a game against Nnamdi a few moves in
 (tools/previewpos.js finds it), your move. A tap on the pit lands its path marks (where every seed will go, the captures);
@@ -28,8 +31,10 @@ import sys, os, json, base64, subprocess, shutil, http.server, threading, functo
 from playwright.sync_api import sync_playwright
 
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-store = os.path.join(root, "docs", "launch", "store"); srcd = os.path.join(store, "src"); outd = os.path.join(store, "preview")
-listing = json.load(open(os.path.join(store, "listing.json"))); CAPS = listing["preview"]["captions"]
+LANG = next((a.split("=", 1)[1] for a in sys.argv if a.startswith("--lang=")), "en"); assert LANG in ("en", "fr"), LANG
+FR = LANG == "fr"; sfx = "-fr" if FR else ""
+store = os.path.join(root, "docs", "launch", "store"); srcd = os.path.join(store, "src" + sfx); outd = os.path.join(store, "preview" + sfx)
+listing = json.load(open(os.path.join(store, "listing-fr.json" if FR else "listing.json"))); CAPS = listing["preview"]["captions"]
 FPS = 30; RATE = 48000; MIN_S, MAX_S = 15.0, 29.5
 # name: the page's size in CSS pixels and its density (the frame is exactly the store's size)
 RECORDINGS = {"phone": (443, 960, 2), "ipad": (800, 600, 2)}
@@ -86,7 +91,8 @@ def record(name, limit=None):
         pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=os.path.join(root, "node_modules", "three", "build", "three.module.js"), content_type="text/javascript"))
         pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'medium'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.name', 'Meka'); localStorage.setItem('ayo.take', '0');" % json.dumps(json.dumps(saved)))
         pg.clock.install(); pg.add_init_script(HOLD)
-        pg.goto(f"{base}/web/index.html?capture=1&stay=home&lite=0", wait_until="load")  # the full board, seed physics on: never the lighter one
+        pg.goto(f"{base}/web/index.html?capture=1&stay=home&lite=0&lang={LANG}", wait_until="load")  # the full board, seed physics on: never the lighter one
+        assert pg.evaluate("document.documentElement.lang") == LANG, "the game in the video's language"
         pg.evaluate("document.fonts.ready"); pg.evaluate(CAPTION + "(%s, %s)" % tuple(json.dumps(v) for v in PLACE[name]))
         cdp = ctx.new_cdp_session(pg)
         clock = {"ms": 0, "i": 0}
@@ -130,13 +136,17 @@ def record(name, limit=None):
         # Hint: Mama Ngozi's pit is picked for you with its path, and one more tap sows it
         pg.touchscreen.tap(*pg.evaluate("(() => { const r = document.querySelector('#hintBtn').getBoundingClientRect(); return [r.x + r.width / 2, r.y + r.height / 2]; })()"))
         assert until("window.__ayo.selected !== null", 30 * 6), "the hint picks a pit"
-        run(60); hinted = pg.evaluate("window.__ayo.selected"); tap(hinted)
+        run(60); hinted = pg.evaluate("window.__ayo.selected")
+        said = pg.evaluate("document.querySelector('#hint').textContent"); print("  hint line:", said, flush=True)
+        if FR: assert "tap again" not in said and "would play" not in said and said.strip(), ("the hint line in French", said)
+        tap(hinted)
         assert until(f"window.__ayo.state.moves.length > {n0 + 2} && !window.__ayo.busy", 30 * 10), "the hinted move is sown"
         run(10); pg.evaluate("window.__caption('')"); run(10); pg.evaluate("window.__caption(%s)" % json.dumps(CAPS[4]))
         left = round(max(MIN_S + 0.5, (clock["i"] - first) / FPS + 2.8) * FPS) - (clock["i"] - first)
         run(left)
         seconds = (clock["i"] - first) / FPS; assert MIN_S <= seconds <= MAX_S, ("15 to 30 seconds", seconds)
         assert pg.evaluate("window.__ayo.state.moves.length") >= n0 + 3
+        if FR: assert pg.evaluate("document.documentElement.lang") == "fr", "still French at the end"
         # the board's own sounds, played again in time into a stereo track
         wav = pg.evaluate("""async ([t0, secs, rate]) => {
           const { boardAudio } = await import('/web/sound.js');
@@ -178,6 +188,7 @@ def encode():
     poster(); readme()
 
 def readme():
+    if FR: return readme_fr()
     L = ["# The store's preview video", "", "Made by `python3 tools/store-preview.py` from the real game on the real board, with the board's own sounds (do not edit by hand;",
          "run it again after the look changes). About 23 seconds: a game against Nnamdi, your first tap showing where every seed will go, the",
          "turn sown (two relays, two captures), Nnamdi's answer explained under the board and watched again slowly, a hint sown, and the name. Each `-poster.jpg` is the frame at 5 seconds.", "",
@@ -186,6 +197,18 @@ def readme():
          "| App Store Connect → the version → iPad 13\" Display → App Previews | `ios-13-preview.mp4` | 1600 × 1200 |",
          "| YouTube (public or unlisted, ads off, not made for kids), then its link in Play Console → Main store listing → Video | `play-youtube.mp4` | 1920 × 1080 |", "",
          "Apple takes 15–30 seconds at up to 30 fps, H.264 with stereo AAC; all three are made that way (test/storepreview.test.js checks).",
+         "Apple shows the preview muted until it is tapped, so the captions carry it:", ""]
+    for i, c in enumerate(CAPS): L.append(f"{i+1}. {c}")
+    open(os.path.join(outd, "README.md"), "w").write("\n".join(L) + "\n")
+
+def readme_fr():
+    L = ["# The store's preview video in French", "", "Made by `python3 tools/store-preview.py --lang=fr` from the real game in French on the real board, with the board's",
+         "own sounds (do not edit by hand). The same game and the same moves as `../preview/`, the board's words in French, under the",
+         "French captions of `../listing-fr.json`. Each `-poster.jpg` is the frame at 5 seconds.", "",
+         "| Where it goes (French, fr-FR) | File | Size |", "|---|---|---|",
+         "| App Store Connect → the French localisation → iPhone 6.9\" Display → App Previews | `ios-6.9-preview.mp4` | 886 × 1920 |",
+         "| App Store Connect → the French localisation → iPad 13\" Display → App Previews | `ios-13-preview.mp4` | 1600 × 1200 |",
+         "| YouTube (unlisted is fine, ads off, not made for kids), then its link in Play Console → Main store listing → Manage translations → French → Video | `play-youtube.mp4` | 1920 × 1080 |", "",
          "Apple shows the preview muted until it is tapped, so the captions carry it:", ""]
     for i, c in enumerate(CAPS): L.append(f"{i+1}. {c}")
     open(os.path.join(outd, "README.md"), "w").write("\n".join(L) + "\n")
