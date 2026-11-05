@@ -130,7 +130,7 @@ if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py):
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; story = story or reviewc; record = record or story
+out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -318,6 +318,45 @@ if telec:  # game numbers and crash reports (L13): nothing without a sink; with 
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("telemetry: ok · wrote", out); sys.exit(0)
+if langc:  # French (L18, slice 1): a phone in French opens in French; Settings → Language switches in place and back; a move plays
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        def phone(w, h, loc):
+            ctx = b.new_context(viewport={"width": w, "height": h}, device_scale_factor=2, locale=loc); pg = ctx.new_page(); watch(pg, errors, loc + ": ")
+            pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done')")
+            return ctx, pg
+        ctx, pg = phone(390, 844, "fr-FR")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        assert pg.evaluate("document.documentElement.lang") == "fr"
+        got = pg.evaluate("[document.querySelector('#playBtn b').textContent, document.querySelector('#playSub').textContent, document.querySelector('#homeSettings').getAttribute('aria-label')]")
+        assert got[0] == "Jouer" and got[1].startswith("contre ") and got[2] == "Réglages", got
+        pg.wait_for_timeout(300); pg.screenshot(path=out, animations="disabled")  # no freeze: the board keeps running for the move below
+        pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])")
+        assert pg.evaluate("document.querySelector('#settings h2').textContent") == "Réglages"
+        assert "téléphone" in pg.evaluate("document.querySelector('#langNow').textContent")
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("Settings scrolls sideways in French", W)
+        pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-settings.png", animations="disabled")
+        pg.click("[data-set=lang] [data-v=en]"); pg.wait_for_timeout(200)
+        assert pg.evaluate("document.querySelector('#settings h2').textContent") == "Settings" and pg.evaluate("document.documentElement.lang") == "en"
+        assert pg.evaluate("localStorage.getItem('ayo.lang')") == "en"
+        pg.click("[data-set=lang] [data-v=fr]"); pg.wait_for_timeout(200)
+        assert pg.evaluate("document.querySelector('#settings h2').textContent") == "Réglages"
+        pg.click("#settingsBack"); pg.wait_for_selector("#home:not([hidden])"); pg.click("#playBtn"); pg.wait_for_timeout(1500); pg.wait_for_function("!window.__ayo.busy", timeout=60000)
+        assert pg.evaluate("document.querySelector('#turn').textContent") == "à vous", pg.evaluate("document.querySelector('#turn').textContent")
+        pit = pg.evaluate("window.__ayo.legal")[0]; tap(pg, pit)
+        pg.wait_for_function("window.__ayo.state.moves.length >= 1", timeout=60000); pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length >= 2", timeout=240000)
+        assert pg.evaluate("document.querySelector('#turn').textContent") == "à vous"
+        ctx.close()
+        ctx, pg = phone(390, 844, "en-GB")  # an English phone stays English
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        assert pg.evaluate("document.querySelector('#playBtn b').textContent") == "Play" and pg.evaluate("document.documentElement.lang") == "en"
+        ctx.close()
+        ctx, pg = phone(1180, 820, "fr-FR")  # the Mac
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-wide.png", animations="disabled")
+        b.close()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("lang: ok · wrote", out); sys.exit(0)
 if remindc:  # the daily-puzzle reminder (L14): only in the apps; asks once; a week planned; the card's offer; a tap opens the puzzle
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []

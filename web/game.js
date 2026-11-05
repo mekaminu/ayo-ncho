@@ -28,6 +28,7 @@ import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, 
 import { pour, place, reach } from './slots.js';
 import { boardAudio } from './sound.js';
 import { makeMusic, musicWanted, musicNote } from './music.js';
+import { makeI18n, pickLang, langNote } from './i18n.js';
 import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './last8.js';
 import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown, haulKind } from './handcount.js';
@@ -51,6 +52,10 @@ const params = new URLSearchParams(location.search);
 const GOLD_PREVIEW = previewOf(location.search); // ?try=master: Papa Ike open for this visit (until Gold can be bought)
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem('ayo.' + k, v); } catch {} } };
+// the page's language (web/i18n.js, Launch L18): Settings → Language, Auto follows the phone; ?lang=fr|en for a visit
+const langPref = () => params.get('lang') || prefs.get('lang', 'auto');
+const i18n = makeI18n({ doc: document, lang: pickLang(langPref(), navigator.languages || [navigator.language]) }).start();
+window.__i18n = i18n;
 // block and report (web/block.js): this phone's random tag, sent with a room's create / join / rejoin, and who it has blocked
 const myTag = phoneTag(prefs); const blocked = new Blocked(prefs);
 // a new phone (nothing of the game kept on it): its first Play opens the lesson and it starts against Adaeze (web/lesson.js);
@@ -1519,6 +1524,7 @@ function paintSettings() {
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('music', musicOn()); $('#musicNow').textContent = musicNote({ on: musicOn(), sound: soundOn(), call: callLive() }) ? ` · ${musicNote({ on: musicOn(), sound: soundOn(), call: callLive() })}` : ''; sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : ''; paintRemind(); paintBlocked();
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})` + (lastGameWords(parseFrames(prefs.get('frames.last', ''))) ? ' · ' + lastGameWords(parseFrames(prefs.get('frames.last', ''))) : '');
+  set('lang', prefs.get('lang', 'auto')); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
   const two = $('.choose[data-mode="local"]'); two.setAttribute('aria-pressed', settings.mode === 'local'); two.textContent = settings.mode === 'local' ? 'Chosen' : 'Choose';
@@ -1662,6 +1668,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
         if (LOOKS[v] && !lookOpen(v, owned(), GOLD_PREVIEW)) { toast(lookLockedWords(LOOKS[v].name, inApp()), 3200); click(0.7, 0.05); return; }
         prefs.set('seeds', v); applySeedSet(); paintSettings(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
+      else if (name === 'lang') { prefs.set('lang', v); params.delete('lang'); i18n.set(pickLang(v, navigator.languages || [navigator.language])); }
       else if (name === 'remindAt') { prefs.set('remindAt', v); paintRemind(); remindSync(); }
       else if (name === 'starts') { prefs.set('starts.pref', v); toast(v === 'loser' ? 'From the next game: the loser goes first' : v === 'you' ? 'From the next game: you always start' : 'From the next game: they always start'); }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto') || prefs.get('quality.measured', '') === 'slow') { prefs.set('quality', v); prefs.set('quality.measured', ''); /* a choice in Settings starts the speed judgement afresh */ save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
@@ -1908,9 +1915,9 @@ const mouse = { x: 0, y: 0, in: false, pit: null, words: null, base: null, at: 0
 function pitUnder(x, y) { ptr.set((x / canvas.clientWidth) * 2 - 1, -(y / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera); const h = ray.intersectObjects(board.targets)[0]; return h ? h.object.userData.pit : null; }
 function hoverWords(w) {
   const el = $('#hint');
-  if (mouse.words && el.textContent === mouse.words) el.textContent = mouse.base; // put back what the line said before
+  if (mouse.words && i18n.src(el) === mouse.words) el.textContent = mouse.base; // put back what the line said before
   mouse.words = null; if (!w) return;
-  mouse.base = el.textContent; mouse.words = w; el.textContent = w;
+  mouse.base = i18n.src(el); mouse.words = w; el.textContent = w;
 }
 function paintHover() {
   if (!mouse.in || body.classList.contains('screen') || clipping) { if (mouse.pit !== null || mouse.words) { mouse.pit = null; hoverWords(null); } canvas.style.cursor = ''; mouse.ring = 0; return; }
@@ -1943,9 +1950,9 @@ function holdStart(e) {
 function holdStop() { if (holding.timer) { clearTimeout(holding.timer); holding.timer = null; } }
 function countSay(w) { // the hint line says the count, and goes back to what it said once the number has gone (unless the game moved it on)
   const el = $('#hint');
-  if (counting.words && el.textContent === counting.words) el.textContent = counting.base;
+  if (counting.words && i18n.src(el) === counting.words) el.textContent = counting.base;
   counting.words = null; if (!w) return;
-  counting.base = el.textContent; counting.words = w; el.textContent = w;
+  counting.base = i18n.src(el); counting.words = w; el.textContent = w;
 }
 async function countPit(pit) {
   const run = ++counting.run; if (mouse.words) hoverWords(null);
