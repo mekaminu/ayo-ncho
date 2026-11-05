@@ -1,5 +1,5 @@
 // Builds the web files the store apps carry (app/www), from web/ and engine/ as they are:
-//   - three.js from node_modules (pinned 0.170.0) instead of cdnjs, and the two fonts (Fraunces, Inter; Open Font Licence)
+//   - three.js from node_modules (pinned 0.170.0) instead of cdnjs (a fixed import map in place of the page's written one), and the two fonts (Fraunces, Inter; Open Font Licence)
 //     from @fontsource instead of Google Fonts, so the app opens and looks right with no signal;
 //   - no service worker (the app already has every file);
 //   - nothing else changes: web/app.js notices it is inside the app and points rooms at the live server.
@@ -19,8 +19,12 @@ export const FONTS = [
 // index.html for the app, from the web one: every outside address swapped for a file inside the app.
 export function appHtml(html) {
   let out = html;
-  const swap = (from, to, what) => { if (!out.includes(from)) throw new Error(`index.html: ${what} not found`); out = out.split(from).join(to); };
-  swap(THREE_CDN, './vendor/three.module.min.js', 'three.js from cdnjs');
+  if (!out.includes(THREE_CDN)) throw new Error('index.html: three.js from cdnjs not found');
+  // the web page writes its import map (cdnjs, or the game's server when cdnjs can't be reached); the app's is fixed: the copy inside it
+  const map = out.match(/<script>\/\* the import map:[\s\S]*?<\/script>\n?/);
+  if (!map || !map[0].includes(THREE_CDN)) throw new Error('index.html: the import map for three.js not found');
+  out = out.replace(map[0], '<script type="importmap">{"imports":{"three":"./vendor/three.module.min.js"}}</script>\n');
+  if (out.includes(THREE_CDN)) throw new Error('index.html: three.js from cdnjs named outside the import map'); // never ship it
   out = out.replace(/<link rel="preconnect" href="https:\/\/fonts\.googleapis\.com">\n?/, '');
   const fonts = out.match(/<link href="https:\/\/fonts\.googleapis\.com\/css2[^"]*" rel="stylesheet">/);
   if (!fonts) throw new Error('index.html: Google Fonts link not found');

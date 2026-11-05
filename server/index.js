@@ -17,6 +17,8 @@
 // /privacy, /terms and /support are the pages the stores ask for (server/legal.js).
 // GET /version says which build of the game this server carries (a hash of web/ and engine/), and the page is served with the
 // same hash in its <meta name="ayo-build">, so a page left open can tell a newer game is out (web/fresh.js).
+// GET /vendor/three.module.min.js is the 3D library (three 0.170.0 from node_modules, the same file cdnjs serves): the page loads it
+// from cdnjs, and from here on a phone that could not reach cdnjs (the start-up watch in web/index.html decides, on the phone).
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
 import express from "express";
 import http from "node:http";
@@ -44,12 +46,16 @@ export function buildId(dirs = [WEB, ENGINE]) {
 // index.html with the build written in (read once: the files never change under a running server)
 export function pageWithBuild(html, build) { return html.replace('<meta name="ayo-build" content="dev">', `<meta name="ayo-build" content="${build}">`); }
 
+export const THREE_FILE = path.join(__dirname, "..", "node_modules", "three", "build", "three.module.min.js");
+
 export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000, env = process.env } = {}) {
   const app = express();
   mountLegal(app, env);
   const build = buildId(), page = pageWithBuild(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), build);
   app.get("/version", (_req, res) => { res.set("Cache-Control", "no-store"); res.json({ v: build }); });
+  const haveLocal = fs.existsSync(THREE_FILE);
   app.get(["/", "/index.html"], (_req, res) => { res.set("Cache-Control", "no-cache"); res.type("html").send(page); });
+  app.get("/vendor/three.module.min.js", (_req, res) => { if (!haveLocal) return res.status(404).end(); res.set("Access-Control-Allow-Origin", "*"); res.sendFile(THREE_FILE, { maxAge: "7d" }); });
   app.use("/engine", express.static(ENGINE));
   app.use(express.static(WEB));
   app.get("/healthz", (_req, res) => res.json({ ok: true, rooms: rooms.size }));

@@ -22,7 +22,7 @@ test("the shim is kept for offline play", () => {
 
 test("the start-up watch stands down once the board draws, and speaks plainly otherwise", () => {
   assert.match(game, /window\.__ayoUp = true/);
-  assert.match(html, /setTimeout\(show,12000\)/);
+  assert.match(html, /if\(t>=1500\)waiting\(\);if\(\(t>=12000&&hard/); // the board on its way after 1.5 s; the plain screen 12 s after an error, or after a minute
   assert.match(html, /The board couldn\\u2019t start/);
   assert.match(html, /Software Update/);
   assert.match(html, /For Meka: /); // what went wrong, on screen, so a screenshot says it

@@ -48,6 +48,10 @@
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
 #                  <out>-friend.png the friend's view (the far seat, pits nearest them) with the host's shout by his face. --wide for the host on a Mac
+#        --cdn: the board on a slow or patchy line (the real server): on a slow line (throttled) "The board is on its way" shows over the empty
+#                  board after 1.5 s (picture <out>) and goes once the board draws; with cdnjs unreachable the page starts again once with
+#                  three.js from the game's own server (/vendor/three.module.min.js), the board draws, the phone remembers it for 3 days and the
+#                  next visit goes straight there; with both unreachable the plain screen says so after 12 s (picture <out>-fail.png)
 #        --telemetry: game numbers and crash reports (L13) — with no sink nothing is recorded; with ?telemetry=test (a sink kept in memory)
 #        a move sends game_start once, the store sends store_open, the Settings → Privacy switch off sends nothing, on again sends;
 #        the words carry nothing typed (the name, the room code); a picture of the Privacy row (out-settings.png)
@@ -169,7 +173,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -178,7 +182,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8766), functools.partial(Quiet, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 node = None
-if online or legal or freshc:  # the real server on its own port, so two pages can meet at one board
+if online or legal or freshc or cdnc:  # the real server on its own port, so two pages can meet at one board
     def start_node():  # with a fixed ROOM_SECRET, so a restart mid-game can be checked (the rooms come back from the boards' tickets)
         n = subprocess.Popen(["node", os.path.join(root, "server", "index.js")], env={**os.environ, "PORT": "8767", "ROOM_SECRET": "render-check-secret"}, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         for _ in range(100):
@@ -197,6 +201,55 @@ def watch(pg, errors, tag=""):
 def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it on this page
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+if cdnc:  # the board on a slow or patchy line: the line while it loads, three.js from the game's own server when cdnjs can't be reached
+    BASE = "http://127.0.0.1:8767/"
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        seed = "localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done');"
+        # 1. a slow line: the CDN answers (from the local copy), everything from the server crawls in
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "cdn slow: ")
+        pg.add_init_script(seed)
+        cdp = ctx.new_cdp_session(pg); cdp.send("Network.enable"); cdp.send("Network.emulateNetworkConditions", {"offline": False, "latency": 300, "downloadThroughput": 60 * 1024, "uploadThroughput": 20 * 1024})
+        pg.goto(BASE, wait_until="commit"); pg.wait_for_selector("#bootWait.on", timeout=15000)
+        words = pg.evaluate("document.querySelector('#bootWait').textContent"); assert "The board is on its way" in words, words
+        assert pg.evaluate("document.querySelector('#bootWait').getAttribute('role')") == "status"
+        assert not pg.evaluate("window.__ayoUp"), "the line shows while the board is still on its way"
+        pg.wait_for_timeout(700); pg.screenshot(path=out, timeout=120000)
+        print("cdn: on a slow line after %.1f s: %s" % (pg.evaluate("performance.now()/1000"), words))
+        pg.wait_for_function("window.__done===true", timeout=120000); pg.wait_for_function("!document.querySelector('#bootWait')", timeout=5000)
+        assert not pg.query_selector("#bootFail"), "no failure on a slow line"
+        print("cdn: the board drew after %.1f s and the line went" % pg.evaluate("performance.now()/1000"))
+        ctx.close()
+        # 2. cdnjs unreachable: the page starts again with three.js from the server
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page(); loads = []; local = []
+        pg.on("pageerror", lambda e: errors.append("cdn local: " + str(e)) if len(loads) > 1 else None)
+        pg.on("load", lambda: loads.append(1)); pg.on("request", lambda r: local.append(r.url) if r.url.endswith("/vendor/three.module.min.js") else None)
+        pg.route("https://fonts.googleapis.com/**", lambda r: r.abort()); pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.abort())
+        pg.add_init_script(seed)
+        pg.goto(BASE, wait_until="commit"); pg.wait_for_function("window.__done===true", timeout=120000)
+        assert len(loads) >= 2 and local, ("it started again with the local copy", loads, local)
+        until = pg.evaluate("+localStorage.getItem('ayo.3dlocal')"); now = pg.evaluate("Date.now()")
+        assert 2.9 * 864e5 < until - now <= 3 * 864e5, ("remembered for 3 days", until - now)
+        assert pg.evaluate("window.__ayo3d") == "./vendor/three.module.min.js" and not pg.query_selector("#bootFail")
+        pg.wait_for_function("!document.querySelector('#bootWait')", timeout=5000)
+        print("cdn: cdnjs unreachable → started again with three.js from the server (%d loads), remembered for 3 days" % len(loads))
+        n = len(loads); pg.goto(BASE, wait_until="commit"); pg.wait_for_function("window.__done===true", timeout=120000)
+        assert len(loads) == n + 1, "the next visit goes straight to the server's copy"
+        print("cdn: the next visit loaded straight from the server")
+        ctx.close()
+        # 3. neither: the plain screen, saying which
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page()
+        pg.route("https://fonts.googleapis.com/**", lambda r: r.abort()); pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.abort()); pg.route("**/vendor/three.module.min.js", lambda r: r.abort())
+        pg.add_init_script(seed)
+        pg.goto(BASE, wait_until="commit"); pg.wait_for_selector("#bootFail", timeout=30000)
+        small = pg.evaluate("document.querySelector('#bootFail small').textContent")
+        assert "The board couldn" in pg.evaluate("document.querySelector('#bootFail').textContent") and "3D: own server" in small and "could not load game.js" in small, small
+        pg.screenshot(path=out[:-4] + "-fail.png", timeout=120000)
+        print("cdn: neither reachable → the plain screen:", small[:90])
+        ctx.close(); b.close()
+    if node: node.terminate()
+    if errors: print("page errors:", errors); sys.exit(1)
+    print("cdn ok"); sys.exit(0)
 if nextc:  # the next puzzle (idea 5 Nov): the result card counts down to midnight, turns at midnight, and Home's card turns with the day
     import datetime, zoneinfo
     with sync_playwright() as p:

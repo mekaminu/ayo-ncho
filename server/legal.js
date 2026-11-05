@@ -129,7 +129,7 @@ function privacy(c) {
 <h2>What our host and others see</h2>
 <ul>
 <li>The server runs on Render (render.com). Like any web host, Render handles your device's internet address and the time of each request to deliver the page and keep the service secure. We do not use these to identify or follow you.</li>
-<li>On the web, the game loads its 3D library (three.js) from cdnjs, run by Cloudflare, and its lettering from Google Fonts, so those services see your internet address when the page loads. The apps carry both inside them and do not.</li>
+<li>On the web, the game loads its 3D library (three.js) from cdnjs, run by Cloudflare (or, on a phone that cannot reach cdnjs, from the game’s own server), and its lettering from Google Fonts, so those services see your internet address when the page loads. The apps carry both inside them and do not.</li>
 <li>When you share a result or an invite, your phone's own share sheet or WhatsApp sends it; we do not see what you share or to whom.</li>
 </ul>
 

@@ -65,7 +65,7 @@ export function privacyFr(c, updated) {
 <h2>Ce que voient notre hébergeur et d’autres</h2>
 <ul>
 <li>Le serveur tourne chez Render (render.com). Comme tout hébergeur web, Render traite l’adresse internet de votre appareil et l’heure de chaque requête pour livrer la page et protéger le service. Nous ne nous en servons pas pour vous identifier ni vous suivre.</li>
-<li>Sur le web, le jeu charge sa bibliothèque 3D (three.js) depuis cdnjs, géré par Cloudflare, et ses polices depuis Google Fonts : ces services voient donc votre adresse internet quand la page se charge. Les applis embarquent les deux et ne le font pas.</li>
+<li>Sur le web, le jeu charge sa bibliothèque 3D (three.js) depuis cdnjs, géré par Cloudflare (ou, sur un téléphone qui ne peut pas joindre cdnjs, depuis le serveur du jeu), et ses polices depuis Google Fonts : ces services voient donc votre adresse internet quand la page se charge. Les applis embarquent les deux et ne le font pas.</li>
 <li>Quand vous partagez un résultat ou une invitation, c’est le menu de partage de votre téléphone ou WhatsApp qui l’envoie ; nous ne voyons ni ce que vous partagez ni avec qui.</li>
 </ul>
 
