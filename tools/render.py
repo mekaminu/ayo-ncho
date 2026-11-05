@@ -159,6 +159,9 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  every seed ends where the new game says. Then Home → Play on a set board deals nothing
 #        add --ponder (with --smoke) for weighing it up (web/ponder.js): plays a move, catches the faint light over one of their pits while the
 #                  computer thinks (<out>), and checks it went over their own pits as planned, then onto the pit they played, and went away
+#        add --lastmark (with --smoke) for which pit they played (web/lastmark.js): after their reply, once its ghost marks have faded, the
+#                  faint light still sits on the pit they played (<out>), the pit's label says "played last", it stays while you pick a pit
+#                  of yours, steps aside while their move is watched again, goes with your move and comes back on their next one
 #        --win: the win, on the board — a saved game one move from beating Mama Ngozi (tools/endgame.js finds it): Continue, the winning
 #                  move; before the Game over card rises the winning trough's seeds jump in a wave (<out> mid-wave), the lamp warms and the
 #                  score glints; then the card rises with the lamp back as it was. --wide for the Mac
@@ -166,7 +169,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1874,6 +1877,29 @@ with sync_playwright() as p:
                 assert k < len(route), ("the light went where the plan says, then to the pick", e)
             assert e["seen"] and e["seen"][0] == e["plan"][0], ("it starts on the first pit weighed", e)
             print("ponder:", lv, "weighed", e["plan"], "· played", e["pick"], "· light went", e["seen"])
+        if lastc:  # which pit they played: the faint light stays on it until your move
+            def lm(): return pg.evaluate("window.__ayo.lastMark")
+            def reply():
+                pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.turn === 0 && !window.__ayo.state.over && window.__ayo.explain", timeout=240000)
+                pg.wait_for_function("window.__ayo.marks.steps.length === 0", timeout=60000); pg.wait_for_timeout(300)  # the ghost of their path has faded
+            for rnd in range(2):
+                pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.turn === 0", timeout=240000); pg.wait_for_timeout(300)
+                mine = pg.evaluate("window.__ayo.legal"); tap(pg, mine[-1])
+                pg.wait_for_function("window.__ayo.lastMark.pit === -1", timeout=20000)  # your move takes it away
+                reply(); moves = pg.evaluate("window.__ayo.state.moves"); m = lm()
+                assert m["pit"] == moves[-1] and m["pit"] >= 6 and m["shown"], ("on the pit they played", m, moves[-1])
+                assert m["label"].endswith("played last"), m
+                if rnd == 0: pg.mouse.move(2, 2); pg.wait_for_timeout(400); pg.screenshot(path=out, timeout=120000)  # the mouse off the board, so its own ring is not in the picture
+            mine = pg.evaluate("window.__ayo.legal"); x, y = pg.evaluate("window.__ayo.pitAt(%d)" % mine[0]); pg.mouse.click(x, y); pg.wait_for_timeout(300)  # one tap: picked, not sown
+            assert pg.evaluate("window.__ayo.selected") == mine[0]
+            m = lm(); assert m["shown"], ("picking a pit of yours keeps it", m, pg.evaluate("[window.__ayo.selected, window.__ayo.busy, !!window.__ayo.explain, window.__ayo.state.turn, window.__ayo.state.over]"))
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
+            pg.wait_for_function("!window.__ayo.busy", timeout=60000); pre = pg.evaluate("[window.__ayo.busy, window.__ayo.replaying, !!window.__ayo.explain, document.body.className, window.__ayo.selected]")
+            pg.evaluate("() => { window.__ayo.replayLast(); }"); pg.wait_for_timeout(150); assert pg.evaluate("window.__ayo.replaying"), ("their move watched again", pre)
+            pg.wait_for_function("window.__ayo.lastMark.pit === -1 || !window.__ayo.replaying", timeout=20000); assert pg.evaluate("window.__ayo.replaying") and lm()["pit"] == -1, "watching their move again: the pit lights by itself"
+            pg.wait_for_function("!window.__ayo.replaying", timeout=120000); pg.wait_for_timeout(300)
+            pg.wait_for_function("window.__ayo.lastMark.shown", timeout=20000)  # back after the replay
+            print("lastmark:", lm())
         if wakec:  # keep the screen on: held during the game, let go when it is not wanted
             pg.wait_for_function("!window.__ayo.busy", timeout=240000); pg.wait_for_timeout(200)
             w = pg.evaluate("window.__ayo.wake"); assert w["supported"] and w["wanted"] and w["held"], ("the screen should be held while the game is in play", w)
@@ -1906,7 +1932,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc or ponderc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc or ponderc or lastc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))

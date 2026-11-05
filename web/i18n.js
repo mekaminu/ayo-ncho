@@ -335,6 +335,7 @@ export const FR = {
   'Enter to sow, or pick another': 'Entrée pour semer, ou choisissez-en un autre',
   'picked': 'choisi',
   'must feed the other side': 'doit nourrir l’autre côté',
+  'played last': 'joué en dernier',
   'empty': 'vide',
   'picks up again once': 'reprend une fois',
   'nothing to sow': 'rien à semer',
