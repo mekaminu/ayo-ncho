@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { newGame, applyMove, legalMoves, replay } from "../engine/ayo.js";
 import { chooseMove, masterSearch, counterReply, MASTER } from "../engine/ai.js";
-import { playGame } from "../tools/master-match.js";
+import { playGame, provenOf, tally } from "../tools/master-match.js";
 import { CHARACTERS, faceFor, line } from "../web/characters.js";
 import { parseOwned, owns, previewOf, levelOpen, playable, lockedWords, GOLD_LEVELS } from "../web/entitle.js";
 import { LEVELS } from "../web/record.js";
@@ -100,4 +100,13 @@ test("From a bad opening Master looks for a turn-round, but only so far: a trap 
   const r = masterSearch(s, { ...fixed, nodes: 60000, traps: 60000 });
   assert.ok(legalMoves(s).includes(r.pit));
   if (r.trap) assert.ok(r.trap > 0);
+});
+
+test("the match report says what each scripted opening leaves Master with best play, and tallies the games by it", () => {
+  // opening 4 (the first mover plays pit 4): Master opening it finds a forced loss, answering it a forced win; opening 0
+  // leaves its first mover ~7 seeds behind with best play (the games Master can only draw against a player who never errs)
+  assert.equal(provenOf(8, "ncho", 200000), "lost"); assert.equal(provenOf(9, "ncho", 200000), "won");
+  assert.equal(provenOf(1, "ncho", 200000), "ahead"); assert.equal(provenOf(0, "ncho", 200000), "behind");
+  const t = tally(["W", "D", "L", "W"], ["ahead", "behind", "lost", "ahead"]);
+  assert.deepEqual(t, { ahead: { games: 2, W: 2, D: 0, L: 0 }, behind: { games: 1, W: 0, D: 1, L: 0 }, lost: { games: 1, W: 0, D: 0, L: 1 } });
 });
