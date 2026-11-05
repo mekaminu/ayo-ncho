@@ -545,7 +545,22 @@ const SAYS = {
   'Three. I will have to think now.': 'Trois. Il va falloir que je réfléchisse.',
   'Five. They will write songs. Short ones.': 'Cinq. On écrira des chansons. Des courtes.',
   'Three. Patience, my child.': 'Trois. Patience, mon enfant.',
-  'Five. Sit with the board a while.': 'Cinq. Restez un moment avec le plateau.',
+  'Five. Sit with the board a while.': 'Cinq. Restez un moment avec le plateau.',  // waiting on you (web/waiting.js): what each of them says when you have been thinking a while
+  'Hurry up! My turn is getting cold.': 'Dépêche-toi ! Mon tour refroidit.',
+  'Are you asleep? Wake up!': 'Tu dors ? Réveille-toi !',
+  "I can wait. I can't wait. Play!": 'Je peux attendre. Non, je ne peux pas. Joue !',
+  'Take your time. Count it twice.': 'Prenez votre temps. Comptez deux fois.',
+  'I can see you counting. Good.': 'Je vous vois compter. C’est bien.',
+  'No rush. Wrong answers are quick.': 'Rien ne presse. Les mauvaises réponses viennent vite.',
+  'Cousin, today abeg.': 'Cousin, aujourd’hui, s’il te plaît.',
+  'Are you counting or praying?': 'Tu comptes ou tu pries ?',
+  'My suya is getting cold, o.': 'Mon suya refroidit, o.',
+  'I have sold yams faster than this.': 'J’ai vendu des ignames plus vite que ça.',
+  'Count. I will wait.': 'Comptez. J’attendrai.',
+  'The seeds are not going anywhere.': 'Les graines ne vont nulle part.',
+  'Think. The board will wait for you.': 'Réfléchissez. Le plateau vous attendra.',
+  'Good. The slow ones count further.': 'Bien. Les lents comptent plus loin.',
+  "I waited eleven years for Mama Ngozi's move. Go on.": 'J’ai attendu onze ans un coup de Mama Ngozi. Allez-y.',
 };
 // the runs of 10, 15, 20… (each opponent's `more(n)`): {n} is the run
 const SAYS_N = [

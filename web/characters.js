@@ -70,7 +70,7 @@ export function faceFor(level, mood = 'calm') {
 }
 
 // Which face goes with each moment the opponent speaks at.
-export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think' };
+export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think', waiting: 'calm' };
 
 export const CHARACTERS = {
   easy: {
@@ -85,6 +85,7 @@ export const CHARACTERS = {
       firstWin: ['You beat me?! OK. Again, again!'],
       last8: ['Last eight! Whoever catches next gets them ALL.', 'Ooh, the last ones. Mine, mine, mine.'],
       circling: ['Round and round! Somebody catch something!', 'Are we just going in circles?'],
+      waiting: ['Hurry up! My turn is getting cold.', 'Are you asleep? Wake up!', 'I can wait. I can\'t wait. Play!'],
     },
     // your record against them: what they say when you are on a run (yours: you keep winning; theirs: they do)
     runs: { yours: { 3: 'Three in a row? I\'m telling Mama.', 5: 'Five! Are you magic?', more: (n) => `${n} in a row. I give up. No I don't.` },
@@ -102,6 +103,7 @@ export const CHARACTERS = {
       firstWin: ['Well done! I knew you could. Now Nnamdi.'],
       last8: ['Eight left. Count them, every one.', 'The last eight. Concentrate, please.'],
       circling: ['We are going round in circles. Somebody take something.', 'Round and round. Think, class.'],
+      waiting: ['Take your time. Count it twice.', 'I can see you counting. Good.', 'No rush. Wrong answers are quick.'],
     },
     runs: { yours: { 3: 'Three in a row. You have been practising.', 5: 'Five! I am telling your mother — good news, this time.', more: (n) => `${n} in a row. Time I moved you up a class.` },
             theirs: { 3: 'Three for me. Count slower.', 5: 'Five. We will go over it again.', more: (n) => `${n}. Patience. Counting is a habit.` } },
@@ -118,6 +120,7 @@ export const CHARACTERS = {
       firstWin: ['Fine. That one counts. Barely.'],
       last8: ['Last eight, cousin. Next chop takes everything.', 'Small seeds left. Big stakes.'],
       circling: ['We are just going round, cousin. Somebody chop.', 'This one is a merry-go-round.'],
+      waiting: ['Cousin, today abeg.', 'Are you counting or praying?', 'My suya is getting cold, o.'],
     },
     runs: { yours: { 3: 'Three straight? Who have you been practising with?', 5: 'Five in a row. OK, I\'m actually trying now.', more: (n) => `${n} in a row. Cousin, leave something for me.` },
             theirs: { 3: 'Three–zero. Suya is on you.', 5: 'Five. I\'m not even looking at the board.', more: (n) => `${n} and counting. Buy a bigger board.` } },
@@ -134,6 +137,7 @@ export const CHARACTERS = {
       firstWin: ['So. You finally beat me. Once.'],
       last8: ['Eight left. Now we see who counts.', 'The last seeds. Sit up.'],
       circling: ['Round and round. Someone must count.', 'The seeds are walking in circles. So are you.'],
+      waiting: ['I have sold yams faster than this.', 'Count. I will wait.', 'The seeds are not going anywhere.'],
     },
     runs: { yours: { 3: 'Three in a row? Mama Ngozi is watching.', 5: 'Five. Now the market will talk.', more: (n) => `${n} in a row. The board is yours. For now.` },
             theirs: { 3: 'Three. Come back when the seeds listen to you.', 5: 'Five. Sit well; we are not finished.', more: (n) => `${n}. I am not counting. You are.` } },
@@ -150,6 +154,7 @@ export const CHARACTERS = {
       firstWin: ['Ah. You beat me. Mama Ngozi must never hear of it.'],
       last8: ['Eight seeds. Everything was for this.', 'The last eight. I have been waiting.'],
       circling: ['We walk in circles. One of us will tire first.', 'Round we go. I am not tired.'],
+      waiting: ['Think. The board will wait for you.', 'Good. The slow ones count further.', 'I waited eleven years for Mama Ngozi\'s move. Go on.'],
     },
     runs: { yours: { 3: 'Three. I will have to think now.', 5: 'Five. They will write songs. Short ones.', more: (n) => `${n} in a row. I am taking notes.` },
             theirs: { 3: 'Three. Patience, my child.', 5: 'Five. Sit with the board a while.', more: (n) => `${n}. The board is a slow teacher.` } },
