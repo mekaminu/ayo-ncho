@@ -1242,7 +1242,7 @@ $('#revDone').addEventListener('click', () => { click(1, 0.05); endReview(true);
 async function animate(events, prevStores, pace = PACE) {
   wakePoke(); // a turn on the board is something happening: a friend's move keeps the screen on as a tap does
   if (counting.pit !== null) endCount(); // a turn starting takes the count away: those seeds may be about to move
-  if (hurry.depth++ === 0) { hurry.on = false; hurry.words = longTurn(events) && !clipping && !reduceMotion; hurry.base = $('#hint').textContent; if (hurry.words) $('#hint').textContent = hurryWords(hurry.base, { keys: keysLikely() }); }
+  if (hurry.depth++ === 0) { hurry.on = false; hurry.words = longTurn(events) && !clipping && !reduceMotion; hurry.base = i18n.src($('#hint')); if (hurry.words) $('#hint').textContent = hurryWords(hurry.base, { keys: keysLikely() }); }
   try { await sowEvents(events, prevStores, pace); } finally { if (hurry.depth === 1) hideHands(); if (--hurry.depth === 0) { if (hurry.words) $('#hint').textContent = hurry.base; hurry.on = false; hurry.words = false; } }
 }
 async function sowEvents(events, prevStores, pace) {

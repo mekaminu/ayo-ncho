@@ -133,8 +133,10 @@ test("the page turns into French, a line the game writes again is French too, an
   p.hint.textContent = "waiting"; p.tick();
   assert.equal(p.hint.textContent, "attend");
   assert.equal(i.src(p.hint), "waiting");
-  p.hint.textContent = "pit 3 · 5 seeds"; p.tick(); // not translated yet (a later slice): stays as written
-  assert.equal(p.hint.textContent, "pit 3 · 5 seeds"); assert.equal(i.src(p.hint), "pit 3 · 5 seeds");
+  p.hint.textContent = "pit 3 · 5 seeds"; p.tick(); // the board's words (slice 2)
+  assert.equal(p.hint.textContent, "trou 3 · 5 graines"); assert.equal(i.src(p.hint), "pit 3 · 5 seeds");
+  p.hint.textContent = "pit 3 · a line with no French yet"; p.tick(); // no French for a part: stays as written
+  assert.equal(p.hint.textContent, "pit 3 · a line with no French yet"); assert.equal(i.src(p.hint), "pit 3 · a line with no French yet");
   p.hint.firstChild.data = "thinking…"; p.tick();
   assert.equal(p.hint.textContent, "réfléchit…");
   p.btn.setAttribute("aria-label", "Settings"); p.tick();
@@ -166,7 +168,8 @@ test("a French word the game writes is never taken for English", () => {
 test("lines put together from parts are French only when every part is", () => {
   assert.equal(translate("mahogany · iroko · ebony · Benin bronze and Grandpa's board in the store", "fr"), "acajou · iroko · ébène · le bronze du Bénin et le plateau de grand-père dans la boutique");
   assert.equal(translate("Job's tears · river stones at 7 days played (2 so far) · cowries in the store", "fr"), "Larmes de Job · galets après 7 jours de jeu (2 pour l’instant) · les cauris dans la boutique");
-  assert.equal(translate("pit 3 · 5 seeds", "fr"), "pit 3 · 5 seeds", "never half French");
+  assert.equal(translate("pit 3 · 5 seeds · a part with no French", "fr"), "pit 3 · 5 seeds · a part with no French", "never half French");
+  assert.equal(translate("ends in their pit 3 — a part with no French", "fr"), "ends in their pit 3 — a part with no French", "never half French either side of a dash");
   assert.equal(translate("Nnamdi · waiting", "fr"), "Nnamdi · attend");
   assert.equal(FR["What do we call you?"], "Comment vous appelle-t-on ?", "a thin space keeps ? off the start of a line");
   assert.ok(Object.values(FR).every((v) => !/ [:;?!]/.test(v)));

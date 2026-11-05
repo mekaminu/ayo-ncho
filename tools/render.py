@@ -85,7 +85,7 @@
 #                  (<out>), a tap on cowries pours them in (<out>-seeds.png), a store button says it is bought in the app and the look stays
 #                  only a look; Use on iroko keeps it; Back puts the tried seeds back and keeps iroko; Settings → Board → Store opens it and
 #                  Back goes back to Settings; ?try=looks shows the looks as open for the visit. --wide for the Mac (<out> only)
-import sys, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
+import sys, re, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py): every page at this pixel density, the layout unchanged
     from playwright.sync_api import Browser as _B
@@ -346,6 +346,19 @@ if langc:  # French (L18, slice 1): a phone in French opens in French; Settings 
         pit = pg.evaluate("window.__ayo.legal")[0]; tap(pg, pit)
         pg.wait_for_function("window.__ayo.state.moves.length >= 1", timeout=60000); pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length >= 2", timeout=240000)
         assert pg.evaluate("document.querySelector('#turn').textContent") == "à vous"
+        # slice 2: the board's words as it plays — their move explained, then the first tap's path words, all in French
+        pg.mouse.move(2, 2); pg.wait_for_timeout(400)  # the mouse off the board: the hint line says the move, not the pit under it
+        lw = pg.evaluate("document.querySelector('#lastMove').hidden ? '' : document.querySelector('#lastWords').textContent")
+        assert not re.search(r"\b(picked|took|gave|ended|their|your|pit)\b", lw), ("their move, explained, in English", lw)
+        h = pg.evaluate("document.querySelector('#hint').textContent"); assert "touchez" in h or "cliquez" in h, ("the hint line", h)
+        pits = pg.evaluate("window.__ayo.legal"); best = max(pits, key=lambda q: pg.evaluate(f"window.__ayo.state.pits[{q}]"))
+        x, y = pg.evaluate("window.__ayo.pitAt(%d)" % best); pg.mouse.click(x, y); pg.mouse.move(2, 2); pg.wait_for_timeout(1400)  # one tap: the path, not the move
+        h = pg.evaluate("document.querySelector('#hint').textContent")
+        assert "pour semer" in h and not re.search(r"\b(ends|takes|gives|picks|their|your|pit|tap)\b", h), ("the path words in French", h)
+        assert pg.evaluate("window.__i18n.src(document.querySelector('#hint'))").endswith(" to sow")
+        print("  fr hint:", h, "| their move:", lw)
+        pg.screenshot(path=out[:-4] + "-board.png", animations="disabled")
+        pg.mouse.click(x, y); pg.wait_for_function("window.__ayo.state.moves.length >= 3", timeout=60000); pg.wait_for_function("!window.__ayo.busy", timeout=240000)
         ctx.close()
         ctx, pg = phone(390, 844, "en-GB")  # an English phone stays English
         pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
@@ -923,7 +936,7 @@ with sync_playwright() as p:
         pg.wait_for_function("window.__ayo.feed.selected === %d" % opos["only"], timeout=10000); pg.wait_for_timeout(900)
         F = pg.evaluate("window.__ayo.feed"); print("feed: only —", F["hint"])
         assert F["hint"].startswith("They have no seeds — only pit %d reaches them" % (opos["only"] + 1)) or F["hint"].startswith("only pit %d reaches them · " % (opos["only"] + 1)) or F["hint"].startswith("the only pit that leaves them seeds · "), F["hint"]
-        assert F["hint"].endswith("tap again to sow") or F["hint"].endswith("Enter to sow"), F["hint"]
+        assert F["hint"].endswith(" to sow") or F["hint"].endswith("Enter to sow"), F["hint"]
         assert pg.evaluate("window.__ayo.marks.steps.length") > 0, "its path should show"
         shot(out[:-4] + "-only.png")
         pg.keyboard.press("Escape"); pg.wait_for_timeout(400)

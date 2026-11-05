@@ -5,8 +5,11 @@
 // from FR; the lines built from parts (an opponent's name, a count) from PATTERNS, which translate their parts again.
 // Names stay as they are (Adaeze, Auntie Bisi, Nnamdi, Mama Ngozi, Papa Ike, Nchò, Ayo), and so does Gold, the upgrade's name.
 // Slice 1: the frame, every word written in index.html (Home, the board's buttons, Settings, the cards, the rules), the fixed
-// toasts, the status words and the lines on Home and Settings built from parts. The words the board builds as it plays
-// (the hint line, the path, the chips), the opponents' lines, the store, rooms and calls follow in later slices.
+// toasts, the status words and the lines on Home and Settings built from parts. Slice 2: the words the board builds as it
+// plays (the hint line, where the seeds go and what it leaves open, their move explained, her take, last 8, circling, feed
+// them, the count by touch, the mouse, undo, hurry, the lesson, the pits' labels for screen readers): each part of a line
+// joined by " · " or " — " is its own phrase or pattern, so the line is French only when every part is. The cards, the
+// opponents' lines, the store, rooms and calls follow in later slices.
 
 export const LANGS = ['auto', 'en', 'fr'];
 
@@ -310,6 +313,67 @@ export const FR = {
   'Play today and start your calm streak': 'Jouez aujourd\u2019hui pour commencer votre série tranquille',
   'today ✓': 'aujourd\u2019hui ✓',
   'every seed set unlocked': 'tous les jeux de graines ouverts',
+  // the board as it plays (slice 2): the status words, the hint line and the chips under the board
+  'game over': 'partie finie',
+  'passing the phone…': 'on passe le téléphone…',
+  'tap again to sow': 'touchez encore pour semer',
+  'tap again to sow, or pick another': 'touchez encore pour semer, ou choisissez-en un autre',
+  'tap a pit on your side': 'touchez un trou de votre côté',
+  'tap a pit on your side to sow': 'touchez un trou de votre côté pour semer',
+  'click a pit on your side, or press 1–6': 'cliquez sur un trou de votre côté, ou appuyez sur 1–6',
+  'Enter to sow': 'Entrée pour semer',
+  'Enter to sow, or pick another': 'Entrée pour semer, ou choisissez-en un autre',
+  'picked': 'choisi',
+  'must feed the other side': 'doit nourrir l’autre côté',
+  'empty': 'vide',
+  'picks up again once': 'reprend une fois',
+  'nothing to sow': 'rien à semer',
+  'ends the game level': 'finit la partie à égalité',
+  'wins the game': 'gagne la partie',
+  'ends the game': 'finit la partie',
+  'picked up again once': 'a repris une fois',
+  'picked up again twice': 'a repris deux fois',
+  'sowed nothing': 'n’a rien semé',
+  'the game ends level': 'la partie finit à égalité',
+  'you win': 'vous gagnez',
+  'they win': 'l’autre gagne',
+  'then they can win': 'puis l’autre peut gagner',
+  'keeps you in the game': 'vous gardait dans la partie',
+  'Her take': 'Son avis',
+  'the next capture takes them all': 'la prochaine prise les emporte toutes',
+  'each keeps their side': 'chacun garde son côté',
+  'move with no capture and it ends': 'coup sans prise et c’est fini',
+  'moves with no capture and it ends': 'coups sans prise et c’est fini',
+  'hurrying…': 'on accélère…',
+  'tap the board to hurry': 'touchez le plateau pour accélérer',
+  'click the board or press Space to hurry': 'cliquez sur le plateau ou appuyez sur Espace pour accélérer',
+  'They have no seeds': 'L’autre côté n’a plus de graines',
+  'they have no seeds': 'l’autre côté n’a plus de graines',
+  'you must give the other side seeds': 'vous devez donner des graines à l’autre côté',
+  'only move': 'seul coup possible',
+  'the only pit that leaves them seeds': 'le seul trou qui laisse des graines à l’autre côté',
+  'Taking back your move': 'On reprend votre coup',
+  'reaches every other pit': 'atteint tous les autres trous',
+  'goes right round the board, past its own pit': 'fait tout le tour du plateau, au-delà de son propre trou',
+  'click to see where they go': 'cliquez pour voir où elles vont',
+  'the loser goes first': 'le perdant joue en premier',
+  'after a draw, the other side goes first': 'après un match nul, l’autre côté commence',
+  'You start': 'Vous commencez',
+  'pass the phone after each move': 'passez le téléphone après chaque coup',
+  'A pale ring: those seeds go to their trough, not yours — a pit on their side that makes 4 before your last seed is theirs. Only your last seed takes a 4 over there.': 'Un anneau pâle : ces graines vont dans la réserve d’en face, pas dans la vôtre — un trou de son côté qui fait 4 avant votre dernière graine est à lui. Seule votre dernière graine prend un 4 là-bas.',
+  'A pale ring: those seeds go to their trough, not yours.': 'Un anneau pâle : ces graines vont dans la réserve d’en face, pas dans la vôtre.',
+  // the lesson
+  'A capture of 4': 'Une prise de 4',
+  'The lit pit is yours. Tap it: the hand picks up its seeds and drops one in each pit, anticlockwise — the brass marks show where.': 'Le trou éclairé est à vous. Touchez-le : la main prend ses graines et en dépose une dans chaque trou, dans le sens inverse des aiguilles d’une montre — les marques de laiton montrent où.',
+  'One seed in each pit. The turn ends where the last seed lands in an empty pit.': 'Une graine dans chaque trou. Le tour s’arrête là où la dernière graine tombe dans un trou vide.',
+  'Its last seed lands in their pit of 3 and makes it 4. Your last seed making a 4 on their side wins it. Tap the lit pit.': 'Sa dernière graine tombe dans un trou d’en face qui en a 3 et en fait 4. Votre dernière graine qui fait 4 de son côté le gagne. Touchez le trou éclairé.',
+  '+4 in your trough. Any pit that reaches 4 goes to the owner of that side — unless your last seed makes it, over there.': '+4 dans votre réserve. Tout trou qui arrive à 4 va au maître de ce côté — sauf si c’est votre dernière graine qui le fait, là-bas.',
+  'This time the last seed lands on seeds already there: the hand picks them all up and sows on. Tap the lit pit.': 'Cette fois la dernière graine tombe sur des graines déjà là : la main les prend toutes et continue de semer. Touchez le trou éclairé.',
+  'Picked up again and on into their side, until a seed landed in an empty pit. First to 25 seeds wins. That is Nchò.': 'Reprises, et en avant de son côté, jusqu’à ce qu’une graine tombe dans un trou vide. Le premier à 25 graines gagne. C’est ça, le Nchò.',
+  "You're ready": 'Vous êtes prêt',
+  'Skip the lesson': 'Passer la leçon',
+  'In the lesson, play the lit pit': 'Pendant la leçon, jouez le trou éclairé',
+  'Finish': 'Terminer',
 };
 // French sets a thin space before : ; ? ! so they never start a line
 for (const k in FR) FR[k] = FR[k].replace(/ ([:;?!])/g, '\u00a0$1');
@@ -346,7 +410,61 @@ export const PATTERNS = [
   [/^(\d+) days? played$/, (m) => `${m[1]} jour${m[1] === '1' ? '' : 's'} de jeu`],
   [/^(\d+) more days? for (.+)$/, (m) => `encore ${m[1]} jour${m[1] === '1' ? '' : 's'} pour ${look(m[2])}`],
   [/^New game — (.+)$/, (m) => `Nouvelle partie — ${translate(m[1], 'fr')}`],
+  // the board as it plays (slice 2); `need` translates a part and gives up on the whole line if that part has no French
+  [/^(your|their|Your|Their) pit (\d)(?: \(key (\d)\))?$/, (m) => pitFr(m)],
+  [/^pit (\d)$/, (m) => `trou ${m[1]}`],
+  [/^pits ([\d, ]+) (or|and) (\d)$/, (m) => `trous ${m[1]} ${m[2] === 'or' ? 'ou' : 'et'} ${m[3]}`],
+  [/^picks up again ×(\d+)$/, (m) => `reprend ×${m[1]}`],
+  [/^picked up again ×(\d+)$/, (m) => `a repris ×${m[1]}`],
+  [/^ends in (.+)$/, (m) => `finit dans ${need(m[1])}`],
+  [/^ended in (.+)$/, (m) => `a fini dans ${need(m[1])}`],
+  [/^takes (\d+)$/, (m) => `prend ${m[1]}`],
+  [/^gives (\d+)$/, (m) => `donne ${m[1]}`],
+  [/^took (\d+)$/, (m) => `a pris ${m[1]}`],
+  [/^gave (\d+)$/, (m) => `a donné ${m[1]}`],
+  [/^the last (\d+) go to (you|them)$/, (m) => (m[2] === 'you' ? `les ${m[1]} dernières vous reviennent` : `les ${m[1]} dernières reviennent à l’autre`)],
+  [/^the last (\d+) went to (you|them)$/, (m) => (m[2] === 'you' ? `les ${m[1]} dernières vous sont revenues` : `les ${m[1]} dernières sont revenues à l’autre`)],
+  [/^then they can take (\d+)$/, (m) => `puis l’autre peut prendre ${m[1]}`],
+  [/^([^·—:]+?) would play this one$/, (m) => `${m[1]} jouerait celui-ci`],
+  [/^([^·—:]+?) would play pit (\d)$/, (m) => `${m[1]} jouerait le trou ${m[2]}`],
+  [/^(.+) was the move$/, (m) => `le bon coup, c’était ${need(m[1])}`],
+  [/^(\d+) seeds? better$/, (m) => `${m[1]} graine${m[1] === '1' ? '' : 's'} de mieux`],
+  [/^(\d+) seeds? left$/, (m) => (m[1] === '1' ? 'il reste 1 graine' : `il reste ${m[1]} graines`)],
+  [/^no capture in (\d+) moves$/, (m) => `aucune prise en ${m[1]} coups`],
+  [/^each keeps their side: (.+)$/, (m) => `chacun garde son côté : ${need(m[1])}`],
+  [/^you'd (win|lose) (\d+)–(\d+)$/, (m) => `vous ${m[1] === 'win' ? 'gagneriez' : 'perdriez'} ${m[2]}–${m[3]}`],
+  [/^level (\d+)–(\d+)$/, (m) => `égalité ${m[1]}–${m[2]}`],
+  [/^([^·—:]+?) would (win|lose) (\d+)–(\d+)$/, (m) => `${who(m[1])} ${m[2] === 'win' ? 'gagnerait' : 'perdrait'} ${m[3]}–${m[4]}`],
+  [/^The seeds are circling — (\d+) moves with no capture and the game ends; each keeps the seeds on their side$/, (m) => `Les graines tournent en rond — ${m[1]} coups sans prise et la partie s’arrête ; chacun garde les graines de son côté`],
+  [/^only (pits? .+) (has seeds|reaches them)$/, (m) => `${m[1].startsWith('pits') ? 'seuls les' : 'seul le'} ${need(m[1])} ${m[1].startsWith('pits') ? (m[2] === 'has seeds' ? 'ont des graines' : 'atteignent l’autre côté') : (m[2] === 'has seeds' ? 'a des graines' : 'atteint l’autre côté')}`],
+  [/^you must feed them: (pits? .+)$/, (m) => `vous devez nourrir l’autre côté : ${need(m[1])}`],
+  [/^(pits? .+) would leave them nothing$/, (m) => `${cap(the(m[1]))} ne laisserai${m[1].startsWith('pits') ? 'en' : ''}t rien à l’autre côté`],
+  [/^play (pits? .+)$/, (m) => `jouez ${the(m[1])}`],
+  [/^(pit \d) doesn't reach them$/, (m) => `${cap(the(m[1]))} n’atteint pas l’autre côté`],
+  [/^they have no seeds: play (pits? .+)$/, (m) => `l’autre côté n’a plus de graines : jouez ${the(m[1])}`],
+  [/^((?:your |their )?pit \d) is empty$/, (m) => `${cap(the(m[1]))} est vide`],
+  [/^Taking back your move and ([^·—:]+?)'s reply$/, (m) => `On reprend votre coup et la réponse de ${who(m[1])}`],
+  [/^Taking back ([^·—:]+?)'s move$/, (m) => `On reprend le coup de ${who(m[1])}`],
+  [/^([^·—:]+?)'s move again, slowly$/, (m) => `Le coup de ${who(m[1])}, encore une fois, lentement`],
+  [/^([^·—:]+?)'s move, slowly$/, (m) => `Le coup de ${who(m[1])}, lentement`],
+  [/^([^·—:]+?)'s move: (.+)\. Watch it again, slowly$/, (m) => `Le coup de ${who(m[1])} : ${need(m[2])}. Le revoir, lentement`],
+  [/^([^·—:]+?)'s take: (.+)\. Play it through, slowly$/, (m) => `L’avis de ${who(m[1])} : ${need(m[2])}. Le jouer, lentement`],
+  [/^([^·—:]+?) starts$/, (m) => `${who(m[1])} commence`],
+  [/^Learn Nchò · (\d+) of (\d+)$/, (m) => `Apprendre le Nchò · ${m[1]} sur ${m[2]}`],
+  [/^([^·—:]+?) sows one of hers…$/, (m) => `${m[1]} sème un des siens…`],
+  [/^([^·—:]+?) plays you for real now\. Tap a pit once to see where its seeds go, twice to sow\.$/, (m) => `${m[1]} joue contre vous pour de vrai maintenant. Touchez un trou une fois pour voir où vont ses graines, deux fois pour semer.`],
 ];
+// a pit named from the seat looking at it: "your pit 3" → "votre trou 3", "their pit 3" → "le trou 3 d'en face"; the screen
+// readers' "Your pit 3 (key 3)" → "Votre trou 3 (touche 3)"
+function pitFr(m) {
+  const mine = m[1].toLowerCase() === 'your'; const s = mine ? `votre trou ${m[2]}` : `le trou ${m[2]} d’en face`;
+  return (m[1][0] === 'Y' || m[1][0] === 'T' ? cap(s) : s) + (m[3] ? ` (touche ${m[3]})` : '');
+}
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+const NO = Symbol('no French');
+// "pit 3" as the subject or object of a sentence: "le trou 3", "les trous 2 ou 5" ("your pit 3" is already "votre trou 3")
+const the = (s) => (/^pits? /.test(s) ? (s.startsWith('pits') ? 'les ' : 'le ') : '') + need(s);
+function need(s) { const r = sub(s); if (r === null) throw NO; return r; }
 
 // One string into the page's language. Whitespace around it is kept; inside, runs of it count as one space.
 export function translate(s, lang) {
@@ -355,15 +473,30 @@ export function translate(s, lang) {
   if (!core) return s;
   if (Object.prototype.hasOwnProperty.call(FR, core)) return m[1] + FR[core] + m[3];
   const one = whole(core); if (one !== null) return m[1] + one + m[3];
-  if (core.includes(' · ')) { // a line put together from parts: French only if every part is
-    const parts = core.split(' · '); const out = parts.map((p) => whole(p) ?? (KEEP.has(p) || !/\p{L}/u.test(p) ? p : null));
-    if (!out.includes(null)) return m[1] + out.join(' · ') + m[3];
+  const out = sub(core);
+  return out === null || out === core ? s : m[1] + out + m[3];
+}
+// A line put together from parts: the whole line first, then its parts split on " — ", then each of those on " · ". French
+// only if every part is (a name or a number stays as it is), so nothing is ever half French.
+function sub(core) {
+  const one = whole(core); if (one !== null) return one;
+  if (core.includes(' — ')) {
+    const out = core.split(' — ').map(sub);
+    if (!out.includes(null)) return out.join(' — ');
   }
-  return s;
+  if (core.includes(' · ')) {
+    const out = core.split(' · ').map((p) => whole(p) ?? (KEEP.has(p) || !/\p{L}/u.test(p) ? p : null));
+    if (!out.includes(null)) return out.join(' · ');
+  }
+  return KEEP.has(core) || !/\p{L}/u.test(core) ? core : null;
 }
 function whole(core) {
   if (Object.prototype.hasOwnProperty.call(FR, core)) return FR[core];
-  for (const [re, fn] of PATTERNS) { const r = re.exec(core); if (r) return fn(r).replace(/ ([:;?!])/g, '\u00a0$1'); }
+  for (const [re, fn] of PATTERNS) {
+    const r = re.exec(core); if (!r) continue;
+    let out; try { out = fn(r); } catch (e) { if (e === NO) continue; throw e; }
+    return out.replace(/ ([:;?!])/g, '\u00a0$1');
+  }
   return null;
 }
 
