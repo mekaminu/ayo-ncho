@@ -164,6 +164,12 @@ button{font-family:inherit}
 .pzOut{flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:10px 12px;font-size:14px;color:var(--brass);border-color:rgba(230,183,111,.55)} /* play it out (web/playout.js): the game carries on from the puzzle */
 .pzOut .face.s{width:24px;height:24px;border:1px solid rgba(230,183,111,.5);flex:none}
 .pzOut svg{flex:none}
+.pzNext{margin:-4px 0 0;text-align:center;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums} /* the next puzzle (web/nextday.js) */
+.pzNext.ready{color:var(--brass);cursor:pointer;border:1px solid rgba(230,183,111,.5);border-radius:999px;padding:8px 12px;margin:0;background:rgba(230,183,111,.1)}
+.pzNext.glint{animation:pzGlint .9s ease-out}
+@keyframes pzGlint{0%{box-shadow:0 0 0 0 rgba(230,183,111,.7);transform:scale(.96)}40%{transform:scale(1.03)}100%{box-shadow:0 0 0 14px rgba(230,183,111,0);transform:scale(1)}}
+.turned{animation:dayTurn .5s ease-out} /* the Home card's puzzle turning with the day */
+@keyframes dayTurn{0%{transform:scale(.97);box-shadow:0 0 0 0 rgba(230,183,111,.55)}50%{transform:scale(1.015)}100%{transform:scale(1);box-shadow:0 0 0 12px rgba(230,183,111,0)}}
 .pzShow{color:var(--brass);font-size:13px;padding:4px 8px 0;margin-top:-4px}
 .pzRemind{color:var(--brass);font-size:13px;padding:4px 8px 0;margin-top:-4px;display:flex;align-items:center;justify-content:center;gap:6px}
 .pzRemind.on{animation:pzRing .5s ease-out}
@@ -225,7 +231,7 @@ button{font-family:inherit}
 .wide #store::before{position:fixed;inset:0;background:linear-gradient(90deg,rgba(13,9,6,.96) 0%,rgba(13,9,6,.9) 34%,rgba(13,9,6,0) 58%)}
 .wide .storeHead{padding-top:calc(env(safe-area-inset-top,0px) + 26px)}
 .wide .storeBody{max-height:none;flex:1;padding-bottom:24px}
-@media (prefers-reduced-motion:reduce){.pzCard,.pzRow span,.pzRemind.on{animation:none}}
+@media (prefers-reduced-motion:reduce){.pzCard,.pzRow span,.pzRemind.on,.pzNext.glint,.turned{animation:none}}
 /* the first game's lesson, in the puzzle's frame */
 .lsCard{gap:12px}
 .lsWords{margin:0;font-size:15px;line-height:1.45}
@@ -602,6 +608,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
       <div class="pzScore"><div class="col"><span class="eyebrow" id="pzEyebrow">You captured</span><span class="pzBig"><span id="pzGot">8</span> <small>/ <span id="pzTarget">8</span></small></span></div><span class="pzBadge" id="pzBadge">Solved</span></div>
       <div class="pzRow" id="pzRow" aria-label="8 of 8 seeds">●●●●●●●●</div>
       <div class="mini two2"><div><span>Your best today</span><b id="pzBest">8 of 8</b></div><div><span>Days solved</span><b id="pzRun">none yet</b></div></div>
+      <p class="pzNext" id="pzNext" hidden aria-live="polite">Next puzzle in 5 h 12 min</p>
       <div class="two"><button class="btn" id="pzShare" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button><button class="btn ghost" id="pzAgain" type="button">Try again</button></div>
       <button class="btn ghost pzOut" id="pzOut" type="button" hidden><span class="face s" id="pzOutFace"></span><span id="pzOutWords">Play it out vs Nnamdi</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       <button class="btn quiet pzRemind" id="pzRemind" type="button" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span id="pzRemindWords">Remind me each day at 19:00</span></button>

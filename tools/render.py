@@ -169,7 +169,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -197,6 +197,47 @@ def watch(pg, errors, tag=""):
 def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it on this page
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+if nextc:  # the next puzzle (idea 5 Nov): the result card counts down to midnight, turns at midnight, and Home's card turns with the day
+    import datetime, zoneinfo
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2, timezone_id="Europe/London"); pg = ctx.new_page(); watch(pg, errors, "nextday: ")
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.speed', 'fast'); }")
+        pg.clock.install(time=datetime.datetime(2026, 11, 5, 23, 40, 0, tzinfo=zoneinfo.ZoneInfo("Europe/London")))
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&puzzle=1", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pz = pg.evaluate("window.__ayo.puzzle"); assert pz["key"] == "2026-11-05", pz["key"]
+        tap(pg, pz["answer"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+        nx = lambda: pg.evaluate("document.querySelector('#pzNext').textContent")
+        pg.wait_for_function("!document.querySelector('#pzNext').hidden", timeout=5000)
+        assert re.match(r"^Next puzzle in (\d+ min|under a minute)$", nx()), nx()
+        box = pg.evaluate("document.querySelector('#pzCard').getBoundingClientRect().toJSON()"); assert box["top"] > 0 and box["bottom"] <= pg.viewport_size["height"], ("the card still fits the screen", box)
+        first = nx(); pg.clock.fast_forward(61000); pg.wait_for_timeout(300); assert nx() != first, ("it ticks on the minute", first, nx())
+        print("nextday: solved before midnight · %s → %s" % (first, nx()))
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.clock.fast_forward("25:00"); pg.wait_for_function("document.querySelector('#pzNext').classList.contains('ready')", timeout=10000)
+        assert nx() == "Tomorrow's puzzle is here · tap to play it", nx()
+        assert pg.evaluate("document.querySelector('#pzNext').classList.contains('glint') && document.querySelector('#pzNext').getAttribute('role') === 'button'")
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-ready.png", timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        print("nextday: at midnight the line turned:", nx())
+        pg.click("#pzNext"); pg.wait_for_function("document.querySelector('#pzCard').hidden", timeout=5000)
+        pz2 = pg.evaluate("window.__ayo.puzzle"); assert pz2["key"] == "2026-11-06" and not pz2["played"], pz2["key"]
+        assert pg.evaluate("document.querySelector('#pzDay').textContent") == "Daily puzzle · Fri 6 Nov", pg.evaluate("document.querySelector('#pzDay').textContent")
+        print("nextday: a tap set up the new day's position (%s, capture %d)" % (pz2["key"], pz2["target"]))
+        tap(pg, pz2["answer"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+        assert re.match(r"^Next puzzle in 23 h \d+ min$", nx()), nx()
+        pg.click("#pzHome"); pg.wait_for_selector("#home:not([hidden])", timeout=10000)
+        day = lambda: pg.evaluate("document.querySelector('#puzzleDay').textContent")
+        assert day() == "Daily puzzle · Fri 6 Nov" and pg.evaluate("document.querySelector('#puzzleState').textContent") == "solved ✓", day()
+        pg.clock.fast_forward("24:00:00"); pg.wait_for_function("document.querySelector('#puzzleDay').textContent === 'Daily puzzle · Sat 7 Nov'", timeout=10000)
+        assert pg.evaluate("document.querySelector('#puzzleState').textContent") == "not yet played" and pg.evaluate("document.querySelector('#puzzleCard').classList.contains('turned')")
+        print("nextday: Home's card turned with the day:", day())
+        pg.evaluate("localStorage.setItem('ayo.lang', 'fr')"); pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&puzzle=1&lang=fr", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pz3 = pg.evaluate("window.__ayo.puzzle"); tap(pg, pz3["answer"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000); pg.wait_for_timeout(400)
+        assert re.match(r"^Prochaine énigme dans (\d+ h( \d+ min)?|\d+ min|moins d’une minute)$", nx()), nx()
+        print("nextday: in French:", nx())
+        ctx.close(); b.close()
+    if errors: print("page errors:", errors); sys.exit(1)
+    print("nextday ok"); sys.exit(0)
 if playoutc:  # play it out (idea 5 Nov): after your move in the daily puzzle, the game carries on from there against the opponent chosen on Home
     SAVED = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", "import { newGame, applyMove, legalMoves } from './engine/ayo.js'; let s = newGame('ncho'); for (let k = 0; k < 6; k++) s = applyMove(s, legalMoves(s)[0]).state; console.log(JSON.stringify({ moves: s.moves, variant: 'ncho', rules: s.rules, level: 'medium', stats: { biggest: 0, captures: 0, started: 1 }, local: false }))"], cwd=root).decode())
     with sync_playwright() as p:

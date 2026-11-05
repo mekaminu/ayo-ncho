@@ -53,6 +53,7 @@ import { STEPS as LESSON, DONE as LESSON_DONE, startState as lessonStart, eyebro
 import { phoneTag, Blocked, mayBlock, sortKnocks, blockWords, ARM_MS as BLOCK_MS, REPORT_PAGE, REPORT_HASH } from './block.js';
 import { makeWaiting, WAIT_MOOD, drumPit, shiverAt, DRUM_MS, DRUM_GAP_MS, DRUMS } from './waiting.js';
 import { lastMarkPit, lastMarkOp, withLast } from './lastmark.js';
+import { nextLine, nextTick, dayTurned } from './nextday.js';
 import { ponderOn, ponderPlan, ponderAt, GLANCE_MS, SETTLE_MS as PONDER_SETTLE_MS, GLIDE as PONDER_GLIDE } from './ponder.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
@@ -1364,8 +1365,9 @@ async function play(pit) {
 let daily = parseDaily(prefs.get('daily', null));
 const puzzle = { on: false, p: null, played: false, got: 0, mine: false };
 function todaysPuzzle() { const v = settings.game; if (!puzzle.p || puzzle.p.key !== todayKey() || puzzle.p.variant !== v) puzzle.p = dailyPuzzle(todayKey(), v); return puzzle.p; }
+let puzzleCardKey = null; // the day the Home card was painted for: at midnight it paints itself afresh (web/nextday.js)
 function paintPuzzleCard() { // the Home card: today's ask and where you stand
-  const p = todaysPuzzle(); const e = dailyEntry(daily, p.key, p.variant);
+  const p = todaysPuzzle(); const e = dailyEntry(daily, p.key, p.variant); puzzleCardKey = p.key;
   $('#puzzleDay').textContent = `Daily puzzle · ${dayLabel(p.key)}`; $('#puzzleAsk').textContent = `Capture ${p.target} in one turn`;
   $('#puzzleState').textContent = cardLine(e); $('#puzzleCard').classList.toggle('solved', !!(e && e.solved));
 }
@@ -1394,7 +1396,7 @@ function paintPuzzleResult(got, e, firstSolve) {
   $('#pzAgain').textContent = hit ? 'Play it again' : 'Try again';
   $('#pzShow').hidden = !canShow(e); // after two misses Mama Ngozi offers to show the move
   paintPlayOut();
-  paintRemindOffer();
+  paintRemindOffer(); paintNext();
   $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
   if (hit) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); buzz([20, 40, 20]); if (firstSolve) { const run = solvedRun(daily, p.key); if (run > 1) setTimeout(() => toast(`${run} days in a row`), 900); } }
   else { click(0.7, 0.08); }
@@ -1443,9 +1445,31 @@ async function puzzleShow() { // Show me: the position comes back, the answer pi
   const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', `the move captures ${r.got}`);
   for (let i = 0; i < Math.min(r.got, 16); i++) { const s = document.createElement('span'); s.textContent = '●'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
   $('#pzBest').textContent = `${shown.got} of ${p.target}`; $('#pzRun').textContent = runLine(solvedRun(daily, p.key));
-  $('#pzAgain').textContent = 'Now you'; $('#pzShow').hidden = true; $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
+  $('#pzAgain').textContent = 'Now you'; $('#pzShow').hidden = true; paintNext(); $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
   toast(`${CHARACTERS.hard.name} showed you — now play it yourself`); click(1.2, 0.06);
 }
+// The next puzzle (web/nextday.js): a line on the result card saying how long until the new day's position, ticking on the
+// minute; at midnight with the card up it turns brass, glints, and a tap sets up the new day. The Home card turns with the day.
+function paintNext(turnNow = false) {
+  const el = $('#pzNext'); const p = puzzle.p; if (!p || lesson.on) { el.hidden = true; return; }
+  const n = nextLine(dailyEntry(daily, p.key, p.variant), p.key); const was = el.classList.contains('ready');
+  el.hidden = false; el.textContent = n.text; el.classList.toggle('ready', n.ready);
+  if (n.ready) { el.setAttribute('role', 'button'); el.tabIndex = 0; } else { el.removeAttribute('role'); el.removeAttribute('tabindex'); }
+  if (n.ready && !was && turnNow) { el.classList.remove('glint'); void el.offsetWidth; el.classList.add('glint'); click(1.6, 0.08); setTimeout(() => click(2.1, 0.08), 140); buzz(15); }
+}
+function nextPuzzleNow() { // the tap on "Tomorrow's puzzle is here": today's position, a fresh go
+  if (busy || !puzzle.on || !$('#pzNext').classList.contains('ready')) return; openPuzzle(); click(1.3, 0.08);
+}
+$('#pzNext').addEventListener('click', nextPuzzleNow);
+$('#pzNext').addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); ev.stopPropagation(); nextPuzzleNow(); } });
+let dayTimer = 0;
+function dayTick() { // once a minute, and on coming back to the page: the card's line, and Home's card at midnight
+  clearTimeout(dayTimer); dayTimer = setTimeout(dayTick, nextTick(Date.now()));
+  if (document.hidden) return;
+  if (puzzle.on && !$('#pzCard').hidden) paintNext(true);
+  if (!$('#home').hidden && dayTurned(puzzleCardKey)) { paintPuzzleCard(); const c = $('#puzzleCard'); c.classList.remove('turned'); void c.offsetWidth; c.classList.add('turned'); }
+}
+setTimeout(dayTick, 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) dayTick(); });
 function puzzleAgain() { if (busy) return; const p = puzzle.p; puzzle.played = false; puzzle.mine = false; puzzle.got = 0; state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); click(1.2, 0.05); }
 function closePuzzle() { // Back to home: the board goes back to your game (or a fresh one)
   if (busy) return; puzzle.on = false; puzzle.played = false; $('#pzCard').hidden = true;

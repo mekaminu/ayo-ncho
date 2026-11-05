@@ -336,6 +336,8 @@ export const FR = {
   'picked': 'choisi',
   'must feed the other side': 'doit nourrir l’autre côté',
   'played last': 'joué en dernier',
+  "Tomorrow's puzzle is here · tap to play it": 'La nouvelle énigme est là · touchez pour y jouer',
+  "Under a minute left to solve today's": 'Moins d’une minute pour résoudre celle du jour',
   'empty': 'vide',
   'picks up again once': 'reprend une fois',
   'nothing to sow': 'rien à semer',
@@ -597,7 +599,11 @@ const at = (g) => (g === 'Ayo' ? 'à l’Ayo' : 'au Nchò');
 const who = (s) => FR[s] || s; // a name stays a name; "Player 2" becomes "Joueur 2"
 const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
+const spanFr = (w) => w === 'under a minute' ? 'moins d’une minute' : w; // "5 h 12 min" reads the same in French
 export const PATTERNS = [
+  // the next puzzle (web/nextday.js): "5 h 12 min", "42 min", "under a minute" keep their numbers
+  [/^Next puzzle in (\d+ h(?: \d+ min)?|\d+ min|under a minute)$/, (m) => `Prochaine énigme dans ${spanFr(m[1])}`],
+  [/^(\d+ h(?: \d+ min)?|\d+ min) left to solve today's$/, (m) => `Encore ${spanFr(m[1])} pour résoudre celle du jour`],
   [/^Play it out vs (.+)$/, (m) => `Jouer la suite contre ${who(m[1])}`], // play it out from the daily puzzle (web/playout.js)
   [/^Playing it out from today's puzzle — (.+)'s move$/, (m) => `La partie continue depuis l’énigme du jour — à ${who(m[1])} de jouer`],
   [/^Ayo & Nchò — played out from today's puzzle, I (beat|drew with|lost to) (.+?) (\d+)–(\d+)\.$/, (m) => `Ayo & Nchò — en jouant la suite de l’énigme du jour, ${{ beat: 'j’ai battu', 'drew with': 'j’ai fait match nul avec', 'lost to': 'j’ai perdu contre' }[m[1]]} ${who(m[2])} ${m[3]}–${m[4]}.`],
