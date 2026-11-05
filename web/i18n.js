@@ -85,6 +85,7 @@ export const FR = {
   'Store': 'Boutique',
   'Store · boards, seed sets and Gold': 'Boutique · plateaux, graines et Gold',
   'Daily puzzle': 'Énigme du jour',
+  "from today's puzzle": 'depuis l’énigme du jour',
   'Capture 8 in one turn': 'Prenez 8 en un tour',
   'not yet played': 'pas encore jouée',
   'Which game': 'Quel jeu',
@@ -579,6 +580,9 @@ const who = (s) => FR[s] || s; // a name stays a name; "Player 2" becomes "Joueu
 const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
 export const PATTERNS = [
+  [/^Play it out vs (.+)$/, (m) => `Jouer la suite contre ${who(m[1])}`], // play it out from the daily puzzle (web/playout.js)
+  [/^Playing it out from today's puzzle — (.+)'s move$/, (m) => `La partie continue depuis l’énigme du jour — à ${who(m[1])} de jouer`],
+  [/^Ayo & Nchò — played out from today's puzzle, I (beat|drew with|lost to) (.+?) (\d+)–(\d+)\.$/, (m) => `Ayo & Nchò — en jouant la suite de l’énigme du jour, ${{ beat: 'j’ai battu', 'drew with': 'j’ai fait match nul avec', 'lost to': 'j’ai perdu contre' }[m[1]]} ${who(m[2])} ${m[3]}–${m[4]}.`],
   ...ROOMS.slice(0, -1), // slice 5: playing a friend, the store, the reminder (before the store lines below, which would catch "… in the store")
   [/^vs (.+?) · (Easy|Steady|Medium|Hard|Master)(?: · (.+) starts)?$/, (m) => `contre ${m[1]} · ${lv(m[2])}` + (m[3] ? ` · ${who(m[3])} commence` : '')],
   [/^(.+?) · (Easy|Steady|Medium|Hard|Master)$/, (m) => `${need(m[1])} · ${lv(m[2])}`],
