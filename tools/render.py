@@ -1,5 +1,8 @@
 # Render the game with headless Chromium (software WebGL) and optionally play a move.
 # Usage: python3 tools/render.py out.png            -> still frame (mid-game position, pit 4 lit)
+#        add --sideways to check a phone held on its side (844x390, touch): the board lies across the screen, your row nearest you,
+#                  each pit where a tap lands on it, bigger than the upright board on the same screen (?sideways=0); a real move and the
+#                  reply played sideways (<out>); turned upright (390x844) and onto the Mac (1180x820) it stands up as before, and back
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
 #        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
@@ -86,7 +89,7 @@
 #                  (<out>), a tap on cowries pours them in (<out>-seeds.png), a store button says it is bought in the app and the look stays
 #                  only a look; Use on iroko keeps it; Back puts the tried seeds back and keeps iroko; Settings → Board → Store opens it and
 #                  Back goes back to Settings; ?try=looks shows the looks as open for the visit. --wide for the Mac (<out> only)
-import sys, re, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
+import sys, re, math, base64, http.server, threading, functools, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py): every page at this pixel density, the layout unchanged
     from playwright.sync_api import Browser as _B
@@ -155,7 +158,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -183,6 +186,45 @@ def watch(pg, errors, tag=""):
 def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it on this page
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+if sidec:  # a phone held sideways (idea 5 Nov): the board lies across a short, wide screen
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        def opened(q=""):
+            ctx = b.new_context(viewport={"width": 844, "height": 390}, device_scale_factor=2, has_touch=True); pg = ctx.new_page(); watch(pg, errors, "sideways%s: " % q)
+            pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")
+            pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home" + q, wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+            pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(900)
+            return ctx, pg
+        pits = lambda pg: [pg.evaluate("window.__ayo.pitAt(%d)" % i) for i in range(12)]
+        span = lambda P: ((P[5][0] - P[0][0]) ** 2 + (P[5][1] - P[0][1]) ** 2) ** 0.5
+        c0, up = opened("&sideways=0"); assert up.evaluate("window.__ayo.side") == 0; upright = span(pits(up)); c0.close()
+        ctx, pg = opened()
+        assert abs(pg.evaluate("window.__ayo.side") - math.pi / 2) < 1e-9, "a phone on its side should see the board from its long side"
+        assert pg.evaluate("document.documentElement.classList.contains('sideways')")
+        P = pits(pg); lying = span(P)
+        mine, theirs = P[:6], P[6:]
+        assert all(abs(y - mine[0][1]) < 8 for x, y in mine) and all(abs(y - theirs[0][1]) < 8 for x, y in theirs), ("each row should lie level across the screen", P)
+        assert mine[0][1] > theirs[0][1] + 30, ("your row should be the nearer (lower) one", P)
+        assert lying >= upright * 1.3, ("the board should come out bigger lying across the screen", lying, upright)
+        bar = pg.evaluate("document.querySelector('.bar').getBoundingClientRect().toJSON()"); hud = pg.evaluate("document.querySelector('.hud.bottom').getBoundingClientRect().toJSON()")
+        for i, (x, y) in enumerate(P):
+            assert 0 < x < bar["left"] and 0 < y < 390 and x > hud["right"], ("pit %d is off the board's room" % i, x, y, bar, hud)
+            assert pg.evaluate("window.__ayo.hitTest(%f, %f)" % (x, y))[:1] == [i], ("a tap on pit %d should land on it" % i)
+        print("sideways: rows level, yours nearest, pits %.0f px end to end lying vs %.0f upright (x%.2f), every tap lands" % (lying, upright, lying / upright))
+        legal = pg.evaluate("window.__ayo.legal"); pit = legal[len(legal) // 2]; x, y = P[pit]
+        pg.touchscreen.tap(x, y); pg.wait_for_timeout(300); assert pg.evaluate("window.__ayo.selected") == pit, "the first tap should pick the pit"
+        pg.touchscreen.tap(x, y)
+        pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy", timeout=240000); pg.wait_for_timeout(900)
+        pg.screenshot(path=out, timeout=120000); print("sideways: played pit %d and Nnamdi replied" % pit)
+        pg.set_viewport_size({"width": 390, "height": 844}); pg.wait_for_timeout(600)
+        assert pg.evaluate("window.__ayo.side") == 0 and not pg.evaluate("document.documentElement.classList.contains('sideways')"), "upright again, the board should stand up"
+        Q = pits(pg); assert abs(Q[0][0] - Q[5][0]) < 30 and Q[0][1] > Q[5][1] + 100, ("upright, your row runs up the screen", Q)
+        pg.set_viewport_size({"width": 1180, "height": 820}); pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.side") == 0, "the Mac keeps the upright board"
+        pg.set_viewport_size({"width": 844, "height": 390}); pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.side") > 1, "on its side again"
+        print("sideways: upright and on the Mac it stands up as before, and lies down again")
+        ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
 if looksc:  # the store's seed sets (L10): close renders of each, then the lock in Settings and the swap in place
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []
