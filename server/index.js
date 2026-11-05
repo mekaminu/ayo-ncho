@@ -15,6 +15,8 @@
 // moves as its ticket (ticketOf in rooms.js) and sends it with a rejoin. A room the server has forgotten is rebuilt from it
 // (see rooms.js); the secret is ROOM_SECRET.
 // /privacy, /terms and /support are the pages the stores ask for (server/legal.js).
+// GET /version says which build of the game this server carries (a hash of web/ and engine/), and the page is served with the
+// same hash in its <meta name="ayo-build">, so a page left open can tell a newer game is out (web/fresh.js).
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
 import express from "express";
 import http from "node:http";
@@ -23,14 +25,33 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage, backMessage } from "./rooms.js";
 import { mountLegal } from "./legal.js";
+import { createHash } from "node:crypto";
+import fs from "node:fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const WEB = path.join(__dirname, "..", "web"), ENGINE = path.join(__dirname, "..", "engine");
+
+// The build: the first 12 hex characters of a SHA-256 over every file in web/ and engine/ (names and contents, in order),
+// so it changes exactly when what a phone would load changes.
+export function buildId(dirs = [WEB, ENGINE]) {
+  const h = createHash("sha256");
+  for (const d of dirs) for (const f of fs.readdirSync(d).sort()) {
+    const p = path.join(d, f); if (!fs.statSync(p).isFile()) continue;
+    h.update(path.basename(d) + "/" + f + "\0"); h.update(fs.readFileSync(p)); h.update("\0");
+  }
+  return h.digest("hex").slice(0, 12);
+}
+// index.html with the build written in (read once: the files never change under a running server)
+export function pageWithBuild(html, build) { return html.replace('<meta name="ayo-build" content="dev">', `<meta name="ayo-build" content="${build}">`); }
 
 export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000, env = process.env } = {}) {
   const app = express();
   mountLegal(app, env);
-  app.use("/engine", express.static(path.join(__dirname, "..", "engine")));
-  app.use(express.static(path.join(__dirname, "..", "web")));
+  const build = buildId(), page = pageWithBuild(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), build);
+  app.get("/version", (_req, res) => { res.set("Cache-Control", "no-store"); res.json({ v: build }); });
+  app.get(["/", "/index.html"], (_req, res) => { res.set("Cache-Control", "no-cache"); res.type("html").send(page); });
+  app.use("/engine", express.static(ENGINE));
+  app.use(express.static(WEB));
   app.get("/healthz", (_req, res) => res.json({ ok: true, rooms: rooms.size }));
   app.get("/api/rooms/:code", (req, res) => {
     const code = normaliseCode(req.params.code);
@@ -128,7 +149,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   timer.unref();
 
   const close = () => new Promise((res) => { clearInterval(timer); for (const ws of wss.clients) ws.terminate(); wss.close(() => server.close(() => res())); });
-  return { app, server, wss, rooms, close };
+  return { app, server, wss, rooms, close, build };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

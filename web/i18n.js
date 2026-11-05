@@ -210,6 +210,7 @@ export const FR = {
   "Mama Ngozi's take": 'L’avis de Mama Ngozi',
   'after your move against the computer, if a clearly better pit was there she says which one under the board; tap it to see that move play through': 'après votre coup contre l’ordinateur, si un trou nettement meilleur existait, elle dit lequel sous le plateau ; touchez pour voir ce coup se jouer',
   'Keep the screen on': 'Garder l’écran allumé',
+  'A newer version is ready · tap to update': 'Une nouvelle version est prête · touchez pour mettre à jour',
   'while a game is in play the phone never goes dark; it may sleep after 3 minutes with nobody touching it (10 while a friend thinks)': 'pendant une partie le téléphone ne s’éteint pas ; il peut se mettre en veille après 3 minutes sans qu’on le touche (10 quand un ami réfléchit)',
   'Daily puzzle reminder': 'Rappel de l’énigme du jour',
   'the phone tells you once a day when a new puzzle is waiting, and never on a day you have played it': 'le téléphone vous prévient une fois par jour qu’une nouvelle énigme attend, jamais un jour où vous l’avez jouée',

@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0d0906">
+<meta name="ayo-build" content="dev">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Ayo &amp; Nchò</title>
@@ -332,6 +333,9 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 #gameover .rating small{flex-basis:100%;font-size:11px;color:var(--muted)}
 .streak.rating{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--fg);opacity:.85}
 .streak.rating[hidden]{display:none}
+.streak.fresh{display:flex;align-items:center;justify-content:center;gap:6px;margin:2px auto 0;padding:6px 12px;border:1px solid rgba(200,147,47,.45);border-radius:999px;background:rgba(200,147,47,.10);color:#f1d79a;font:inherit;font-size:11.5px;cursor:pointer;animation:pop .35s ease-out}
+.streak.fresh[hidden]{display:none}
+.streak.fresh .rv{width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6d58e,#c8932f 60%,#8a5a1c)}
 .streak.rating .rv{width:8px;height:8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f6d58e,#c8932f 60%,#8a5a1c)}
 @media (prefers-reduced-motion:reduce){.record{animation:none}}
 /* Mama Ngozi's review (Gold): a line on the Game over card, then a panel under the board stepping through the moves she would change */
@@ -494,7 +498,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 .wide .puzzleTop{right:auto;width:min(38vw,360px);left:max(24px,env(safe-area-inset-left,0px));top:calc(env(safe-area-inset-top,0px) + 34px)}
 .wide .puzzleBottom{right:auto;width:min(40vw,380px);left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 28px)}
 .wide.puzzle #hint{top:calc(env(safe-area-inset-top,0px) + 24px)}
-@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#last8.new,#circling.new,#circling em.bump,.nowCard.pop{animation:none}}
+@media (prefers-reduced-motion:reduce){.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#last8.new,#circling.new,#circling em.bump,.nowCard.pop,.streak.fresh{animation:none}}
 </style>
 </head>
 <body class="screen">
@@ -553,6 +557,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
     </div>
     <p class="streak rating" id="ratingLine" hidden><span class="rv" aria-hidden="true"></span><span id="ratingText"></span></p>
     <p class="streak" id="streakLine" aria-live="polite"></p>
+    <button class="streak fresh" id="freshLine" type="button" hidden><span class="rv" aria-hidden="true"></span><span id="freshWords">A newer version is ready · tap to update</span></button>
   </div>
 </section>
 
