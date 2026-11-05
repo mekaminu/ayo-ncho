@@ -157,6 +157,8 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #        --deal: setting up the board — as --win, then Play again on the Game over card: the seeds in both troughs are dealt back
 #                  four to each pit (<out> mid-deal), the counts tick, Mama Ngozi's opening waits for the board to be set, and
 #                  every seed ends where the new game says. Then Home → Play on a set board deals nothing
+#        add --ponder (with --smoke) for weighing it up (web/ponder.js): plays a move, catches the faint light over one of their pits while the
+#                  computer thinks (<out>), and checks it went over their own pits as planned, then onto the pit they played, and went away
 #        --win: the win, on the board — a saved game one move from beating Mama Ngozi (tools/endgame.js finds it): Continue, the winning
 #                  move; before the Game over card rises the winning trough's seeds jump in a wave (<out> mid-wave), the lamp warms and the
 #                  score glints; then the card rises with the lamp back as it was. --wide for the Mac
@@ -164,7 +166,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1853,6 +1855,25 @@ with sync_playwright() as p:
             assert not pg.evaluate("window.__ayo.waitSkip(60000)"), "once a move"
             pg.wait_for_timeout(500); assert pg.evaluate("window.__ayo.state.turn") == 0 and not pg.evaluate("window.__ayo.busy"), "nothing played"
             print("waiting:", lv, "says", json.dumps(said), "· pit", w["last"]["pit"], "shivered")
+        if ponderc:  # weighing it up: while the computer thinks, a faint light drifts over a pit or two of its own, then onto the pit it plays
+            pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.turn === 0 && !window.__ayo.state.over", timeout=240000); pg.wait_for_timeout(300)
+            lv = pg.evaluate("window.__ayo.level"); want = json.loads(subprocess.check_output(["node", "-e", "import('./web/ponder.js').then(m=>console.log(JSON.stringify(m.GLANCES)))"], cwd=root).decode())
+            n0 = len(pg.evaluate("window.__ayo.ponder")["log"])
+            mine = pg.evaluate("window.__ayo.legal"); tap(pg, mine[0])
+            pg.wait_for_function("window.__ayo.ponder.lit", timeout=240000, polling=20)
+            pg.screenshot(path=out, timeout=120000)
+            pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.turn === 0 || window.__ayo.state.over", timeout=240000); pg.wait_for_timeout(600)
+            pd = pg.evaluate("window.__ayo.ponder"); e = pd["log"][-1]; moves = pg.evaluate("window.__ayo.state.moves")
+            assert len(pd["log"]) == n0 + 1 and not pd["on"] and not pd["lit"], ("one hover for their reply, gone after", pd)
+            assert 1 <= len(e["plan"]) <= want.get(lv, 2), ("as many pits as they weigh", lv, e)
+            assert all(p >= 6 for p in e["plan"]) and len(set(e["plan"])) == len(e["plan"]), ("their own pits, each once", e)
+            assert e["pick"] == moves[e["moves"]], ("it settles on the pit it played", e, moves)
+            route = e["plan"] + [e["pick"]]; k = 0  # the frames drawn here are slow, so a pit may be passed between two of them: the light's pits come in the plan's order
+            for s_ in e["seen"]:
+                while k < len(route) and route[k] != s_: k += 1
+                assert k < len(route), ("the light went where the plan says, then to the pick", e)
+            assert e["seen"] and e["seen"][0] == e["plan"][0], ("it starts on the first pit weighed", e)
+            print("ponder:", lv, "weighed", e["plan"], "· played", e["pick"], "· light went", e["seen"])
         if wakec:  # keep the screen on: held during the game, let go when it is not wanted
             pg.wait_for_function("!window.__ayo.busy", timeout=240000); pg.wait_for_timeout(200)
             w = pg.evaluate("window.__ayo.wake"); assert w["supported"] and w["wanted"] and w["held"], ("the screen should be held while the game is in play", w)
@@ -1885,7 +1906,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc or ponderc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))
