@@ -126,6 +126,9 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #        add --music (with --smoke) to check the music (L17): off on a new phone, Settings → Feel → Music on starts it (bars on the
 #                  clock, the audio running), the speaker on the board silences it and says so under the switch, it keeps playing on
 #                  Home, and off takes every note off the clock
+#        add --rest (with --smoke) to check the board rests when nothing moves (web/rest.js): waiting for your move it draws only the
+#                  once-a-second heartbeat; a first tap on a pit (the path marks land, the end glow breathes) draws every frame, Esc rests
+#                  again; Home's slow turn draws every frame; ?rest=0 draws every frame as before
 #        add --wake (with --smoke) to check keeping the screen on: a stand-in for the browser's wake lock records each request; during the
 #                  game the screen is held, 3 minutes with nobody touching it lets it go, a key takes it back, Home lets it go, Play takes it
 #                  again, and Settings → Feel → Keep the screen on off lets it go
@@ -151,7 +154,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1615,6 +1618,32 @@ with sync_playwright() as p:
             m = pg.evaluate("window.__ayo.music"); assert not m["playing"] and m["pending"] == 0 and pg.evaluate("localStorage.getItem('ayo.music')") == "0", ("off: nothing left", m)
             pg.click("#settingsBack"); pg.wait_for_timeout(200)
             print("music:", m)
+        if restc:  # rest the board when nothing moves: count the frames drawn while waiting, with a pit picked, and on Home
+            pg.wait_for_function("!window.__ayo.busy", timeout=240000); pg.wait_for_function("window.__ayo.tweens === 0 && !window.__ayo.marks.steps.length", timeout=60000); pg.wait_for_timeout(800)  # their move's faint marks fade by themselves first
+            def drawn_over(ms):
+                a = pg.evaluate("window.__ayo.rest"); pg.wait_for_timeout(ms); b = pg.evaluate("window.__ayo.rest")
+                return b["drawn"] - a["drawn"], b["rested"] - a["rested"], b
+            d, r, st = drawn_over(3000)
+            assert st["on"] and st["resting"] and d <= 5 and r >= 10, ("waiting for your move: only the heartbeat should draw", d, r, st)
+            print("rest: waiting 3 s — drawn", d, "rested", r)
+            pit = pg.evaluate("window.__ayo.legal[0]"); xy = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
+            pg.mouse.click(xy[0], xy[1]); pg.wait_for_timeout(800)
+            assert pg.evaluate("window.__ayo.selected") == pit, "the first tap picks the pit"
+            d2, r2, st = drawn_over(3000)
+            assert d2 >= 3 and r2 == 0 and not st["resting"], ("a picked pit's glow breathes: drawn every frame", d2, r2, st)
+            print("rest: a pit picked 3 s — drawn", d2, "rested", r2)
+            pg.screenshot(path=out.replace(".png", "-rest-picked.png"), timeout=120000)
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(1200)
+            d3, r3, st = drawn_over(2000)
+            assert st["resting"] and d3 <= 4, ("put back: rests again", d3, r3, st)
+            pg.screenshot(path=out.replace(".png", "-rest.png"), timeout=120000)
+            print("rest: put back 2 s — drawn", d3, "rested", r3)
+            pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])"); pg.wait_for_timeout(500)
+            d4, r4, st = drawn_over(3000)
+            assert d4 >= 3 and r4 == 0 and not st["resting"], ("Home turns the board slowly: drawn every frame", d4, r4, st)
+            print("rest: Home 3 s — drawn", d4, "rested", r4)
+            pg.click("#continueBtn" if not pg.evaluate("document.querySelector('#continueBtn').disabled") else "#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden", timeout=20000)
+            pg.wait_for_function("window.__ayo.rest.resting", timeout=20000)  # back at the board: once the camera has come round, it rests
         if wakec:  # keep the screen on: held during the game, let go when it is not wanted
             pg.wait_for_function("!window.__ayo.busy", timeout=240000); pg.wait_for_timeout(200)
             w = pg.evaluate("window.__ayo.wake"); assert w["supported"] and w["wanted"] and w["held"], ("the screen should be held while the game is in play", w)
