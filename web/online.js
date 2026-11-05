@@ -77,7 +77,7 @@ export function inviteLink(code, base = typeof location !== 'undefined' ? locati
 export function cleanCode(s) { return String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); }
 // The invite, in the host's own voice, for WhatsApp and the share sheet.
 export function inviteText(code) { return `Come and play Ayo & Nchò with me — open the link, say your name and knock, and I'll let you in. Room ${String(code || '').toUpperCase()}.`; }
-export function whatsappLink(code, link) { return 'https://wa.me/?text=' + encodeURIComponent(inviteText(code) + '\n' + link); }
+export function whatsappLink(code, link, t = (s) => s) { return 'https://wa.me/?text=' + encodeURIComponent(t(inviteText(code)) + '\n' + link); }
 
 // What the player sees for a refusal, in plain words.
 export const ERROR_TEXT = {

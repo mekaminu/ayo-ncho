@@ -39,6 +39,7 @@
 #                  Undo takes your move back and leaves hers; then two of us after Player 1 won: Player 2 starts and the board faces them.
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
+#        --frrooms (French, L18 slice 5: two French phones meet in a room — the Rooms screen, the name card, the door, a shout, the take-back card and the call card all French, the WhatsApp invite French; pictures <out>, <out>-door.png, <out>-back.png, <out>-call.png)
 #        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, a weak line going voice only on both phones and Video again bringing the pictures back (picture <out>-weak.png), mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
@@ -130,7 +131,7 @@ if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py):
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; story = story or reviewc; record = record or story
+out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -493,6 +494,67 @@ if legal:  # privacy, terms and support: Settings links to the server's pages, w
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)
+if frrooms:  # French (L18, slice 5): two French phones meet in a room — the Rooms screen, the name card, the door, joining, a shout across the board, the take-back ask and the call's card, all in French; the invite on WhatsApp in French (« tu »)
+    import atexit; atexit.register(lambda: node.terminate())
+    ENG = re.compile(r"(?<![^\W\d_])(room|door|friend|waiting|knock|knocked|wants|play|move|your|they|them|the|and|tap|let|again|asks?|video|voice|seat|link|share|send)(?![^\W\d_])", re.I)
+    def no_english(pg, sel, what):
+        t = pg.evaluate(f"[...document.querySelectorAll({sel!r})].filter(e=>!e.closest('[hidden]')).map(e=>e.innerText).join(' | ')")
+        bad = ENG.search(re.sub(r"Meka|Tete|Ayo|Nchò|WhatsApp|Oya", "", t, flags=re.I)); assert not bad, (what, bad.group(0), t); return t.replace("\xa0", " ").lower()
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        def phone(name):
+            ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, locale="fr-FR", permissions=["camera", "microphone"]); pg = ctx.new_page(); watch(pg, errors, name + ": ")
+            pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done')")
+            pg.goto("http://127.0.0.1:8767/?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+            assert pg.evaluate("document.documentElement.lang") == "fr"; return pg
+        host = phone("host")
+        host.click("#friendsBtn"); host.wait_for_selector("#nameCard:not([hidden])", timeout=10000)
+        no_english(host, "#nameCard", "the name card"); host.fill("#nameField", "Meka"); host.click("#nameGo")
+        host.wait_for_function("document.querySelector('#roomStatus').dataset.state==='open'", timeout=20000); code = host.evaluate("window.__ayo.room.code")
+        rooms = no_english(host, "#rooms", "the Rooms screen"); print("rooms:", rooms.replace("\n", " ")[:300])
+        assert "votre salle" in rooms and "on attend un ami" in rooms and "votre nom : meka" in rooms, rooms
+        wa = host.evaluate("decodeURIComponent(document.querySelector('#waBtn').href)"); assert "Viens jouer à Ayo & Nchò avec moi" in wa and ("Salle " + code) in wa, wa
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=out, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        friend = phone("friend")
+        friend.click("#friendsBtn"); friend.wait_for_selector("#nameCard:not([hidden])", timeout=10000); friend.fill("#nameField", "Tete"); friend.click("#nameGo")
+        friend.wait_for_function("document.querySelector('#roomStatus').dataset.state==='open'", timeout=20000)
+        friend.fill("#codeField", "zzzz"); friend.click("#joinBtn"); friend.wait_for_function("document.querySelector('#joinNote').classList.contains('bad')", timeout=10000)
+        note = friend.evaluate("document.querySelector('#joinNote').textContent"); assert note.startswith("Aucune salle avec ce code"), note
+        friend.fill("#codeField", code.lower()); friend.click("#joinBtn")
+        friend.wait_for_function("window.__ayo.room && window.__ayo.room.knock && window.__ayo.room.knock.id", timeout=20000)
+        friend.wait_for_function("document.querySelector('#hint').textContent.startsWith('Vous avez frappé')", timeout=10000)
+        assert friend.evaluate("document.querySelector('#turn').textContent") == "à la porte"
+        host.wait_for_selector("#knockCard:not([hidden])", timeout=20000)
+        door = no_english(host, "#knockCard", "the door"); assert "tete veut jouer" in door, door
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(200); host.screenshot(path=out[:-4] + "-door.png", animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        host.click("#knockYes")
+        for pg in (host, friend): pg.wait_for_function("window.__ayo.room && window.__ayo.room.friend && window.__ayo.room.friend.name", timeout=20000)
+        host.wait_for_function("document.querySelector('#turn').textContent==='à vous'", timeout=20000)
+        # a shout: shown in French on the other phone, the row itself in French
+        host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
+        row = no_english(host, "#shoutMenu", "the shout row"); assert "oya, à toi" in row and "abandonner cette partie" in row, row
+        host.click("#shoutMenu .pill[data-id=well]")
+        friend.wait_for_function("document.body.innerText.includes('Bien joué')", timeout=10000)
+        # take it back: the host plays, asks, the friend's card is French
+        tap(host, 2); host.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===1", timeout=240000)
+        host.wait_for_function("!document.querySelector('#undo').disabled", timeout=20000)
+        assert host.evaluate("document.querySelector('#undo').getAttribute('aria-label')") == "Demander à reprendre votre coup"
+        host.click("#undo"); host.wait_for_function("document.querySelector('#hint').textContent.startsWith('Vous avez demandé à Tete')", timeout=10000)
+        friend.wait_for_selector("#backCard:not([hidden])", timeout=20000)
+        back = no_english(friend, "#backCard", "the take-back card"); assert "meka demande à reprendre son coup" in back, back
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out[:-4] + "-back.png", animations="disabled"); friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        friend.click("#backNo"); host.wait_for_function("document.body.innerText.includes('Tete dit qu’on continue')", timeout=20000)
+        # the call: the camera menu and the card on the friend's phone
+        host.click("#callBtn"); host.wait_for_selector("#callMenu:not([hidden])", timeout=5000)
+        menu = no_english(host, "#callMenu", "the call menu"); assert ("vidéo avec tete" in menu or "voix avec tete" in menu) and "bloquer tete" in menu, menu
+        vid = "vidéo avec tete" in menu; host.click("#callMenu .pill[data-id=%s]" % ("video" if vid else "voice"))  # the lighter board (headless) offers voice only
+        friend.wait_for_selector("#callCard:not([hidden])", timeout=20000)
+        card = no_english(friend, "#callCard", "the call card"); assert ("meka aimerait la vidéo au plateau" if vid else "meka aimerait parler au plateau") in card, card
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out[:-4] + "-call.png", animations="disabled")
+        b.close()
+    node.terminate()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("frrooms: ok · wrote", out); sys.exit(0)
 if online:
     import atexit; atexit.register(lambda: node.terminate())  # the server never outlives a failed check (whichever one is running)
     with sync_playwright() as p:

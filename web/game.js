@@ -461,7 +461,7 @@ let online = false, roomWanted = null; // online while a room is open, knocked o
 let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
 // your move, even in another tab: what the friend does while this page is out of sight is said on the tab's title, icon and the app's badge
 let awayIcon = null; const awayIconLoad = () => { if (awayIcon === null) { awayIcon = ''; fetch('./icon.svg').then((r) => r.text()).then((t) => { awayIcon = t; }).catch(() => {}); } };
-const away = makeAway({ doc: document, nav: navigator, icon: () => awayIcon, chime: () => { click(1.6, 0.07); setTimeout(() => click(2.1, 0.07), 150); } });
+const away = makeAway({ doc: document, nav: navigator, t: (w) => i18n.t(w), icon: () => awayIcon, chime: () => { click(1.6, 0.07); setTimeout(() => click(2.1, 0.07), 150); } });
 const awayNote = (kind, d = {}) => { if (online) away.note(kind, { name: friend ? friend.name : undefined, ...d }); };
 const awayBack = () => { if (!isAwayNow()) away.back(); };
 const isAwayNow = () => document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus());
@@ -484,7 +484,7 @@ addEventListener('unhandledrejection', (e) => tele.crash('rejection', e.reason))
 // the daily-puzzle reminder (L14, web/remind.js): a local notification from the phone itself, at most once a day, only if switched
 // on and only in the apps (?remind=test stands a fake plugin in for the visit); the permission is asked when it is first turned on
 const remindFake = new URLSearchParams(location.search).get('remind') === 'test' ? testNotifications({ answer: new URLSearchParams(location.search).get('remindAnswer') || 'granted' }) : null;
-const reminders = makeReminders(remindFake || plugin('LocalNotifications'));
+const reminders = makeReminders(remindFake || plugin('LocalNotifications'), { t: (w) => i18n.t(w) });
 const remindOn = () => prefs.get('remind', '0') === '1';
 const remindHour = () => hourOf(prefs.get('remindAt', ''));
 function remindSync(ask = false) {
@@ -545,7 +545,7 @@ function setRoomStatus(s, text) {
   rooms.state = s; const el = $('#roomStatus'); el.dataset.state = s; el.querySelector('span').textContent = text || STATUS_TEXT[s];
   const ready = (s === 'open' || s === 'door') && net && net.code;
   $('#waBtn').classList.toggle('off', !ready); $('#copyBtn').disabled = !ready; $('#shareLinkBtn').disabled = !ready;
-  if (ready) $('#waBtn').href = whatsappLink(net.code, inviteLink(net.code, publicBase())); else $('#waBtn').removeAttribute('href');
+  if (ready) $('#waBtn').href = whatsappLink(net.code, inviteLink(net.code, publicBase()), i18n.t); else $('#waBtn').removeAttribute('href');
 }
 function paintRoomStatus() { // what the room card says, from the connection and the door
   if (!roomsShowing()) return;
@@ -573,7 +573,7 @@ $('#joinCard').addEventListener('submit', (e) => { e.preventDefault(); const cod
 $('#copyBtn').addEventListener('click', async () => { if (!net || !net.code) return; tele.track('invite_sent', { how: 'copy' }); const link = inviteLink(net.code, publicBase()); try { await navigator.clipboard.writeText(link); toast('Link copied'); click(1.3, 0.06); } catch { toast(link); } });
 $('#shareLinkBtn').addEventListener('click', async () => {
   if (!net || !net.code) return; tele.track('invite_sent', { how: 'share' }); const link = inviteLink(net.code, publicBase());
-  try { if (navigator.share) await navigator.share({ title: 'Ayo & Nchò', text: inviteText(net.code), url: link }); else { await navigator.clipboard.writeText(link); toast('Link copied'); } } catch {}
+  try { if (navigator.share) await navigator.share({ title: 'Ayo & Nchò', text: i18n.t(inviteText(net.code)), url: link }); else { await navigator.clipboard.writeText(link); toast('Link copied'); } } catch {}
 });
 $('#waBtn').addEventListener('click', () => { click(1.3, 0.06); if (net && net.code) tele.track('invite_sent', { how: 'whatsapp' }); });
 $('#roomsName').addEventListener('click', () => askName("That's me").then(() => { if (net && !friend && net.seat !== null) { net.leave(); net = null; prefs.set('room', 'null'); openRoom(); toast('A new room, with your new name'); } }));
@@ -774,7 +774,7 @@ function callListen(stream) {
 }
 function showCallCard() {
   const lighter = callLite(); const n = callName();
-  $('#callTitle').textContent = callWords('asked', n, call.f.theirs); $('#callSub').textContent = callWords('askedSub', n) + (lighter ? ' The lighter board is on, so this phone sends voice only.' : '');
+  $('#callTitle').textContent = callWords('asked', n, call.f.theirs); $('#callSub').replaceChildren(callWords('askedSub', n), lighter ? ' The lighter board is on, so this phone sends voice only.' : ''); // two text nodes, so each is put into the page's language
   $('#callFace').innerHTML = initialFace(n); $('#callVideo').hidden = lighter; $('#callCard').hidden = false;
 }
 function paintCall() {
@@ -825,7 +825,7 @@ function fillCallPills(f, n) {
     callPill(f.mic ? 'Mute' : 'Unmute', () => { callDo(f.toggleMic()); if (call.talk) call.talk.setMic(f.mic); click(f.mic ? 1.3 : 0.8, 0.05); }, f.mic ? '' : 'off', f.mic ? 'Mute your microphone' : 'Turn your microphone back on').dataset.id = 'mic';
     if (f.weak) {
       if (f.better) callPill(callWords('videoAgain', n), () => { toggleCallMenu(false); callDo(f.videoAgain()); }, '', 'The line is better: turn the pictures back on').dataset.id = 'again';
-      const p = document.createElement('span'); p.className = 'note'; p.textContent = callWords('weakNote', n) + (f.better ? '' : ' Video again comes here once the line is better.'); callMenu.appendChild(p);
+      const p = document.createElement('span'); p.className = 'note'; p.replaceChildren(callWords('weakNote', n), f.better ? '' : ' Video again comes here once the line is better.'); callMenu.appendChild(p);
     } else if (f.mine === 'video') callPill(f.cam ? 'Camera off' : 'Camera on', () => { callDo(f.toggleCam()); if (call.talk) call.talk.setCam(f.cam); click(f.cam ? 1.3 : 0.8, 0.05); }, f.cam ? '' : 'off').dataset.id = 'cam';
     if (f.theirs === 'video' && !f.weak) callPill(f.hideTheirs ? `Show ${n}'s picture` : `Hide ${n}'s picture`, () => { f.toggleTheirs(); paintCall(); click(1, 0.05); }, f.hideTheirs ? 'off' : '').dataset.id = 'theirs';
     callPill(callWords('hangUp'), () => { toggleCallMenu(false); callDo(f.hangUp()); }, 'end').dataset.id = 'end';
@@ -1669,7 +1669,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
         if (LOOKS[v] && !lookOpen(v, owned(), GOLD_PREVIEW)) { toast(lookLockedWords(LOOKS[v].name, inApp()), 3200); click(0.7, 0.05); return; }
         prefs.set('seeds', v); applySeedSet(); paintSettings(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
-      else if (name === 'lang') { prefs.set('lang', v); params.delete('lang'); i18n.set(pickLang(v, navigator.languages || [navigator.language])); }
+      else if (name === 'lang') { prefs.set('lang', v); params.delete('lang'); i18n.set(pickLang(v, navigator.languages || [navigator.language])); if (reminders.supported) remindSync(); } // the reminder's words follow the language
       else if (name === 'remindAt') { prefs.set('remindAt', v); paintRemind(); remindSync(); }
       else if (name === 'starts') { prefs.set('starts.pref', v); toast(v === 'loser' ? 'From the next game: the loser goes first' : v === 'you' ? 'From the next game: you always start' : 'From the next game: they always start'); }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto') || prefs.get('quality.measured', '') === 'slow') { prefs.set('quality', v); prefs.set('quality.measured', ''); /* a choice in Settings starts the speed judgement afresh */ save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }

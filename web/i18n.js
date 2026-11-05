@@ -13,7 +13,12 @@
 // review (the card line and each step, her lines in it), the puzzle's result, the lesson's end, Home's record and rating
 // lines, and the words that are shared (the result, the puzzle, the clip's caption), which game.js passes through t().
 // Slice 4: the opponents' own words (SAYS, SAYS_N) — every line in web/characters.js, their runs, their bios and Mama
-// Ngozi's take. The store, rooms and calls follow in later slices.
+// Ngozi's take. Slice 5 (web/i18n-rooms.js): playing a friend — the Rooms screen, the door, the shouts, taking back, giving
+// up, the call, block and report, the server's answers, the away titles and the invite (game.js and away.js pass the words that
+// leave the page through t()) — and the store's rows, the purchases' toasts, the reminder (its notification too) and the
+// first game's tips.
+
+import { FR_ROOMS, roomPatterns } from './i18n-rooms.js';
 
 export const LANGS = ['auto', 'en', 'fr'];
 
@@ -262,11 +267,9 @@ export const FR = {
   'Your name': 'Votre nom',
   'Knock': 'Frapper',
   'At the door': 'À la porte',
-  'Let them in and they take the far seat. Nobody else can join once they do.': 'Faites-le entrer et il prend la place d’en face. Personne d’autre ne peut entrer ensuite.',
   'Not now': 'Pas maintenant',
   'Let in': 'Faire entrer',
   'Take it back?': 'Reprendre le coup ?',
-  'Their seeds go back where they were and it is their move again. Or play on and the move stands.': 'Ses graines reviennent à leur place et c’est de nouveau à lui. Ou bien continuez et le coup reste.',
   'Play on': 'On continue',
   'Let them': 'D’accord',
   'Nothing is on until you say yes. The picture and sound go straight between your two phones and are never recorded.': 'Rien ne s’allume avant votre oui. L’image et le son passent directement entre vos deux téléphones et ne sont jamais enregistrés.',
@@ -399,6 +402,8 @@ export const FR = {
   'Nothing to change. I would have played it the same.': 'Rien à changer. Je l’aurais jouée pareil.',
   'That is all. Next game, count twice.': 'C’est tout. À la prochaine partie, comptez deux fois.',
 };
+export const OVERLAP = Object.keys(FR_ROOMS).filter((k) => Object.prototype.hasOwnProperty.call(FR, k)); // test/i18n-rooms.test.js: none
+Object.assign(FR, FR_ROOMS); // slice 5
 // The opponents' own words (slice 4): every line in web/characters.js and Mama Ngozi's take (web/coach.js), each in the voice
 // it has in English. Adaeze (a child) and Nnamdi (your cousin) say tu; the three elders — Auntie Bisi the teacher, Mama Ngozi
 // and Papa Ike — say vous, as Mama Ngozi already does in her review. Speakers keep their own gender (Adaeze and Mama Ngozi
@@ -556,9 +561,11 @@ Object.assign(FR, SAYS);
 // French sets a thin space before : ; ? ! so they never start a line
 for (const k in FR) FR[k] = FR[k].replace(/ ([:;?!])/g, '\u00a0$1');
 // names and words that stay as they are when a line is put together from parts
-const KEEP = new Set(['Adaeze', 'Auntie Bisi', 'Nnamdi', 'Mama Ngozi', 'Papa Ike', 'Nchò', 'Ayo', 'Gold', 'Tete', 'Player']);
+const KEEP = new Set(['Adaeze', 'Auntie Bisi', 'Nnamdi', 'Mama Ngozi', 'Papa Ike', 'Nchò', 'Ayo', 'Gold', 'Tete', 'Player', 'Iroko']);
 const LOOK_FR = { 'river stones': 'les galets', 'benin bronze': 'le bronze du Bénin', "grandpa's board": 'le plateau de grand-père', cowries: 'les cauris', 'palm kernels': 'les noix de palme' };
 const look = (s) => LOOK_FR[s.toLowerCase()] || s;
+// a look named in a sentence: "Les cauris sont à vous", "pour le bronze du Bénin"; a wood, Gold and the bundle by their own name
+const item = (s, inside = false) => { const l = LOOK_FR[s.toLowerCase()]; const r = l || FR[s] || s; return inside || !l ? r : cap(r); };
 
 const DAYS = { Mon: 'lun.', Tue: 'mar.', Wed: 'mer.', Thu: 'jeu.', Fri: 'ven.', Sat: 'sam.', Sun: 'dim.' };
 const MONTHS = { Jan: 'janv.', Feb: 'févr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'août', Sep: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'déc.' };
@@ -567,8 +574,10 @@ const pl = (n, one, many) => `${n} ${n === '1' ? one : many}`;
 const OPPS = 'Adaeze|Auntie Bisi|Nnamdi|Mama Ngozi|Papa Ike';
 const at = (g) => (g === 'Ayo' ? 'à l’Ayo' : 'au Nchò');
 const who = (s) => FR[s] || s; // a name stays a name; "Player 2" becomes "Joueur 2"
+const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
 export const PATTERNS = [
+  ...ROOMS.slice(0, -1), // slice 5: playing a friend, the store, the reminder (before the store lines below, which would catch "… in the store")
   [/^vs (.+?) · (Easy|Steady|Medium|Hard|Master)(?: · (.+) starts)?$/, (m) => `contre ${m[1]} · ${lv(m[2])}` + (m[3] ? ` · ${who(m[3])} commence` : '')],
   [/^(.+?) · (Easy|Steady|Medium|Hard|Master)$/, (m) => `${need(m[1])} · ${lv(m[2])}`],
   [/^(Player [12]) starts · on this phone$/, (m) => `${who(m[1])} commence · sur ce téléphone`],
@@ -679,6 +688,7 @@ export const PATTERNS = [
   [/^([^·—:]+?) plays you for real now\. Tap a pit once to see where its seeds go, twice to sow\.$/, (m) => `${m[1]} joue contre vous pour de vrai maintenant. Touchez un trou une fois pour voir où vont ses graines, deux fois pour semer.`],
   // the opponents' runs of 10, 15, 20… (slice 4)
   ...SAYS_N.map(([en, fr]) => [new RegExp('^' + en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('\\{n\\}', '(\\d+)') + '$'), (m) => fr.replace('{n}', m[1])]),
+  ROOMS[ROOMS.length - 1], // a shout in the away title, "Tete: Oya, your move!": last, so it never catches a line that has its own
 ];
 // a pit named from the seat looking at it: "your pit 3" → "votre trou 3", "their pit 3" → "le trou 3 d'en face"; the screen
 // readers' "Your pit 3 (key 3)" → "Votre trou 3 (touche 3)"

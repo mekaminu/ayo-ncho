@@ -64,7 +64,7 @@ export function remindNote(app, on, perm) {
 
 // The reminder's end of the plugin. `L` is LocalNotifications (or a stand-in in the tests); everything fails soft.
 //   sync({ on, hour, variant, playedToday }) → { scheduled: n } | { off } | { denied } | { error }
-export function makeReminders(L, { now = () => new Date(), puzzleFor = dailyPuzzle } = {}) {
+export function makeReminders(L, { now = () => new Date(), puzzleFor = dailyPuzzle, t = (s) => s } = {}) {
   const st = { supported: !!L, perm: null, log: [], busy: Promise.resolve() };
   async function perm(ask) {
     if (!L) return 'denied';
@@ -86,7 +86,7 @@ export function makeReminders(L, { now = () => new Date(), puzzleFor = dailyPuzz
       if (await perm(!!o.ask) !== 'granted') { await cancelOurs().catch(() => {}); st.log.push({ denied: true }); return { denied: true }; }
       await cancelOurs();
       const plan = planReminders({ now: now(), hour: o.hour, variant: o.variant, playedToday: o.playedToday, puzzleFor });
-      if (plan.length) await L.schedule({ notifications: plan.map(toNotification) });
+      if (plan.length) await L.schedule({ notifications: plan.map((r) => toNotification({ ...r, title: t(r.title), body: t(r.body) })) }); // in the page's language when it is set
       st.log.push({ scheduled: plan.length, first: plan[0] ? plan[0].key : null, hour: hourOf(o.hour) });
       return { scheduled: plan.length, plan };
     } catch (e) { st.log.push({ error: String(e && e.message || e) }); return { error: true }; }

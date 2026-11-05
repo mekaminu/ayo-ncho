@@ -49,9 +49,10 @@ export function isAway(doc) {
   try { return typeof doc.hasFocus === 'function' ? !doc.hasFocus() : false; } catch { return false; }
 }
 
-// The controller. env: { doc, nav, icon (the svg text of the tab's icon, or a function giving it), chime() }.
+// The controller. env: { doc, nav, icon (the svg text of the tab's icon, or a function giving it), chime(), t (the page's
+// language: the title is outside the page's body, so it is put into French here) }.
 // note(kind, d) says it if the page is away (returns true when it did); back() clears it all.
-export function makeAway({ doc, nav, icon, chime } = {}) {
+export function makeAway({ doc, nav, icon, chime, t = (s) => s } = {}) {
   let count = 0, words = '', iconEl = null, plainHref = null;
   const st = { get count() { return count; }, get words() { return words; } };
   const iconLink = () => {
@@ -62,7 +63,7 @@ export function makeAway({ doc, nav, icon, chime } = {}) {
   st.note = (kind, d = {}) => {
     if (!isAway(doc)) return false;
     const w = awayWords(kind, d); if (!w) return false;
-    count += 1; words = w; doc.title = awayTitle(w, count);
+    count += 1; words = w; doc.title = awayTitle(t(w), count);
     const el = iconLink(); const svg = typeof icon === 'function' ? icon() : icon;
     if (el && svg) el.setAttribute('href', svgUrl(dotIcon(svg)));
     badge(count);
