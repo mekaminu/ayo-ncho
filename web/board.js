@@ -178,6 +178,7 @@ export function buildLights(scene, shadowSize = 2048) {
   key.shadow.camera.left = -0.8; key.shadow.camera.right = 0.8; key.shadow.camera.top = 0.9; key.shadow.camera.bottom = -0.9; key.shadow.camera.near = 0.2; key.shadow.camera.far = 5; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.004; scene.add(key);
   const rim = new THREE.DirectionalLight(0xffb070, 0.7); rim.position.set(0.8, 0.9, -1.2); scene.add(rim);
   const fill = new THREE.PointLight(0xffe8d0, 0.25, 4); fill.position.set(0.9, 1.4, 1.3); scene.add(fill);
+  return { key, rim, fill }; // the lamp, so the win can warm it a moment
 }
 
 export function seedMaterial(q = {}) {
