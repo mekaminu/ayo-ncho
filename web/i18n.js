@@ -12,7 +12,8 @@
 // Game over (its top line, the title, how the game went, the record, the rating, the next opponent offered), Mama Ngozi's
 // review (the card line and each step, her lines in it), the puzzle's result, the lesson's end, Home's record and rating
 // lines, and the words that are shared (the result, the puzzle, the clip's caption), which game.js passes through t().
-// The opponents' lines, the store, rooms and calls follow in later slices.
+// Slice 4: the opponents' own words (SAYS, SAYS_N) — every line in web/characters.js, their runs, their bios and Mama
+// Ngozi's take. The store, rooms and calls follow in later slices.
 
 export const LANGS = ['auto', 'en', 'fr'];
 
@@ -398,6 +399,160 @@ export const FR = {
   'Nothing to change. I would have played it the same.': 'Rien à changer. Je l’aurais jouée pareil.',
   'That is all. Next game, count twice.': 'C’est tout. À la prochaine partie, comptez deux fois.',
 };
+// The opponents' own words (slice 4): every line in web/characters.js and Mama Ngozi's take (web/coach.js), each in the voice
+// it has in English. Adaeze (a child) and Nnamdi (your cousin) say tu; the three elders — Auntie Bisi the teacher, Mama Ngozi
+// and Papa Ike — say vous, as Mama Ngozi already does in her review. Speakers keep their own gender (Adaeze and Mama Ngozi
+// "battue", Papa Ike "battu"); the player's is never assumed. Nnamdi's "chop" is "manger", the word awalé players use.
+const SAYS = {
+  // Adaeze
+  'Nine years old and already sure she is winning.': 'Neuf ans, et déjà sûre de gagner.',
+  'Me first? No, you first. Go!': 'Moi d’abord ? Non, toi d’abord. Vas-y !',
+  'I will be gentle. Maybe.': 'Je vais être gentille. Peut-être.',
+  'Mine! All mine!': 'À moi ! Tout à moi !',
+  'Did you see that? Four!': 'Tu as vu ça ? Quatre !',
+  'Hehe. Thank you.': 'Hihi. Merci.',
+  'Ah ah, that one was mine!': 'Ah ah, celui-là était à moi !',
+  'Not fair. OK, fair.': 'Pas juste. Bon, d’accord, juste.',
+  'I was keeping those!': 'Je les gardais, celles-là !',
+  'Heh, no take-backs… fine.': 'Hé, on ne reprend pas… bon, d’accord.',
+  'I saw that.': 'J’ai vu, hein.',
+  'I won! Can we play again?': 'J’ai gagné ! On rejoue ?',
+  'Told you I was winning.': 'Je t’avais dit que je gagnais.',
+  'Again! One more!': 'Encore ! Une autre !',
+  'You only won because I let you.': 'Tu as gagné seulement parce que je t’ai laissé faire.',
+  'You beat me?! OK. Again, again!': 'Tu m’as battue ?! OK. Encore, encore !',
+  'Last eight! Whoever catches next gets them ALL.': 'Les huit dernières ! Celui qui prend ensuite les a TOUTES.',
+  'Ooh, the last ones. Mine, mine, mine.': 'Oh, les dernières. À moi, à moi, à moi.',
+  'Round and round! Somebody catch something!': 'On tourne, on tourne ! Quelqu’un, prenez quelque chose !',
+  'Are we just going in circles?': 'On tourne juste en rond ?',
+  "Three in a row? I'm telling Mama.": 'Trois d’affilée ? Je vais le dire à Maman.',
+  'Five! Are you magic?': 'Cinq ! Tu es magique ?',
+  'Three for me! Hehe.': 'Trois pour moi ! Hihi.',
+  "Five! I'm the champion of everything.": 'Cinq ! Je suis la championne de tout.',
+  // Auntie Bisi
+  'Teaches at the primary school. Counts every pit twice, and makes you count it too.': 'Institutrice à l’école primaire. Elle compte chaque trou deux fois, et vous le fait compter aussi.',
+  'Sit up straight. We count before we sow.': 'Redressez-vous. On compte avant de semer.',
+  'Good afternoon. Your move, and no rushing.': 'Bonjour. À vous, et sans vous presser.',
+  'Four. Now you see why we count.': 'Quatre. Vous voyez pourquoi on compte.',
+  'Mm. Write that one down.': 'Mm. Notez celle-là.',
+  'Thank you. Next.': 'Merci. Suivant.',
+  'Very good. That was well counted.': 'Très bien. C’était bien compté.',
+  'Ah. A star for you.': 'Ah. Une étoile pour vous.',
+  'I saw that coming. Too late.': 'Je l’ai vu venir. Trop tard.',
+  'Correction is allowed. Once.': 'On a droit à une correction. Une seule.',
+  'Rub it out, then. Neatly.': 'Effacez, alors. Proprement.',
+  'Homework: count to four, carefully.': 'Devoir : compter jusqu’à quatre, soigneusement.',
+  'Well tried. Again tomorrow.': 'Bien essayé. On recommence demain.',
+  'Excellent. Top of the class.': 'Excellent. En tête de la classe.',
+  'You were listening after all.': 'Vous écoutiez, finalement.',
+  'Well done! I knew you could. Now Nnamdi.': 'Bravo ! Je savais que vous y arriveriez. Maintenant, Nnamdi.',
+  'Eight left. Count them, every one.': 'Il en reste huit. Comptez-les, toutes.',
+  'The last eight. Concentrate, please.': 'Les huit dernières. Concentrez-vous, s’il vous plaît.',
+  'We are going round in circles. Somebody take something.': 'Nous tournons en rond. Que quelqu’un prenne quelque chose.',
+  'Round and round. Think, class.': 'On tourne, on tourne. Réfléchissez, la classe.',
+  'Three in a row. You have been practising.': 'Trois d’affilée. Vous avez travaillé, ça se voit.',
+  'Five! I am telling your mother — good news, this time.': 'Cinq ! Je le dirai à votre mère — une bonne nouvelle, cette fois.',
+  'Three for me. Count slower.': 'Trois pour moi. Comptez plus lentement.',
+  'Five. We will go over it again.': 'Cinq. Nous allons revoir la leçon.',
+  // Nnamdi
+  'Your quick cousin. Talks more than he plans, plans more than you think.': 'Votre cousin vif. Il parle plus qu’il ne calcule, et calcule plus que vous ne croyez.',
+  "Relax, I'll go easy. Small small.": 'Détends-toi, j’y vais doucement. Petit à petit.',
+  'Loser carries the board.': 'Le perdant porte le plateau.',
+  "Chop. That's how we do it.": 'Je mange. C’est comme ça qu’on fait.',
+  'Four seeds, no stress.': 'Quatre graines, pas de stress.',
+  'You left that one open, o.': 'Tu as laissé celui-là ouvert, oh.',
+  'Ehn? Who taught you that?': 'Hein ? Qui t’a appris ça ?',
+  'OK… OK. I see you.': 'OK… OK. Je te vois venir.',
+  'That was my pit!': 'C’était mon trou !',
+  'Undo? In Lagos we call that a loan.': 'Annuler ? À Lagos, on appelle ça un prêt.',
+  "I'll allow it. Once.": 'Je te l’accorde. Une fois.',
+  'Cousin, I warned you.': 'Cousin, je t’avais prévenu.',
+  'GG. Buy me suya.': 'GG. Tu me payes le suya.',
+  'Best of three. Obviously.': 'En deux manches gagnantes. Évidemment.',
+  'My phone was lagging.': 'Mon téléphone ramait.',
+  'Fine. That one counts. Barely.': 'Bon. Celle-là compte. De justesse.',
+  'Last eight, cousin. Next chop takes everything.': 'Les huit dernières, cousin. Le prochain qui mange prend tout.',
+  'Small seeds left. Big stakes.': 'Peu de graines. Gros enjeu.',
+  'We are just going round, cousin. Somebody chop.': 'On ne fait que tourner, cousin. Que quelqu’un mange.',
+  'This one is a merry-go-round.': 'C’est un manège, cette partie.',
+  'Three straight? Who have you been practising with?': 'Trois de suite ? Avec qui tu t’entraînes ?',
+  "Five in a row. OK, I'm actually trying now.": 'Cinq d’affilée. OK, là je joue pour de vrai.',
+  'Three–zero. Suya is on you.': 'Trois–zéro. Le suya, c’est pour toi.',
+  "Five. I'm not even looking at the board.": 'Cinq. Je ne regarde même pas le plateau.',
+  // Mama Ngozi
+  'Thirty years at the market, ten thousand games on the same board.': 'Trente ans au marché, dix mille parties sur le même plateau.',
+  'Sit well. This will take a while.': 'Asseyez-vous bien. Ça va prendre un moment.',
+  'I have seen that opening before.': 'J’ai déjà vu cette ouverture.',
+  'Patience is a seed too.': 'La patience aussi est une graine.',
+  'You counted. You just counted wrong.': 'Vous avez compté. Vous avez juste mal compté.',
+  'Mm-hm.': 'Mm-hm.',
+  'Good. Now do it twice.': 'Bien. Maintenant, refaites-le.',
+  'I gave you that one.': 'Celui-là, je vous l’ai donné.',
+  'Noted.': 'Noté.',
+  'Undo all you like, child.': 'Annulez tant que vous voulez, mon enfant.',
+  'The board remembers.': 'Le plateau se souvient.',
+  'Come back when you have practised.': 'Revenez quand vous aurez appris.',
+  'The board does not lie.': 'Le plateau ne ment pas.',
+  'Well played. I mean it.': 'Bien joué. Je le pense.',
+  'Hm. I taught you too well.': 'Hm. Je vous ai trop bien appris.',
+  'So. You finally beat me. Once.': 'Alors. Vous m’avez enfin battue. Une fois.',
+  'Eight left. Now we see who counts.': 'Il en reste huit. On va voir qui sait compter.',
+  'The last seeds. Sit up.': 'Les dernières graines. Redressez-vous.',
+  'Round and round. Someone must count.': 'On tourne, on tourne. Il faut que quelqu’un compte.',
+  'The seeds are walking in circles. So are you.': 'Les graines tournent en rond. Vous aussi.',
+  'Three in a row? Mama Ngozi is watching.': 'Trois d’affilée ? Mama Ngozi vous a à l’œil.',
+  'Five. Now the market will talk.': 'Cinq. Maintenant, le marché va en parler.',
+  'Three. Come back when the seeds listen to you.': 'Trois. Revenez quand les graines vous écouteront.',
+  'Five. Sit well; we are not finished.': 'Cinq. Asseyez-vous bien ; nous n’avons pas fini.',
+  // her take, once a game across the board from her (web/coach.js)
+  'It was sitting right there.': 'C’était juste là, sous vos yeux.',
+  'Count again. Slowly.': 'Recomptez. Lentement.',
+  'The seeds were telling you.': 'Les graines vous le disaient.',
+  'That one ended it. You walked past it.': 'Celui-là finissait la partie. Vous l’avez laissé passer.',
+  'The game was yours. Was.': 'La partie était à vous. Était.',
+  'That pit was the way out.': 'Ce trou-là, c’était la sortie.',
+  'Still breathing — only just.': 'Encore en vie — de justesse.',
+  // Papa Ike
+  "Mama Ngozi's old rival. They have not spoken since the final of 1987.": 'Le vieux rival de Mama Ngozi. Ils ne se parlent plus depuis la finale de 1987.',
+  'Sit. Count. Then count again.': 'Asseyez-vous. Comptez. Puis recomptez.',
+  'Your move. Take your time; I have mine.': 'À vous. Prenez votre temps ; j’ai le mien.',
+  'Mama Ngozi sent you? Hm.': 'C’est Mama Ngozi qui vous envoie ? Hm.',
+  'Seen from far away.': 'Vu de loin.',
+  'That was decided six moves ago.': 'Ça s’est décidé il y a six coups.',
+  'Mm.': 'Mm.',
+  'A fair price.': 'Un prix honnête.',
+  'Good. You are seeing further.': 'Bien. Vous voyez plus loin.',
+  'I lent you that. I will collect.': 'Je vous l’ai prêté. Je viendrai le reprendre.',
+  'Take it back. The board will wait.': 'Reprenez-le. Le plateau attendra.',
+  'Once more, then. Slowly.': 'Encore une fois, alors. Lentement.',
+  'The seeds go where they are sent.': 'Les graines vont où on les envoie.',
+  'Come back next week. Bring Mama Ngozi.': 'Revenez la semaine prochaine. Amenez Mama Ngozi.',
+  'So. The young ones count now.': 'Alors. Les jeunes savent compter, maintenant.',
+  'Well played. Tell nobody at the market.': 'Bien joué. N’en dites rien au marché.',
+  'Ah. You beat me. Mama Ngozi must never hear of it.': 'Ah. Vous m’avez battu. Mama Ngozi ne doit jamais l’apprendre.',
+  'Eight seeds. Everything was for this.': 'Huit graines. Tout était pour ça.',
+  'The last eight. I have been waiting.': 'Les huit dernières. Je les attendais.',
+  'We walk in circles. One of us will tire first.': 'Nous tournons en rond. L’un de nous se lassera le premier.',
+  'Round we go. I am not tired.': 'On tourne. Je ne suis pas fatigué.',
+  'Three. I will have to think now.': 'Trois. Il va falloir que je réfléchisse.',
+  'Five. They will write songs. Short ones.': 'Cinq. On écrira des chansons. Des courtes.',
+  'Three. Patience, my child.': 'Trois. Patience, mon enfant.',
+  'Five. Sit with the board a while.': 'Cinq. Restez un moment avec le plateau.',
+};
+// the runs of 10, 15, 20… (each opponent's `more(n)`): {n} is the run
+const SAYS_N = [
+  ["{n} in a row. I give up. No I don't.", '{n} d’affilée. J’abandonne. Non, en fait non.'],
+  ['{n}! Are you letting me win?', '{n} ! Tu me laisses gagner ?'],
+  ['{n} in a row. Time I moved you up a class.', '{n} d’affilée. Il est temps de vous faire passer dans la classe supérieure.'],
+  ['{n}. Patience. Counting is a habit.', '{n}. Patience. Compter, c’est une habitude.'],
+  ['{n} in a row. Cousin, leave something for me.', '{n} d’affilée. Cousin, laisse-moi quelque chose.'],
+  ['{n} and counting. Buy a bigger board.', '{n} et ça continue. Achète un plus grand plateau.'],
+  ['{n} in a row. The board is yours. For now.', '{n} d’affilée. Le plateau est à vous. Pour l’instant.'],
+  ['{n}. I am not counting. You are.', '{n}. Moi, je ne compte pas. Vous, si.'],
+  ['{n} in a row. I am taking notes.', '{n} d’affilée. Je prends des notes.'],
+  ['{n}. The board is a slow teacher.', '{n}. Le plateau est un maître patient.'],
+];
+Object.assign(FR, SAYS);
 // French sets a thin space before : ; ? ! so they never start a line
 for (const k in FR) FR[k] = FR[k].replace(/ ([:;?!])/g, '\u00a0$1');
 // names and words that stay as they are when a line is put together from parts
@@ -522,6 +677,8 @@ export const PATTERNS = [
   [/^Ayo & Nchò — (Player [12]) and (Player [12]) drew (\d+)–(\d+) in (\d+) moves, both on one phone\.$/, (m) => `Ayo & Nchò — ${who(m[1])} et ${who(m[2])} ont fait match nul ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}, tous deux sur un seul téléphone.`],
   [/^My best turn against (.+?) at (Nchò|Ayo): (.+)\. Ayo & Nchò — Nigerian Mancala in 3D\.$/, (m) => `Mon meilleur tour contre ${who(m[1])} ${at(m[2])} : ${m[3].split(', ').map(clipBit).join(', ')}. Ayo & Nchò — le mancala nigérian en 3D.`],
   [/^([^·—:]+?) plays you for real now\. Tap a pit once to see where its seeds go, twice to sow\.$/, (m) => `${m[1]} joue contre vous pour de vrai maintenant. Touchez un trou une fois pour voir où vont ses graines, deux fois pour semer.`],
+  // the opponents' runs of 10, 15, 20… (slice 4)
+  ...SAYS_N.map(([en, fr]) => [new RegExp('^' + en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('\\{n\\}', '(\\d+)') + '$'), (m) => fr.replace('{n}', m[1])]),
 ];
 // a pit named from the seat looking at it: "your pit 3" → "votre trou 3", "their pit 3" → "le trou 3 d'en face"; the screen
 // readers' "Your pit 3 (key 3)" → "Votre trou 3 (touche 3)"

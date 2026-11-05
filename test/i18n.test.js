@@ -50,7 +50,7 @@ test("lines built from parts", () => {
 });
 
 test("every French phrase is French: nothing left in English by mistake, and the dictionary has no empty entry", () => {
-  const same = new Set(["Iroko", "iroko", "Auto", "auto", "Clip", "English", "Français", "Vidéo"]);
+  const same = new Set(["Iroko", "iroko", "Auto", "auto", "Clip", "English", "Français", "Vidéo", "Mm.", "Mm-hm."]);
   for (const [en, fr] of Object.entries(FR)) {
     assert.ok(fr && fr.trim(), "empty: " + en);
     if (en === fr) assert.ok(same.has(en), "left as English: " + en);

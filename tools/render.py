@@ -378,6 +378,11 @@ if langc:  # French (L18, slices 1–3): a phone in French opens in French; Sett
         print("  fr card:", " | ".join(card))
         for line in card: assert not re.search(ENG, line.replace("Mama Ngozi", "").replace("Nchò", "").replace("Gold", "")), ("English on the French card", line, card)
         assert card[1] == "Vous gagnez" and card[0].startswith("Nchò · ") and " coups" in card[0] and "vous menez" in card[4], card
+        # slice 4: the third win running is worth Mama Ngozi's word — on the card in « » and in her bubble, in French
+        said = pg.evaluate("[document.querySelector('#goRecSay').textContent, document.querySelector('#bubble').textContent, window.__i18n.src(document.querySelector('#bubble'))]")
+        print("  fr her word:", said[0], "| bubble:", said[1])
+        assert said[0] == "« Trois d’affilée ? Mama Ngozi vous a à l’œil. »" and said[1] == said[0][2:-2], said
+        assert said[2] == "Three in a row? Mama Ngozi is watching.", said
         pg.click("#shareBtn"); pg.wait_for_function("window.__shared.length >= 1", timeout=10000)
         sh = pg.evaluate("window.__shared[0]"); assert sh.startswith("Ayo & Nchò — J’ai battu Mama Ngozi "), sh
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-cards.png", animations="disabled")
