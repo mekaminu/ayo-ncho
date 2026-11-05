@@ -7,8 +7,20 @@
 // The seller's name and the support email are not kept in the repo: the server reads them from SELLER_NAME and SUPPORT_EMAIL
 // (set in Render → Environment), and says plainly that they are coming until they are set.
 
+import { privacyFr, termsFr, supportFr, frSpaces, footerFr, NAV_FR, TITLES_FR, PLACEHOLDER_FR } from "./legal-fr.js";
+
 export const UPDATED = "4 November 2026";
 export const PAGES = ["privacy", "terms", "support"];
+export const LANGS = ["en", "fr"];
+
+// Which language a request gets: ?lang=fr|en wins (Settings links pass the game's own language), else the browser's first
+// language (French when it starts with "fr", as the game's Auto does), else English.
+export function pageLang(query = {}, acceptLanguage = "") {
+  const q = String(query.lang || "").toLowerCase();
+  if (LANGS.includes(q)) return q;
+  const first = String(acceptLanguage || "").split(",")[0].trim().toLowerCase();
+  return first.startsWith("fr") ? "fr" : "en";
+}
 const GAME = "Ayo &amp; Nchò";
 
 export function esc(s) {
@@ -17,15 +29,16 @@ export function esc(s) {
 const EMAIL_RE = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
 
 // Who runs the game and how to reach them, from the environment; plain placeholders until Meka gives them.
-export function contact(env = process.env) {
+export function contact(env = process.env, lang = "en") {
+  const fr = lang === "fr";
   const seller = String(env.SELLER_NAME || "").trim().slice(0, 120);
   const email = String(env.SUPPORT_EMAIL || "").trim().slice(0, 200);
   const ok = EMAIL_RE.test(email);
   return {
-    seller: seller ? esc(seller) : `the maker of ${GAME}`,
+    seller: seller ? esc(seller) : fr ? PLACEHOLDER_FR.seller : `the maker of ${GAME}`,
     sellerSet: !!seller,
     email: ok ? esc(email) : "",
-    mail: ok ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : `<span class="soon">the support email address (coming soon)</span>`,
+    mail: ok ? `<a href="mailto:${esc(email)}">${esc(email)}</a>` : `<span class="soon">${fr ? PLACEHOLDER_FR.mail : "the support email address (coming soon)"}</span>`,
   };
 }
 
@@ -38,6 +51,7 @@ nav{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
 nav a{color:var(--muted);text-decoration:none;font-size:14px;font-weight:600;border:1px solid var(--line);border-radius:999px;padding:6px 14px}
 nav a[aria-current="page"]{color:#1a0f07;background:var(--brass);border-color:var(--brass)}
 nav a.game{color:var(--brass);border-color:rgba(230,183,111,.45)}
+nav a.lang{margin-left:auto;border-style:dashed}
 h1{font-family:Fraunces,Georgia,"Times New Roman",serif;font-size:32px;line-height:1.15;margin:0 0 4px;font-weight:700}
 h2{font-family:Fraunces,Georgia,"Times New Roman",serif;font-size:21px;line-height:1.25;margin:30px 0 6px;font-weight:700;color:var(--brass)}
 .date{color:var(--muted);font-size:14px;margin:0 0 18px}
@@ -49,10 +63,13 @@ a{color:var(--brass);text-underline-offset:3px}
 .soon{color:var(--muted);font-style:italic}
 footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}`;
 
-function shell(name, title, body, c) {
-  const link = (p, label) => `<a href="/${p}"${p === name ? ' aria-current="page"' : ""}>${label}</a>`;
+function shell(name, title, body, c, lang = "en") {
+  const fr = lang === "fr";
+  const q = fr ? "?lang=fr" : "";
+  const link = (p, label) => `<a href="/${p}${q}"${p === name ? ' aria-current="page"' : ""}>${label}</a>`;
+  const other = fr ? `<a class="lang" href="/${name}?lang=en" hreflang="en" lang="en">English</a>` : `<a class="lang" href="/${name}?lang=fr" hreflang="fr" lang="fr">Français</a>`;
   return `<!doctype html>
-<html lang="en">
+<html lang="${lang}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -63,9 +80,9 @@ function shell(name, title, body, c) {
 </head>
 <body>
 <main>
-<nav aria-label="${GAME} pages"><a class="game" href="/">← Play</a>${link("privacy", "Privacy")}${link("terms", "Terms")}${link("support", "Support")}</nav>
+<nav aria-label="${fr ? NAV_FR.pages : `${GAME} pages`}"><a class="game" href="/${q}">${fr ? NAV_FR.play : "← Play"}</a>${link("privacy", fr ? NAV_FR.privacy : "Privacy")}${link("terms", fr ? NAV_FR.terms : "Terms")}${link("support", fr ? NAV_FR.support : "Support")}${other}</nav>
 ${body}
-<footer>${GAME}: Nigerian Mancala · run by ${c.seller} · ${c.mail}</footer>
+<footer>${fr ? frSpaces(footerFr(c)) : `${GAME}: Nigerian Mancala · run by ${c.seller} · ${c.mail}`}</footer>
 </main>
 </body>
 </html>
@@ -222,10 +239,15 @@ function support(c) {
 }
 
 const BUILD = { privacy: ["Privacy", privacy], terms: ["Terms of use", terms], support: ["Support", support] };
+const BUILD_FR = { privacy: privacyFr, terms: termsFr, support: supportFr };
 
-// The whole page for one of PAGES, as HTML.
-export function legalPage(name, env = process.env) {
+// The whole page for one of PAGES, as HTML, in English or French (server/legal-fr.js).
+export function legalPage(name, env = process.env, lang = "en") {
   const b = BUILD[name]; if (!b) throw new Error("no such page: " + name);
+  if (lang === "fr") {
+    const c = contact(env, "fr");
+    return shell(name, TITLES_FR[name], frSpaces(BUILD_FR[name](c, UPDATED)), c, "fr");
+  }
   const c = contact(env);
   return shell(name, b[0], b[1](c), c);
 }
@@ -233,9 +255,12 @@ export function legalPage(name, env = process.env) {
 // Mount /privacy, /terms and /support (and the same with .html) on an Express app.
 export function mountLegal(app, env = process.env) {
   for (const name of PAGES) {
-    app.get([`/${name}`, `/${name}.html`], (_req, res) => {
+    app.get([`/${name}`, `/${name}.html`], (req, res) => {
       res.set("Cache-Control", "public, max-age=600");
-      res.type("html").send(legalPage(name, env));
+      res.set("Vary", "Accept-Language");
+      const lang = pageLang(req.query, req.get("accept-language"));
+      res.set("Content-Language", lang);
+      res.type("html").send(legalPage(name, env, lang));
     });
   }
 }

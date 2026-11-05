@@ -799,7 +799,7 @@ function blockFriend() {
   blockedOut(blockWords('done', n));
 }
 function reportProblem() { // the support page's "Report a player", beside the game (a new tab on the web, the phone's browser from the apps)
-  const a = document.createElement('a'); a.href = legalLink(REPORT_PAGE) + REPORT_HASH; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); toggleCallMenu(false); click(1, 0.05);
+  const a = document.createElement('a'); a.href = legalLink(REPORT_PAGE, globalThis, i18n.lang) + REPORT_HASH; a.target = '_blank'; a.rel = 'noopener'; document.body.appendChild(a); a.click(); a.remove(); toggleCallMenu(false); click(1, 0.05);
 }
 function blockPills(n) {
   if (!mayBlock({ online, friend })) return;
@@ -1525,7 +1525,7 @@ function paintSettings() {
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('music', musicOn()); $('#musicNow').textContent = musicNote({ on: musicOn(), sound: soundOn(), call: callLive() }) ? ` · ${musicNote({ on: musicOn(), sound: soundOn(), call: callLive() })}` : ''; sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : ''; paintRemind(); paintBlocked();
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})` + (lastGameWords(parseFrames(prefs.get('frames.last', ''))) ? ' · ' + lastGameWords(parseFrames(prefs.get('frames.last', ''))) : '');
-  set('lang', prefs.get('lang', 'auto')); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
+  set('lang', prefs.get('lang', 'auto')); paintLegal(); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
   const two = $('.choose[data-mode="local"]'); two.setAttribute('aria-pressed', settings.mode === 'local'); two.textContent = settings.mode === 'local' ? 'Chosen' : 'Choose';
@@ -1669,7 +1669,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
         if (LOOKS[v] && !lookOpen(v, owned(), GOLD_PREVIEW)) { toast(lookLockedWords(LOOKS[v].name, inApp()), 3200); click(0.7, 0.05); return; }
         prefs.set('seeds', v); applySeedSet(); paintSettings(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
-      else if (name === 'lang') { prefs.set('lang', v); params.delete('lang'); i18n.set(pickLang(v, navigator.languages || [navigator.language])); if (reminders.supported) remindSync(); } // the reminder's words follow the language
+      else if (name === 'lang') { prefs.set('lang', v); params.delete('lang'); i18n.set(pickLang(v, navigator.languages || [navigator.language])); paintLegal(); if (reminders.supported) remindSync(); } // the reminder's words follow the language
       else if (name === 'remindAt') { prefs.set('remindAt', v); paintRemind(); remindSync(); }
       else if (name === 'starts') { prefs.set('starts.pref', v); toast(v === 'loser' ? 'From the next game: the loser goes first' : v === 'you' ? 'From the next game: you always start' : 'From the next game: they always start'); }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto') || prefs.get('quality.measured', '') === 'slow') { prefs.set('quality', v); prefs.set('quality.measured', ''); /* a choice in Settings starts the speed judgement afresh */ save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
@@ -1693,7 +1693,9 @@ $('#settingsBtn').addEventListener('click', () => { if (!busy) { paintSettings()
 $('#settingsBack').addEventListener('click', () => { if (online) return showScreen('play'); const r = settings.rules(); const same = state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(r) && state.moves.length; showScreen(same ? 'play' : 'home'); });
 $('#settingsRules').addEventListener('click', () => { $('#rules').hidden = false; });
 // Privacy, terms and support: the server's pages, opened beside the game (a new tab, or the phone's browser from the apps) so the game stays where it was.
-for (const a of document.querySelectorAll('.legal a')) a.href = legalLink(a.dataset.page);
+// In the game's own language (?lang=fr for a French game), painted again when Settings opens or the language changes.
+function paintLegal() { for (const a of document.querySelectorAll('.legal a')) a.href = legalLink(a.dataset.page, globalThis, i18n.lang); }
+paintLegal();
 
 // game over card, as approved
 function gameOver() {

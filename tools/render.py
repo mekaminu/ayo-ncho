@@ -131,7 +131,7 @@ if os.environ.get("RENDER_SCALE"):  # the store pictures (tools/store-shots.py):
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -470,27 +470,51 @@ if legal:  # privacy, terms and support: Settings links to the server's pages, w
     import atexit; atexit.register(lambda: node.terminate())
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []
-        ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2)
+        # --frlegal: a French phone (L18): the links carry ?lang=fr, the pages come up in French with no English in their words, and English is one tap away
+        lg = "fr" if frlegal else "en"
+        LABELS = {"en": ["Privacy", "Terms", "Support"], "fr": ["Confidentialité", "Conditions", "Assistance"]}[lg]
+        ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2, locale="fr-FR" if frlegal else "en-GB")
         pg = ctx.new_page(); watch(pg, errors)
         pg.goto("http://127.0.0.1:8767/?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
         pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])", timeout=10000)
-        links = pg.evaluate("[...document.querySelectorAll('.legal a')].map(a=>[a.textContent,a.href,a.target])")
-        assert [l[0] for l in links] == ["Privacy", "Terms", "Support"], links
-        for (name, href, target) in links:
-            assert href == "http://127.0.0.1:8767/" + name.lower() and target == "_blank", (name, href, target)
+        links = pg.evaluate("[...document.querySelectorAll('.legal a')].map(a=>[a.textContent,a.href,a.target,a.dataset.page])")
+        assert [l[0] for l in links] == LABELS, links
+        for (name, href, target, page) in links:
+            assert href == "http://127.0.0.1:8767/" + page + "?lang=" + lg and target == "_blank", (name, href, target)
         pg.locator(".legal").scroll_into_view_if_needed(); pg.wait_for_timeout(300)
         pg.evaluate("window.__freeze=true"); pg.screenshot(path=out.replace(".png", "-settings.png"), animations="disabled")
         with ctx.expect_page() as info: pg.click("#lnkPrivacy")
         doc = info.value; doc.wait_for_load_state("load")
-        assert doc.url.endswith("/privacy") and doc.title().startswith("Privacy"), doc.url
+        assert doc.url.endswith("/privacy?lang=" + lg) and doc.title().startswith(LABELS[0]), doc.url
+        assert doc.evaluate("document.documentElement.lang") == lg
         assert pg.evaluate("!document.querySelector('#settings').hidden"), "the game left Settings when the page opened"
         assert doc.evaluate("document.documentElement.scrollWidth <= innerWidth"), "the privacy page scrolls sideways"
+        ENGW = re.compile(r"(?<![^\W\d_])(the|and|your|you|with|is|Last updated|Play)(?![^\W\d_])")
+        def no_english(d, name):
+            if not frlegal: return
+            t = d.evaluate("[...document.querySelectorAll('main > :not(nav)')].map(e=>e.innerText).join(' ')")
+            t = re.sub(r"(Privacy|Terms|Support), in English|Google Play|Licensed Application End User License Agreement|Information Commissioner’s Office|SIL Open Font Licence", "", t)
+            bad = ENGW.search(t); assert not bad, (name, bad.group(0), t[max(0, bad.start() - 60):bad.end() + 60])
+        no_english(doc, "privacy")
         doc.screenshot(path=out)
-        for name in ("terms", "support"):
-            doc.click("nav a[href='/%s']" % name); doc.wait_for_load_state("load")
-            assert doc.url.endswith("/" + name) and doc.evaluate("document.querySelector('nav a[aria-current=page]').textContent") == name.title()
+        q = "?lang=fr" if frlegal else ""
+        for i, name in enumerate(("terms", "support")):
+            doc.click("nav a[href='/%s%s']" % (name, q)); doc.wait_for_load_state("load")
+            assert doc.url.endswith("/" + name + q) and doc.evaluate("document.querySelector('nav a[aria-current=page]').textContent") == LABELS[i + 1]
             assert doc.evaluate("document.documentElement.scrollWidth <= innerWidth"), name + " scrolls sideways"
+            no_english(doc, name)
             doc.screenshot(path=out.replace(".png", "-" + name + ".png"))
+        # the other language is one tap away, and back
+        doc.click("nav a.lang"); doc.wait_for_load_state("load")
+        other = "en" if frlegal else "fr"
+        assert doc.evaluate("document.documentElement.lang") == other and doc.url.endswith("/support?lang=" + other), doc.url
+        doc.click("nav a.lang"); doc.wait_for_load_state("load"); assert doc.evaluate("document.documentElement.lang") == lg
+        if frlegal:  # Settings → Language → English turns the links English at once
+            pg.evaluate("window.__freeze=false"); pg.evaluate("document.querySelector('[data-set=lang] [data-v=en]').click()")
+            pg.wait_for_function("document.documentElement.lang === 'en'", timeout=5000)
+            hrefs = pg.evaluate("[...document.querySelectorAll('.legal a')].map(a=>a.href)")
+            assert all(h.endswith("?lang=en") for h in hrefs), hrefs
+        print("legal pages:", lg, "links", [l[1] for l in links])
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)

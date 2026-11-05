@@ -8,6 +8,10 @@ The game's server serves three pages, in the game's dark-wood look, readable on 
 
 They are linked from Settings (Privacy · Terms · Support, at the bottom), in the browser and in the apps; they open beside the game, so the game stays where it was. The words are in `server/legal.js`; each page says "Last updated" with the date in `UPDATED`.
 
+## In French
+
+Each page is also in French (server/legal-fr.js), at the same address: `/privacy?lang=fr` (and `/terms?lang=fr`, `/support?lang=fr`), or any of them when the browser's first language is French; `?lang=en` keeps English. Settings opens them in the game's own language, and each page has a link to the other language. The French pages say that the English is the one that counts if the two ever differ. When the English changes, change the French in the same commit (test/legal-fr.test.js checks they give the same numbers). For a French store page, Apple's and Google's privacy policy URL can be `https://ayo-ncho.onrender.com/privacy?lang=fr`.
+
 ## Your name and support email
 
 They are not kept in the repo. Until they are set, the pages say "the maker of Ayo & Nchò" and "the support email address (coming soon)". To set them (free, no plan change):

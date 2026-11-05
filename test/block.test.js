@@ -124,6 +124,6 @@ test("the pages and the forms say what video, voice, block and report do", () =>
   assert.match(a, /CAMERA/); assert.match(a, /NSMicrophoneUsageDescription/); assert.match(a, /end to end/);
   // the board offers both from the camera button's menu, and Settings → Privacy lists who is blocked
   const g = read("web/game.js"), h = read("web/index.html");
-  assert.ok(g.includes("blockPills(n)") && g.includes("legalLink(REPORT_PAGE) + REPORT_HASH"));
+  assert.ok(g.includes("blockPills(n)") && g.includes("legalLink(REPORT_PAGE, globalThis, i18n.lang) + REPORT_HASH"));
   assert.ok(h.includes('id="blockedList"') && h.includes('id="blockedNow"'));
 });

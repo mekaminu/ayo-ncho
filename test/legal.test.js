@@ -101,7 +101,7 @@ test("Settings links to all three, opened beside the game; the apps open the web
     assert.ok(m, `Settings links ${p}`);
     assert.match(m[0], /target="_blank"/); assert.match(m[0], /rel="noopener"/);
   }
-  assert.ok(readFileSync(path.join(ROOT, "web", "game.js"), "utf8").includes("a.href = legalLink(a.dataset.page)"));
+  assert.ok(readFileSync(path.join(ROOT, "web", "game.js"), "utf8").includes("a.href = legalLink(a.dataset.page, globalThis, i18n.lang)"));
   const web = { location: { protocol: "https:", host: "ayo-ncho.onrender.com", origin: "https://ayo-ncho.onrender.com", pathname: "/" } };
   assert.equal(legalLink("privacy", web), "https://ayo-ncho.onrender.com/privacy");
   const appWin = { Capacitor: { isNativePlatform: () => true, Plugins: {} }, location: { protocol: "https:", host: "localhost", origin: "https://localhost", pathname: "/" } };
