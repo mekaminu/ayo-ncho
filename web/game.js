@@ -68,6 +68,7 @@ import { makeSender as peekSender, peekShown, peekWords, OPACITY as PEEK_OP, GLI
 import { ponderOn, ponderPlan, ponderAt, GLANCE_MS, SETTLE_MS as PONDER_SETTLE_MS, GLIDE as PONDER_GLIDE } from './ponder.js';
 import { mayOfferDraw, drawButton, drawWords } from './draw.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
+import { oneTapOn, pressAction } from './onetap.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -382,7 +383,7 @@ const lastM = { mesh: null, t0: 0, pit: -1 }; // which pit they played (web/last
 for (let i = 0; i < 12; i++) {
   const b = document.createElement('button'); b.type = 'button'; b.dataset.pit = i; pitLayer.appendChild(b); pitBtns.push(b);
   b.addEventListener('focus', () => { if (canPress() && legalMoves(state).includes(i) && selected !== i) select(i); });
-  b.addEventListener('click', () => pressPit(i));
+  b.addEventListener('click', () => pressPit(i, 'button'));
 }
 let keysUsed = false; const mouseLikely = matchMedia('(hover: hover) and (pointer: fine)').matches; // a Mac, or a Fold with a mouse: the hint line talks keys
 const keysLikely = () => keysUsed || mouseLikely;
@@ -1740,7 +1741,7 @@ function paintSettings() {
   $('#boardSub').textContent = boardsLine({ owned: owned(), preview: GOLD_PREVIEW });
   $('#seedsSub').textContent = seedsLine({ stones, days: streak.days.length, need: MILESTONES[0].days, owned: owned(), preview: GOLD_PREVIEW });
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
-  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('music', musicOn()); $('#musicNow').textContent = musicNote({ on: musicOn(), sound: soundOn(), call: callLive() }) ? ` · ${musicNote({ on: musicOn(), sound: soundOn(), call: callLive() })}` : ''; sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : ''; paintRemind(); paintBlocked(); paintLocalNames();
+  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('music', musicOn()); $('#musicNow').textContent = musicNote({ on: musicOn(), sound: soundOn(), call: callLive() }) ? ` · ${musicNote({ on: musicOn(), sound: soundOn(), call: callLive() })}` : ''; sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('onetap', oneTapOn(prefs)); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : ''; paintRemind(); paintBlocked(); paintLocalNames();
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})` + (lastGameWords(parseFrames(prefs.get('frames.last', ''))) ? ' · ' + lastGameWords(parseFrames(prefs.get('frames.last', ''))) : '');
   set('lang', prefs.get('lang', 'auto')); set('textsize', textSizeNow()); $('#sizeNow').textContent = sizeNote(textSizeNow()); paintLegal(); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
   set('battery', prefs.get('battery', 'auto')); $('#batteryNow').textContent = noteFor(batt.s);
@@ -2358,7 +2359,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (!canPress()) return;
   ptr.set((e.clientX / canvas.clientWidth) * 2 - 1, -(e.clientY / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(board.targets)[0]; if (!hit) return deselect();
-  pressPit(hit.object.userData.pit);
+  pressPit(hit.object.userData.pit, 'tap');
 });
 // the mouse on the Mac (or a Fold with a trackpad): the pit under the pointer says what a click will do before you click —
 // a hand and a faint brass ring on a pit you can play, a not-allowed sign (and why) on one the feed rule bars, a grab hand on the
@@ -2375,7 +2376,7 @@ function hoverWords(w) {
 function paintHover() {
   if (!mouse.in || body.classList.contains('screen') || clipping) { if (mouse.pit !== null || mouse.words) { mouse.pit = null; hoverWords(null); } canvas.style.cursor = ''; mouse.ring = 0; return; }
   const pit = dragged && down ? null : pitUnder(mouse.x, mouse.y);
-  const h = hoverAt({ state, pit, you, press: canPress(), hurry: hurry.depth > 0, busy, selected, dragging: !!(down && dragged) });
+  const h = hoverAt({ state, pit, you, press: canPress(), hurry: hurry.depth > 0, busy, selected, dragging: !!(down && dragged), oneTap: oneTapOn(prefs) });
   canvas.style.cursor = h.cursor; mouse.ring = h.ring ? 1 : 0;
   if (h.ring) { const [x, z] = pitCenters[pit]; board.hover.position.x = x; board.hover.position.z = z; }
   const w = withLast(h.words, pit, lastM.pit); // over the pit they played last, the words say so
@@ -2442,12 +2443,13 @@ function placeCount() {
 // may a pit be pressed right now? (your move, the board showing, nothing in flight, a friend across the board if online)
 function canPress() { return !(busy || state.over || state.turn !== you || body.classList.contains('screen') || (puzzle.on && puzzle.played) || (online && !friend)); }
 // a press on a pit — a tap, a click, a digit, or Enter on its hidden button: first press picks it, the second sows it
-function pressPit(pit) {
+// (with Settings → Feel → Sow on the first tap, a tap or click on the board sows at once — web/onetap.js)
+function pressPit(pit, via = 'tap') {
   if (!canPress()) return false;
   if (lesson.on && pit !== lesson.steps[lesson.k].pit) { shake(pit); $('#hint').textContent = LESSON_WRONG; return false; } // the lesson plays its own pit
   const legal = legalMoves(state);
   if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) { $('#hint').textContent = feedWords(narrowOf(state, you), { you }) || 'you must give the other side seeds'; shake(pit); } else shake(pit); return false; }
-  if (selected === pit) sow(pit); else select(pit);
+  if (pressAction({ pit, selected, via, oneTap: oneTapOn(prefs), lesson: lesson.on }) === 'sow') sow(pit); else select(pit);
   return true;
 }
 function sow(pit) { if (lesson.on) lessonPlay(pit); else if (puzzle.on) puzzlePlay(pit); else if (online) sendMove(pit); else play(pit); }
@@ -2464,8 +2466,8 @@ addEventListener('keydown', (e) => {
   if (body.classList.contains('screen') || !$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden || !$('#backCard').hidden || !$('#callCard').hidden) return; // keys play the board, not the screens or a card
   if (!keysUsed) { keysUsed = true; body.classList.add('keys'); showTurn(); } // from now on the hint line talks keys and your pits' badges show their key
   e.preventDefault();
-  if (a.type === 'pit') { if (canPress()) pressPit(a.pit); else click(0.5, 0.04); }
-  else if (a.type === 'sow') { if (selected !== null) pressPit(selected); else if (canPress()) $('#hint').textContent = hintText('pick', { keys: true }); }
+  if (a.type === 'pit') { if (canPress()) pressPit(a.pit, 'key'); else click(0.5, 0.04); }
+  else if (a.type === 'sow') { if (selected !== null) pressPit(selected, 'key'); else if (canPress()) $('#hint').textContent = hintText('pick', { keys: true }); }
   else if (a.type === 'undo') undo();
   else if (a.type === 'hint') hint();
   else if (a.type === 'straight') straighten();

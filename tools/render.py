@@ -26,6 +26,8 @@
 #                  "tap the board to hurry" (screenshot <out>), a real tap on the board hurries the rest of the turn ("hurrying…"), the turn
 #                  still ends with every pit's count as the engine says, and the opponent's reply starts again at the normal speed, where
 #                  Space hurries it too
+#        add --onetap (with --smoke) to check Sow on the first tap: with the switch on, one tap on a playable pit sows it at once (no pick,
+#                  no marks), a digit still only picks it, and with the switch off a tap picks again
 #        add --hint (with --smoke) to check "a hint that teaches": the Hint button picks Mama Ngozi's pit for you — the path marks land on it
 #                  and the hint line starts "Mama Ngozi would play this one · …" (screenshot <out>); one more tap on that pit sows it
 #        add --straight (with --smoke) to check setting the board straight: the mouse drags the wood (the board turns and tilts) and the
@@ -186,7 +188,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -2122,6 +2124,7 @@ with sync_playwright() as p:
         print("smoke: before", before, "after", after, "scores", pg.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]"))
         assert pg.evaluate("getComputedStyle(document.querySelector('#shoutBtn')).display") == "none", "shouts are for friends online, not the computer"
         if keys:  # the keyboard: a digit lights a pit, Esc puts it back, the digit then Enter sows; the pits carry screen-reader labels; U undoes, H hints
+            pg.mouse.move(4, 4); pg.wait_for_timeout(400)  # the mouse that played the smoke's move leaves the pits, or its hover words stand in for the keys' words
             sel = lambda: pg.evaluate("window.__ayo.selected"); hint = lambda: pg.evaluate("document.querySelector('#hint').textContent")
             legal = pg.evaluate("window.__ayo.legal"); pit = max(legal); key = str(pit + 1); n = pg.evaluate("window.__ayo.state.pits[%d]" % pit)
             pg.keyboard.press("Escape"); assert sel() is None
@@ -2191,6 +2194,26 @@ with sync_playwright() as p:
             pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.turn===window.__ayo.seat", timeout=240000)
             assert not hint().startswith("Mama Ngozi would play"), hint()
             print("hint: one more tap sowed it; the next turn starts clean ·", hint())
+        if onetapc:  # Sow on the first tap: one tap sows at once; the keys still pick; off again, a tap picks
+            pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.turn===window.__ayo.seat", timeout=240000)
+            pg.evaluate("localStorage.setItem('ayo.onetap','1')")
+            at = pg.evaluate("window.__ayo.state.moves.length"); m = pg.evaluate("window.__ayo.legal")[0]
+            for k in "123456":  # a digit on a pit you may play only picks it, even with the switch on
+                pg.keyboard.press(k); pg.wait_for_timeout(250)
+                if pg.evaluate("window.__ayo.selected") is not None: break
+            assert pg.evaluate("window.__ayo.state.moves.length") == at, "a digit only picks, even with the switch on"
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
+            x, y = pg.evaluate("window.__ayo.pitAt(%d)" % m); pg.mouse.click(x, y)
+            pg.wait_for_function("window.__ayo.state.moves.length>%d" % at, timeout=5000)
+            assert pg.evaluate("window.__ayo.state.moves[%d]" % at) == m and not pg.evaluate("window.__ayo.marks.steps.length"), "one tap sowed it, no marks first"
+            print("onetap: one tap sowed pit", m, "at once")
+            pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.turn===window.__ayo.seat", timeout=240000)
+            pg.evaluate("localStorage.setItem('ayo.onetap','0')")
+            at = pg.evaluate("window.__ayo.state.moves.length"); m = pg.evaluate("window.__ayo.legal")[0]
+            x, y = pg.evaluate("window.__ayo.pitAt(%d)" % m); pg.mouse.click(x, y); pg.wait_for_function("window.__ayo.selected===%d" % m, timeout=5000)
+            assert pg.evaluate("window.__ayo.state.moves.length") == at, "switch off: the first tap picks"
+            pg.screenshot(path=out, timeout=120000); pg.keyboard.press("Escape")
+            print("onetap: off again, the first tap picks and shows the path")
         if answer:  # what it leaves open: after the path, ember rings on the pits their richest answer would take, and the words
             hint = lambda: pg.evaluate("document.querySelector('#hint').textContent")
             best, bestGot, seen = None, -1, 0
@@ -2295,6 +2318,7 @@ with sync_playwright() as p:
             pg.keyboard.press("0"); pg.wait_for_timeout(1300); assert not V()["off"], ("the 0 key set it straight", V())
             print("straight: the 0 key too · tip said once")
         if hoverc:  # the mouse on the Mac: the pit under the pointer says what a click will do
+            pg.mouse.move(4, 4); pg.wait_for_timeout(400)  # start with the mouse off the pits, so the line says what it says without one
             hv = lambda: pg.evaluate("window.__ayo.hover"); hint = lambda: pg.evaluate("document.querySelector('#hint').textContent")
             base = hint(); legal = pg.evaluate("window.__ayo.legal"); st = pg.evaluate("window.__ayo.state"); you = pg.evaluate("window.__ayo.seat")
             m = max(legal, key=lambda i: st["pits"][i]); x, y = pg.evaluate("window.__ayo.pitAt(%d)" % m)
