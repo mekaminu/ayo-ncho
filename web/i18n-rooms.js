@@ -131,6 +131,13 @@ export const FR_ROOMS = nb({
   'Too late — they played on': 'Trop tard — la partie a continué',
   'Your friend answers this one': 'C’est à votre ami de répondre',
   'No connection right now — reconnecting': 'Pas de connexion pour l’instant — reconnexion',
+  // a move kept for the line (web/heldmove.js)
+  'No signal': 'Pas de réseau',
+  'your move is kept and goes when the line is back': 'votre coup est gardé et part dès que la ligne revient',
+  'Back online': 'De nouveau en ligne',
+  'Kept back': 'Coup retenu',
+  'pick a pit when you are ready': 'choisissez un trou quand vous voulez',
+  'Esc to keep it back': 'Échap pour le retenir',
   'This browser cannot open a live connection': 'Ce navigateur ne peut pas ouvrir de connexion en direct',
   'Could not reach the server — check your signal and try again': 'Impossible de joindre le serveur — vérifiez votre réseau et réessayez',
 
@@ -221,6 +228,13 @@ export function roomPatterns({ who, item, need }) {
     [R(`(\\d+) games? at this board`), (m) => m[1] === '1' ? '1 partie à ce plateau' : `${m[1]} parties à ce plateau`],
     [R(`([Gg])ame (\\d+)`), (m) => `${m[1] === 'G' ? 'Partie' : 'partie'} ${m[2]}`],
     [R(`weighing their pit (\\d+)`), (m) => `hésite sur le trou ${m[1]} d’en face`],
+    // a move kept for the line (web/heldmove.js)
+    [R(`pit (\\d) goes as soon as the line is back`), (m) => `le trou ${m[1]} part dès que la ligne revient`],
+    [R(`tap pit (\\d) again to keep it back`), (m) => `touchez encore le trou ${m[1]} pour le retenir`],
+    [R(`your pit (\\d) went`), (m) => `votre trou ${m[1]} est parti`],
+    [R(`the game ended meanwhile; pit (\\d) was not played`), (m) => `la partie s’est terminée entre-temps ; le trou ${m[1]} n’a pas été joué`],
+    [R(`the board moved on; pit (\\d) was not played`), (m) => `la partie a avancé ; le trou ${m[1]} n’a pas été joué`],
+    [R(`pit (\\d) can't be played now`), (m) => `le trou ${m[1]} ne peut plus être joué`],
     // the away titles
     [R(`${N} played`), (m) => `${who(m[1])} a joué`],
     [R(`${N} won`), (m) => `${who(m[1])} a gagné`],
