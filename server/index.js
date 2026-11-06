@@ -19,6 +19,8 @@
 // same hash in its <meta name="ayo-build">, so a page left open can tell a newer game is out (web/fresh.js).
 // GET /vendor/three.module.min.js is the 3D library (three 0.170.0 from node_modules, the same file cdnjs serves): the page loads it
 // from cdnjs, and from here on a phone that could not reach cdnjs (the start-up watch in web/index.html decides, on the phone).
+// The page carries Open Graph tags written per address (server/preview.js), so a shared invite or puzzle link shows the board,
+// who is asking and today's ask in WhatsApp's card.
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
 import express from "express";
 import http from "node:http";
@@ -27,6 +29,7 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage, backMessage } from "./rooms.js";
 import { mountLegal } from "./legal.js";
+import { pageWithPreview } from "./preview.js";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 
@@ -54,7 +57,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   const build = buildId(), page = pageWithBuild(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), build);
   app.get("/version", (_req, res) => { res.set("Cache-Control", "no-store"); res.json({ v: build }); });
   const haveLocal = fs.existsSync(THREE_FILE);
-  app.get(["/", "/index.html"], (_req, res) => { res.set("Cache-Control", "no-cache"); res.type("html").send(page); });
+  app.get(["/", "/index.html"], (_req, res) => { res.set("Cache-Control", "no-cache"); res.type("html").send(pageWithPreview(page, _req, rooms)); });
   app.get("/vendor/three.module.min.js", (_req, res) => { if (!haveLocal) return res.status(404).end(); res.set("Access-Control-Allow-Origin", "*"); res.sendFile(THREE_FILE, { maxAge: "7d" }); });
   app.use("/engine", express.static(ENGINE));
   app.use(express.static(WEB));

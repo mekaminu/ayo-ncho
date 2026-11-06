@@ -42,7 +42,7 @@ export function fontsCss() {
 export function build(out = path.join(ROOT, 'app', 'www')) {
   rmSync(out, { recursive: true, force: true });
   mkdirSync(out, { recursive: true });
-  for (const f of readdirSync(path.join(ROOT, 'web'))) if (f !== 'sw.js' && f !== 'index.html') cpSync(path.join(ROOT, 'web', f), path.join(out, f), { recursive: true });
+  for (const f of readdirSync(path.join(ROOT, 'web'))) if (f !== 'sw.js' && f !== 'index.html' && !/^share-board/.test(f)) cpSync(path.join(ROOT, 'web', f), path.join(out, f), { recursive: true });
   cpSync(path.join(ROOT, 'engine'), path.join(out, 'engine'), { recursive: true });
   mkdirSync(path.join(out, 'vendor'));
   cpSync(path.join(ROOT, 'node_modules', 'three', 'build', 'three.module.min.js'), path.join(out, 'vendor', 'three.module.min.js'));

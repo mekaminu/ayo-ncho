@@ -9,7 +9,7 @@
 @font-face{font-family:Fraunces;font-weight:600;src:url(/node_modules/@fontsource/fraunces/files/fraunces-latin-600-normal.woff2) format('woff2')}
 @font-face{font-family:Inter;font-weight:500;src:url(/node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2) format('woff2')}
 html,body{margin:0;background:#0d0906;overflow:hidden;width:1024px;height:500px}
-canvas{display:block;position:absolute;inset:0;width:1024px;height:500px}
+canvas{display:block;position:absolute;inset:0;width:100%!important;height:100%!important}
 #name{position:absolute;left:64px;top:50%;transform:translateY(-54%);color:#f1e6d2;text-shadow:0 2px 18px rgba(0,0,0,.8)}
 #name h1{font:600 64px/1 Fraunces,serif;margin:0;letter-spacing:-.01em}
 #name p{font:500 21px/1.3 Inter,sans-serif;margin:14px 0 0;color:#e6b76f;letter-spacing:.06em;text-transform:uppercase}
@@ -26,7 +26,8 @@ const { pour, place } = await import('/web/slots.js');
 const q = new URLSearchParams(location.search);
 if (q.get('lang') === 'fr') { document.documentElement.lang = 'fr'; document.querySelector('#name p').textContent = 'Mancala nigérian en 3D'; } // the French store page's banner
 const FINISH = q.get('finish') || 'mahogany', SET_ID = q.get('seeds') || 'jobs';
-const W = 1024, H = 500, DPR = 2;
+const W = +(q.get('w') || 1024), H = +(q.get('h') || 500), DPR = 2; // ?w=1200&h=630: the link preview (tools/link-preview.py)
+if (W !== 1024 || H !== 500) { for (const el of [document.documentElement, document.body]) { el.style.width = W + 'px'; el.style.height = H + 'px'; } }
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(DPR); renderer.setSize(W, H); document.body.prepend(renderer.domElement);
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
