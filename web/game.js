@@ -35,6 +35,7 @@ import { pour, place, reach } from './slots.js';
 import { boardAudio } from './sound.js';
 import { makeMusic, musicWanted, musicNote } from './music.js';
 import { makeI18n, pickLang, langNote } from './i18n.js';
+import { applyScale, sizePref, sizeNote, sizeToast } from './textsize.js';
 import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './last8.js';
 import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown, haulKind } from './handcount.js';
@@ -65,6 +66,10 @@ const params = new URLSearchParams(location.search);
 const GOLD_PREVIEW = previewOf(location.search); // ?try=master: Papa Ike open for this visit (until Gold can be bought)
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?? d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem('ayo.' + k, v); } catch {} } };
+// bigger words (web/textsize.js): Settings → Language → Word size; ?textsize=large|larger for a visit (the checks)
+const textSizeNow = () => sizePref(params0().get('textsize') || prefs.get('textsize', 'normal'));
+function params0() { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } }
+applyScale(document, textSizeNow());
 // the page's language (web/i18n.js, Launch L18): Settings → Language, Auto follows the phone; ?lang=fr|en for a visit
 const langPref = () => params.get('lang') || prefs.get('lang', 'auto');
 const i18n = makeI18n({ doc: document, lang: pickLang(langPref(), navigator.languages || [navigator.language]) }).start();
@@ -1649,7 +1654,7 @@ function paintSettings() {
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
   sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('music', musicOn()); $('#musicNow').textContent = musicNote({ on: musicOn(), sound: soundOn(), call: callLive() }) ? ` · ${musicNote({ on: musicOn(), sound: soundOn(), call: callLive() })}` : ''; sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : ''; paintRemind(); paintBlocked();
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})` + (lastGameWords(parseFrames(prefs.get('frames.last', ''))) ? ' · ' + lastGameWords(parseFrames(prefs.get('frames.last', ''))) : '');
-  set('lang', prefs.get('lang', 'auto')); paintLegal(); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
+  set('lang', prefs.get('lang', 'auto')); set('textsize', textSizeNow()); $('#sizeNow').textContent = sizeNote(textSizeNow()); paintLegal(); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
   const two = $('.choose[data-mode="local"]'); two.setAttribute('aria-pressed', settings.mode === 'local'); two.textContent = settings.mode === 'local' ? 'Chosen' : 'Choose';
@@ -1794,6 +1799,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
         prefs.set('seeds', v); applySeedSet(); paintSettings(); }
       else if (name === 'speed') { prefs.set('speed', v); PACE = PACES[v]; }
       else if (name === 'lang') { prefs.set('lang', v); params.delete('lang'); i18n.set(pickLang(v, navigator.languages || [navigator.language])); paintLegal(); if (reminders.supported) remindSync(); } // the reminder's words follow the language
+      else if (name === 'textsize') { prefs.set('textsize', sizePref(v)); applyScale(document, textSizeNow()); toast(sizeToast(v)); } // at once, no new game
       else if (name === 'remindAt') { prefs.set('remindAt', v); paintRemind(); remindSync(); }
       else if (name === 'starts') { prefs.set('starts.pref', v); toast(v === 'loser' ? 'From the next game: the loser goes first' : v === 'you' ? 'From the next game: you always start' : 'From the next game: they always start'); }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto') || prefs.get('quality.measured', '') === 'slow') { prefs.set('quality', v); prefs.set('quality.measured', ''); /* a choice in Settings starts the speed judgement afresh */ save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
@@ -2135,7 +2141,7 @@ const TIPS = [
 let tipStep = +prefs.get('tutorial', '0');
 function showTip(text) {
   if (!text || params.get('still') || params.get('capture') || puzzle.on) return;
-  let t = $('#tip'); if (!t) { t = document.createElement('div'); t.id = 'tip'; t.innerHTML = '<p></p><button class="btn ghost" style="padding:8px 12px;font-size:13px">Got it</button>'; body.appendChild(t); t.querySelector('button').addEventListener('click', () => { t.remove(); }); }
+  let t = $('#tip'); if (!t) { t = document.createElement('div'); t.id = 'tip'; t.innerHTML = '<p></p><button class="btn ghost" style="padding:8px 12px;font-size:calc(13px*var(--ts))">Got it</button>'; body.appendChild(t); t.querySelector('button').addEventListener('click', () => { t.remove(); }); }
   t.querySelector('p').textContent = text;
 }
 function tipFor(events) {

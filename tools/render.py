@@ -175,7 +175,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -252,6 +252,48 @@ if cdnc:  # the board on a slow or patchy line: the line while it loads, three.j
     if node: node.terminate()
     if errors: print("page errors:", errors); sys.exit(1)
     print("cdn ok"); sys.exit(0)
+if tsc:  # bigger words (idea 6 Nov): Settings → Language → Word size; at Larger nothing on Home, the board's lines or Settings runs off the screen
+    OVER = """() => { const W = innerWidth; const bad = [];
+      for (const el of document.querySelectorAll('body *')) { if (el.closest('[hidden]') || el.closest('canvas') || el.closest('.toast')) continue; const cs = getComputedStyle(el);
+        if (cs.display === 'none' || cs.visibility === 'hidden' || !el.childElementCount && !el.textContent.trim()) continue;
+        if (el.closest('.swatches, .seg, .row, .box, .setBody, .rail')) continue; // Settings scrolls; its rows wrap
+        const r = el.getBoundingClientRect(); if (r.width && (r.right > W + 1 || r.left < -1)) bad.push((el.id || el.className || el.tagName) + ' ' + Math.round(r.left) + '–' + Math.round(r.right)); }
+      return { doc: document.documentElement.scrollWidth, W, bad: bad.slice(0, 8) }; }"""
+    fs = lambda sel: pg.evaluate("parseFloat(getComputedStyle(document.querySelector('%s')).fontSize)" % sel)
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        for w, h, tag in ((390, 844, ""), (800, 900, "-fold"), (1180, 820, "-wide")):
+            ctx = b.new_context(viewport={"width": w, "height": h}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "textsize %d: " % w)
+            pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.speed', 'fast'); localStorage.setItem('ayo.textsize', 'larger'); }")
+            pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); pg.wait_for_timeout(800)
+            assert pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ts').trim()") == "1.3", "the saved size is on the page"
+            o = pg.evaluate(OVER); assert o["doc"] <= o["W"] and not o["bad"], ("Home at Larger", o)
+            if not tag: pg.screenshot(path=out.replace(".png", "-home.png"))
+            pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(900)
+            x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pg.evaluate("window.__ayo.state.pits.slice(0,6).indexOf(Math.max(...window.__ayo.state.pits.slice(0,6)))"))
+            pg.mouse.click(x, y); pg.wait_for_timeout(1400)
+            hint = pg.evaluate("document.querySelector('#hint').textContent"); assert hint, "the first tap's words"
+            big = fs('#hint')
+            o = pg.evaluate(OVER); assert o["doc"] <= o["W"] and not o["bad"], ("the board at Larger", o)
+            hb = pg.evaluate("document.querySelector('#hint').getBoundingClientRect().toJSON()"); assert hb["bottom"] <= h and hb["top"] >= 0, ("the hint line on screen", hb)
+            pg.screenshot(path=out.replace(".png", tag + ".png") if tag else out)
+            pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
+            pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000)
+            assert pg.evaluate("document.querySelector('[data-set=textsize] [data-v=larger]').getAttribute('aria-pressed')") == "true"
+            assert "bigger still" in pg.evaluate("document.querySelector('#sizeNow').textContent")
+            pg.evaluate("document.querySelector('[data-set=textsize]').scrollIntoView({block:'center'})"); pg.wait_for_timeout(300)
+            if not tag: pg.screenshot(path=out.replace(".png", "-settings.png"))
+            pg.click("[data-set=textsize] [data-v=normal]"); pg.wait_for_timeout(300)
+            assert pg.evaluate("localStorage.getItem('ayo.textsize')") == "normal" and pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ts').trim()") == "1"
+            pg.click("#settingsBack"); pg.wait_for_timeout(600)
+            if not pg.evaluate("document.querySelector('#hint').hidden"):
+                pg.mouse.click(x, y); pg.wait_for_timeout(900)
+                if pg.evaluate("document.querySelector('#hint').textContent"): r = big / fs('#hint'); assert 1.25 < r < 1.35, ("the hint line is 1.3× at Larger", big, fs('#hint'))
+            print("textsize %d: ok · hint %.1fpx at Larger · %s" % (w, big, hint[:70]))
+            ctx.close()
+        b.close()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    print("textsize ok"); sys.exit(0)
 if nextc:  # the next puzzle (idea 5 Nov): the result card counts down to midnight, turns at midnight, and Home's card turns with the day
     import datetime, zoneinfo
     with sync_playwright() as p:
