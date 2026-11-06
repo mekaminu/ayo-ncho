@@ -43,6 +43,7 @@ import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './la
 import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown, haulKind } from './handcount.js';
 import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
+import { parse as parseTally, record as recordTally, roomKey, entryOf as tallyOf, cardLine as tallyLine, startLine as tallyStart, standingParts, wentUp, played as tallyPlayed } from './tally.js';
 import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
 import { HOLD_MS, COUNT_STAY_MS, countPlan, canCount, stillHolding, countWords } from './count.js';
@@ -472,6 +473,8 @@ let state = newGame(settings.game, settings.rules()); let busy = false; let sele
 let stats = { biggest: 0, captures: 0, started: Date.now() };
 // your record against each opponent, kept on this phone (web/record.js): wins–losses and your best win, on their Home pill and the Game over card
 let records = parseRecord(prefs.get('record', null));
+// the score at the table with a friend (web/tally.js): each room's wins by seat and draws, counted once per game of the room
+let tally = parseTally(prefs.get('tally', null)); let tableRoom = null;
 // who starts (web/starts.js): as at a real board the loser of the last game against this opponent (or between the two of you) moves first;
 // Settings → Rules → Who starts can make it always you or always them. A room's server already starts the loser.
 let starts = parseStarts(prefs.get('starts', null));
@@ -924,7 +927,7 @@ function callRoom() { if (call.f.phase !== 'idle' && (!friend || !friend.online)
 function callEnd() { if (call.f.phase !== 'idle') { const e = call.f.hangUp(); callDo(e); } callMenu.hidden = true; $('#callCard').hidden = true; }
 
 function syncRoom(room) { // the room as the server shows it: the friend's seat and the whole game
-  friend = room.players[them] || null;
+  friend = room.players[them] || null; tableRoom = room.rid ? { code: room.code, rid: room.rid, games: room.games || 0 } : null;
   const s = stateFrom(room.state);
   const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
   state = s; if (!same) { layoutFromState(state); peekIn.pit = -1; peekOut.reset(); }
@@ -1058,7 +1061,7 @@ function startOnline(code, { stay = false } = {}) {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
     if (!had && friend) { tele.track('invite_joined', { as: 'host' }, `j:${net && net.code}`); if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
-    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); resetDraw(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
+    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); resetDraw(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); const tl = tableRoom ? tallyStart(tallyOf(tally, roomKey(tableRoom.code, tableRoom.rid)), you, friend ? friend.name : oppLabel()) : ''; toast((tl ? tl[0].toUpperCase() + tl.slice(1) : 'New game') + ' — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`), tl ? 2600 : 1800); }
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); awayNote('rematch'); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
   on('move', (m) => { drawOnMove(m.seat); if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
@@ -1983,7 +1986,8 @@ function gameOver() {
 // your record against this opponent, counted once per game (the game's start time is its id) and shown on the card with their face;
 // when the result is worth a word (your first win against them, a run of 3, 5, 10…) they say it, on the card and in the bubble
 function paintRecord(a, b) {
-  const box = $('#goRecord'); $('#goNext').hidden = true; if (online || puzzle.on || local) { box.hidden = true; return null; } // two of us keeps no record: the phone cannot tell who sat where
+  const box = $('#goRecord'); $('#goNext').hidden = true; if (online && !puzzle.on) { paintTally(box); return null; }
+  if (online || puzzle.on || local) { box.hidden = true; return null; } // two of us keeps no record: the phone cannot tell who sat where
   const r = recordGame(records, level, a, b, stats.started); records = r.data; if (r.counted) prefs.set('record', JSON.stringify(records));
   const nx = r.counted ? nextUp(level, r.moment, names) : null; // your first win over them: the next one up is offered
   if (nx) { $('#goNext').textContent = nx.text; $('#goNext').dataset.level = nx.level; $('#goNext').hidden = false; }
@@ -1995,6 +1999,22 @@ function paintRecord(a, b) {
   $('#goRecFace').innerHTML = faceFor(level, mood); box.hidden = false;
   if (word) setTimeout(() => { click(1.6, 0.06); buzz(10); }, 450); // the line lands a beat after the card
   return word ? { text: word, mood } : null;
+}
+// the score at the table (web/tally.js): playing a friend game after game, the card says who leads at this board tonight; the
+// standing that changed lands as it stood before ("level 0–0") and turns to the new one ("you lead 1–0") with a knock
+let tallyTimer = 0;
+function paintTally(box) {
+  clearTimeout(tallyTimer);
+  const key = tableRoom && roomKey(tableRoom.code, tableRoom.rid); if (!key) { box.hidden = true; return; }
+  const r = recordTally(tally, key, tableRoom.games, state.winner); tally = r.data; if (r.counted) prefs.set('tally', JSON.stringify(tally));
+  const name = friend ? friend.name : oppLabel(); const text = tallyLine(r.entry, you, name); if (!text) { box.hidden = true; return; }
+  const up = wentUp(r.before, r.entry, you); const parts = text.split(' · '); const at = up === 'draw' ? 1 : up ? 0 : -1;
+  const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const was = up && up !== 'draw' ? (tallyPlayed(r.before) ? standingParts(r.before, you, name)[0] : 'level 0–0') : null;
+  $('#goRecLine').innerHTML = parts.map((p, i) => i === at ? `<em class="tally">${esc(i === 0 && was && !reduceMotion ? was : p)}</em>` : esc(p)).join(' · ');
+  $('#goRecSay').hidden = true; box.classList.remove('word'); $('#goRecFace').innerHTML = initialFace(name).replace('width="44" height="44"', 'width="100%" height="100%"'); box.hidden = false;
+  if (at < 0) return;
+  tallyTimer = setTimeout(() => { const em = $('#goRecLine').querySelector('em.tally'); if (!em || $('#gameover').hidden) return; em.textContent = parts[at]; em.classList.remove('tick'); void em.offsetWidth; em.classList.add('tick'); click(up === 'mine' ? 1.7 : 1.1, 0.07); buzz(8); }, reduceMotion ? 0 : 700);
 }
 // how the game went (web/story.js): the lead move by move as a line drawn in on the card — brass above the middle while
 // the near player leads, ember below while the other side does — a brass dot on the move that won it, an ember ring on

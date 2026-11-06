@@ -345,6 +345,7 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .record .face.s{width:28px;height:28px;margin:0;border:1px solid rgba(230,183,111,.4)}
 .record .col{gap:3px;min-width:0}
 .record b{font-size:calc(13px*var(--ts));font-weight:600}.record b em{font-style:normal;color:var(--brass)}
+.record b em.tally{display:inline-block}.record b em.tally.tick{animation:bump .5s ease-out}@media (prefers-reduced-motion: reduce){.record b em.tally.tick{animation:none}}
 .record i{font-style:italic;font-size:calc(12px*var(--ts));color:var(--muted);line-height:1.35}
 .record.word{border-color:rgba(230,183,111,.4);background:rgba(230,183,111,.1)}
 /* your rating against the computer: on the card the number ticks from before to after; on Home a quiet line with a brass disc */
