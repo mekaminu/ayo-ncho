@@ -32,7 +32,7 @@ import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach
 import { sidewaysAngle, SIDE_PHI } from './sideways.js';
 import { retryOf, isRetry, retryOffer, retryButton, retryToast, retryEyebrow, retryLine, retryShare } from './retry.js';
 import { playoutOf, isPlayout, canPlayOut, playedOut, undoOk, undoReady, playoutButton, playoutToast, playoutEyebrow, playoutShare } from './playout.js';
-import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare } from './local.js';
+import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare, nearSeatAt, tableCards, TABLE_START } from './local.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT, BT, BW, BL, R as CORNER } from './board.js';
 import { pour, place, reach } from './slots.js';
 import { boardAudio, handful } from './sound.js';
@@ -462,6 +462,12 @@ let you = 0, them = 1; // engine seats: against the computer you are always 0; i
 // round to face them (Settings → Feel → Pass the phone — off when the Fold lies flat between you and each side already has its pits nearest it)
 let playout = null; const playingOut = () => !online && !local && isPlayout(playout, state); // a game played on from the daily puzzle (web/playout.js): practice, never saved or counted
 let local = false; const swingOn = () => prefs.get('swing', '1') === '1';
+// across the table (web/local.js tableCards): two of us with Pass the phone off — the board never turns, so each name card stays
+// with its player: the near card is the seat whose pits lie nearest the near edge as the camera sees it (a drag round changes it)
+const tableOn = () => local && !swingOn();
+const nearCard = () => tableOn() ? nearSeatAt(theta) : you;
+let tableNear = null; // the near card's seat as last painted (a drag that brings the other end nearer repaints the cards)
+const scoreOf = (seat) => (seat === nearCard() ? $('#myScore') : $('#oppScore'));
 function seat(s) { you = s; them = 1 - s; baseTheta = s === 1 ? Math.PI : 0; } // the near seat (the camera gets there by the screen's swing, or passTurn's)
 async function passTurn() { // two of us: the player to move takes the near seat; the board turns on round to face them, never back the way it came
   const s = seatOf(state); if (s === you) return;
@@ -572,10 +578,10 @@ function teleStart(s) { // a game's first move, whoever made it (never the puzzl
   if (puzzle.on || s.moves.length !== 1) return; const first = prefs.get('tele.first', null) === null; if (first) prefs.set('tele.first', 'started');
   tele.track('game_start', { game: s.variant, vs: teleVs(), first }, online ? null : `s:${stats.started}`);
 }
-const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : local ? LNAMES[them] : levelLabel(level);
+const oppLabel = () => online ? (friend ? friend.name : 'Waiting for a friend') : local ? LNAMES[1 - nearCard()] : levelLabel(level);
 const defaultMe = $('#meName').textContent;
 const myName = () => prefs.get('name', '') || defaultMe || 'Player';
-function paintMyName() { const n = local ? LNAMES[you] : prefs.get('name', '') || defaultMe; $('#meName').textContent = n; $('#goMe span').textContent = n; } // two of us: the near card is whoever is to move
+function paintMyName() { const n = local ? LNAMES[nearCard()] : prefs.get('name', '') || defaultMe; $('#meName').textContent = n; $('#goMe span').textContent = n; } // two of us: the near card is whoever is to move
 // the name card: asked once (before a room is opened or knocked on), then remembered on this phone
 function askName(verb) {
   return new Promise((res) => {
@@ -1030,7 +1036,7 @@ async function flyBack(b, a, played, words = null) {
   const plan = planReturn(b, a, played); const meshes = plan.map((p) => homes[p.from][p.fromSlot]);
   const c = {}; for (const h in homes) c[h] = homes[h].length;
   for (const h in homes) { const keep = h[0] === 'S' ? a.stores[+h[1]] : a.pits[+h]; if (homes[h].length > keep) homes[h].length = keep; }
-  const paint = (h) => { if (typeof h === 'number') setBadge(h, c[h]); else { const p = +h[1]; $(p === you ? '#myScore' : '#oppScore').textContent = c[h]; } };
+  const paint = (h) => { if (typeof h === 'number') setBadge(h, c[h]); else { const p = +h[1]; scoreOf(p).textContent = c[h]; } };
   if (played !== undefined) { select(played, false); click(0.9, 0.07); }
   if (words) $('#hint').textContent = words; // (after the pit lights: lighting it says the turn's words)
   rattle(Math.min(plan.length, 6), at(played ?? 0));
@@ -1135,7 +1141,7 @@ async function hint() {
 }
 
 function paintFaces() {
-  $('#oppFace').innerHTML = online ? initialFace(friend ? friend.name : '?') : local ? initialFace(String(them + 1)) : faceFor(level, mood); // two of us: the far player's number on a brass ring
+  $('#oppFace').innerHTML = online ? initialFace(friend ? friend.name : '?') : local ? initialFace(String(2 - nearCard())) : faceFor(level, mood); // two of us: the far player's number on a brass ring
   document.querySelectorAll('.pill[data-level]').forEach((b) => { b.querySelector('.face').innerHTML = CHARACTERS[b.dataset.level].face; });
   document.querySelectorAll('[data-face]').forEach((f) => { f.innerHTML = CHARACTERS[f.dataset.face].face; });
 }
@@ -1157,16 +1163,18 @@ window.__race = race;
 function refreshStatic() {
   paintFaces(); paintMyName();
   state.pits.forEach((n, i) => setBadge(i, n));
-  $('#myScore').textContent = state.stores[you]; $('#oppScore').textContent = state.stores[them];
+  $('#myScore').textContent = state.stores[nearCard()]; $('#oppScore').textContent = state.stores[1 - nearCard()];
   $('#oppName').textContent = oppLabel();
   showTurn();
 }
 function showTurn() {
+  const tc = tableOn() && !watch.on && !puzzle.on ? tableCards(state, nearCard()) : null; document.body.classList.toggle('table', !!tc); document.body.classList.toggle('farturn', !!(tc && tc.farTurn)); tableNear = tc ? tc.near.seat : null;
   if (watch.on) { paintWatch(); return; } // watching a game sent as a link: its own words, nothing to press
   if (online) { showTurnOnline(); paintPits(); return; }
   if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : pickHint('puzzle'); $('#undo').disabled = true; $('#hintBtn').disabled = true; paintPits(); return; }
   const mine = state.turn === you && !state.over;
-  if (local) { const w = localTurn(state); $('#turn').textContent = mine || state.over ? w.turn : '…'; $('#oppSub').textContent = mine ? w.sub : state.over ? '' : 'passing the phone…'; }
+  if (tc) { $('#turn').textContent = tc.near.turn; $('#oppSub').textContent = tc.far.sub; } // across the table: each card stays with its player
+  else if (local) { const w = localTurn(state); $('#turn').textContent = mine || state.over ? w.turn : '…'; $('#oppSub').textContent = mine ? w.sub : state.over ? '' : 'passing the phone…'; }
   else { $('#turn').textContent = state.over ? 'game over' : mine ? 'your move' : '…'; $('#oppSub').textContent = state.over ? '' : mine ? 'waiting' : 'thinking…'; }
   $('#hint').textContent = state.over ? '' : mine ? pickHint('pick') : '';
   $('#undo').disabled = busy || state.moves.length < (local ? 1 : 2) || !undoReady(playingOut() ? playout : null, state); undoLabel(false);
@@ -1440,7 +1448,7 @@ async function sowEvents(events, prevStores, pace) {
       const k = pace / PACES.normal; // the sowing speed sets this hand's speed too
       if (animate.cluster && animate.cluster.length) animate.cluster.forEach((s, j) => { const p = handPose(animate.over, j); p.y += 0.08; hold(s, p, 150 * k, 0); }); // a sowing hand still full rises out of the way (Nchò takes a 4 mid-sowing)
       await wait(120 * k);
-      const store = 'S' + e.by, scoreEl = e.by === you ? $('#myScore') : $('#oppScore'), hand = [];
+      const store = 'S' + e.by, scoreEl = scoreOf(e.by), hand = [];
       hands.haul.el.classList.toggle('gift', haulKind(events, e) === 'gift'); // whose 4 is it: seeds going to the other side's trough ride a pale number
       for (const pit of e.pits) {
         const taken = homes[pit].splice(0); setBadge(pit, 0); taken.forEach(moved); rattle(taken.length, at(pit));
@@ -1948,7 +1956,7 @@ async function winMoment() {
     const total = waveLength(w.troughs.map((s) => homes['S' + s].length));
     const glow = key ? tween(total, (t) => { const f = lampAt(t * total, total); key.intensity = k0 * f; win.peak = Math.max(win.peak, f); win.samples++; }) : null;
     for (const s of w.troughs) {
-      const el = s === you ? $('#myScore') : $('#oppScore'); el.classList.remove('glint'); void el.offsetWidth; el.classList.add('glint');
+      const el = scoreOf(s); el.classList.remove('glint'); void el.offsetWidth; el.classList.add('glint');
       const ms = homes['S' + s].slice(); const fromLeft = pitCenters[s * 6][0] < pitCenters[s * 6 + 5][0];
       const order = waveOrder(ms.map((m) => m.position.x), fromLeft); const span = order.length ? order[order.length - 1].at : 0;
       w.notes.forEach((p, k) => setTimeout(() => click(p, w.kind === 'draw' ? 0.06 : 0.08), hurried(Math.round((k / Math.max(1, w.notes.length - 1)) * span), hurry.on)));
@@ -2087,7 +2095,7 @@ $('#replayBtn').addEventListener('click', async () => {
   for (const m of moves) { const r = applyMove(s, m); if (r.state.turn === them) { select(m); await wait(250); } deselect(); await animate(r.events, s.stores, 70); s = r.state; refreshStaticFrom(s); }
   busy = false; $('#gameover').hidden = false;
 });
-function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); $('#myScore').textContent = s.stores[you]; $('#oppScore').textContent = s.stores[them]; }
+function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); const n = local ? nearCard() : you; $('#myScore').textContent = s.stores[n]; $('#oppScore').textContent = s.stores[1 - n]; }
 $('#shareBtn').addEventListener('click', async () => {
   const a = state.stores[you], b = state.stores[them]; let text = tLines(local ? localShare(state) : playingOut() ? (isRetry(playout) ? retryShare(state, you, names[level], playout) : playoutShare(state, you, names[level])) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`);
   const seats = []; if (local) { seats[0] = LNAMES[0]; seats[1] = LNAMES[1]; } else { seats[you] = myName(); seats[them] = online ? oppLabel() : names[level]; }
@@ -2155,7 +2163,7 @@ function newRound() {
   if (!dealsIn(plan, { reduceMotion, clipping })) layoutFromState(state);
   refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); faceSeat();
   const dealt = dealsIn(plan, { reduceMotion, clipping }) ? dealIn(plan, state) : Promise.resolve();
-  if (local) setTimeout(() => toast(`${startWords(st, LNAMES, false)} · pass the phone after each move`), 600);
+  if (local) setTimeout(() => toast(`${startWords(st, LNAMES, false)} · ${tableOn() ? TABLE_START : 'pass the phone after each move'}`), 600);
   else { setTimeout(greet, 600); if (st.first === them || st.why !== 'first') setTimeout(() => toast(startWords(st, ['You', names[level]])), 600); dealt.then(() => { if (deal.again) return; kickAi(); }); } // the computer opens when it is their start, once the board is set
   dealt.then(() => { if (deal.again) { deal.again = false; newRound(); } });
 }
@@ -2167,7 +2175,7 @@ function homeCounts() { return { pits: [...Array(12).keys()].map((i) => homes[i]
 async function dealIn(plan, s) {
   deal.live = true; deal.deals++; busy = true;
   if (hurry.depth++ === 0) { hurry.on = false; hurry.words = false; }
-  const scoreEl = (side) => (side === you ? $('#myScore') : $('#oppScore'));
+  const scoreEl = scoreOf;
   const shown = homeCounts(); shown.pits.forEach((n, i) => setBadge(i, n)); for (const side of [0, 1]) scoreEl(side).textContent = shown.stores[side];
   const SETTING = 'Setting up the board — four seeds to each pit', was = i18n.src($('#hint')); $('#hint').textContent = SETTING; $('#oppSub').textContent = 'setting up…';
   try {
@@ -2582,6 +2590,7 @@ function loop(now) {
   runTweens(now); part('tweens'); hoverStep(now, (now - last) / 1000); ponderStep(now, (now - last) / 1000); peekStep(now, (now - last) / 1000); lastStep(now); sim.step((now - last) / 1000, now); part('physics'); if (pathGlow && !reduceMotion) board.marks.end.material.opacity = 0.34 + 0.1 * Math.sin(now / 240); if (feed.on && !reduceMotion) for (const pit of feed.rings) { const m = board.may[pit]; if (m.visible && m.scale.x <= 1.001) m.material.opacity = 0.6 + 0.15 * Math.sin(now / 320); } if (riskGlow && !reduceMotion) for (const r of board.marks.risk) if (r.visible) r.material.opacity = 0.56 + 0.14 * Math.sin(now / 320); if (idle && !reduceMotion) theta += (now - last) * 0.00004; else if (cinematic && !reduceMotion) theta += (now - last) * 0.000025; /* the clip drifts slowly round the board */ last = now; placeCam(); placeBadges(); placeHands(); part('place'); if (glw.phase === 'lost') glPaint(glw.tick(now, document.hidden)); const fresh = glFresh > 0 && glw.phase === 'ok'; if (fresh) glFresh--; if ((clipping || frames < 3 || fresh || drawDue(now, batt.lastDrawn, batt.plan) || (batt.skipped++, false)) && rest.draw(scene, camera, view, now, frames < 3 || fresh || clipping || moving)) { renderer.render(scene, camera); rest.seen(scene, camera, view); if (batt.plan.on) batt.minGap = Math.min(batt.minGap, now - batt.lastDrawn); batt.lastDrawn = now; } part('render'); if (P) { P.frames = (P.frames || 0) + 1; (P.logic = P.logic || []).push(P.cur || 0); P.cur = 0; } frames++; frameMeter(gap, performance.now() - t0, moving);
   if (frames === 3) { window.__done = true; window.__ayoUp = true; if (params.get('still')) { running = false; return; } }
   if (window.__freeze || document.hidden) { running = false; return; }
+  if (tableNear !== null && !busy && nearSeatAt(theta) !== tableNear && tableOn()) refreshStatic(); // across the table: the board dragged round, the cards follow their players
   requestAnimationFrame(loop);
 }
 function battSet() {

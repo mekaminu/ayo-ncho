@@ -54,3 +54,24 @@ test("undo takes back one move, so the player who just played has it again and t
   const r2 = replay(undoTo(back), "ncho"); assert.equal(seatOf(r2), 1, "and the sixth was Player 2's");
   assert.deepEqual(undoTo([3]), [], "the very first move can be taken back too");
 });
+
+test("across the table (Pass the phone off): each card stays with its player, 'your move' goes to the one to move, the words face the far player on their move", async () => {
+  const { nearSeatAt, tableCards } = await import("../web/local.js");
+  assert.equal(nearSeatAt(0), 0); assert.equal(nearSeatAt(Math.PI), 1); assert.equal(nearSeatAt(TAU), 0); assert.equal(nearSeatAt(1.2), 0); assert.equal(nearSeatAt(2.0), 1);
+  let s = newGame("ncho");
+  let c = tableCards(s, 0);
+  assert.deepEqual([c.near.name, c.near.turn, c.far.name, c.far.sub, c.farTurn], ["Player 1", "your move", "Player 2", "waiting", false]);
+  s = applyMove(s, legalMoves(s)[0]).state; c = tableCards(s, 0);
+  assert.deepEqual([c.near.name, c.near.turn, c.far.name, c.far.sub, c.farTurn], ["Player 1", "waiting", "Player 2", "your move", true], "the board stays: Player 2's card is still the far one");
+  c = tableCards(s, 1); // the board dragged round to face Player 2's end
+  assert.deepEqual([c.near.name, c.near.turn, c.far.name, c.farTurn], ["Player 2", "your move", "Player 1", false]);
+  // over random games the card that says "your move" is always the seat the engine has to move, and only one does
+  for (let g = 0; g < 40; g++) {
+    let st = newGame(g % 2 ? "ayo" : "ncho");
+    while (!st.over) {
+      for (const near of [0, 1]) { const k = tableCards(st, near); const says = [k.near, k.far].filter((x) => (x.turn || x.sub) === "your move"); assert.equal(says.length, 1); assert.equal(says[0].seat, st.turn); assert.equal(k.farTurn, st.turn !== near); }
+      const m = legalMoves(st); st = applyMove(st, m[Math.floor(Math.random() * m.length)]).state;
+    }
+    const k = tableCards(st, 0); assert.equal(k.farTurn, false); assert.equal(k.near.turn, "game over"); assert.equal(k.far.sub, "");
+  }
+});

@@ -34,6 +34,13 @@ button{font-family:inherit}
 .col{display:flex;flex-direction:column}.r{align-items:flex-end}
 #hint{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 118px);font-size:calc(12px*var(--ts));color:var(--brass);background:rgba(13,9,6,.6);padding:6px 12px;border-radius:999px;pointer-events:none;white-space:normal;max-width:min(92vw,560px);text-align:center;line-height:1.35;min-height:1em}
 #hint:empty{display:none}
+/* across the table (two of us, Pass the phone off): the far card faces the far player; on their move the hint line and the words under the board turn to face them too */
+.table .hud.top{transform:rotate(180deg)}
+.table #hint,.table #words{transition:opacity .25s,transform .45s ease}
+.farturn #hint,.farturn #words{transform:translateX(-50%) rotate(180deg)}
+html:not(.wide) .farturn #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 74px)} /* on the phone the far player's words sit at their end, under their card */
+html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 80px + max(var(--hint-h,28px),28px));flex-direction:column}
+@media (prefers-reduced-motion:reduce){.table #hint,.table #words{transition:opacity .25s}}
 /* the words under the board: their move, explained (tappable to watch it again slowly) and, above it on the phone, Mama Ngozi's take on your own last move */
 #words{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 124px + max(var(--hint-h,28px),28px));display:flex;flex-direction:column-reverse;align-items:center;gap:6px;width:max-content;max-width:min(92vw,560px);z-index:2;transition:opacity .25s}
 #lastMove,#take{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.45);color:var(--fg);border-radius:999px;padding:6px 10px 6px 12px;font:500 calc(12px*var(--ts)) Inter,system-ui,sans-serif;line-height:1.35;text-align:left;cursor:pointer;animation:rise .3s ease-out;transition:border-color .15s,transform .15s}

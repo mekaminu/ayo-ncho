@@ -1970,7 +1970,19 @@ with sync_playwright() as p:
         th4 = settled(); tap(pg, max(pg.evaluate("window.__ayo.legal")))
         pg.wait_for_function("!window.__ayo.busy && window.__ayo.seat===0 && window.__ayo.state.moves.length===2", timeout=240000)
         th5 = pg.evaluate("window.__ayo.theta"); assert abs(th5 - th4) < 0.05, ("with Pass the phone off the board must not turn", th4, th5)
-        assert pg.evaluate("document.querySelector('#meName').textContent") == "Player 1"
+        # across the table: the board stayed facing Player 2's end, so the near card is still Player 2's (now waiting), the far card,
+        # turned to face across, is Player 1's with "your move", and the hint line and the words under the board turn round to face them
+        cards = pg.evaluate("[document.querySelector('#meName').textContent, document.querySelector('#turn').textContent, document.querySelector('#oppName').textContent, document.querySelector('#oppSub').textContent, document.body.classList.contains('table'), document.body.classList.contains('farturn'), document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]")
+        st = pg.evaluate("window.__ayo.state"); near = 0 if math.cos(th5) >= 0 else 1
+        assert cards[0] == f"Player {near + 1}" and cards[2] == f"Player {2 - near}", ("each card stays with its player", cards, th5)
+        assert cards[4], "two of us with Pass the phone off is across the table"
+        mover = st["turn"]; assert (cards[1] == "your move") == (mover == near) and (cards[3] == "your move") == (mover != near), ("your move goes to the card to move", cards, mover)
+        assert cards[5] == (mover != near), ("the words face the far player on their move", cards)
+        assert cards[6] == str(st["stores"][near]) and cards[7] == str(st["stores"][1 - near]), ("each card keeps its own score", cards, st["stores"])
+        if cards[5]:
+            pg.wait_for_timeout(600); tf = pg.evaluate("getComputedStyle(document.querySelector('#hint')).transform"); assert tf.startswith("matrix(-1"), ("the hint line turned to face across", tf)
+            assert pg.evaluate("getComputedStyle(document.querySelector('.hud.top')).transform").startswith("matrix(-1"), "the far card faces across"
+            pg.screenshot(path=out[:-4] + "-table.png", timeout=120000, animations="disabled")
         pg.evaluate("localStorage.setItem('ayo.swing','1')")
         print("local: Pass the phone off → seat passed, board stayed ·", cont)
         b.close()

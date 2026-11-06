@@ -46,3 +46,15 @@ export function shareText(state) {
 
 // the line under Play on Home, and the Settings row's words
 export const PLAY_SUB = 'Two of us · pass the phone';
+
+// Across the table (Pass the phone off: the phone or the Fold lies flat between the two players and the board never turns).
+// Each name card stays with its player — the near card belongs to whoever's pits are nearest the near edge as the camera
+// sees it, the far card (turned to face across the table) to the other — and "your move" goes to whichever card is to move.
+// While the far player is to move, the hint line and the words under the board turn round to face them too (farTurn).
+export function nearSeatAt(theta) { return Math.cos(theta) >= 0 ? 0 : 1; }
+export function tableCards(state, near) {
+  const far = 1 - near, mover = state.turn === 1 ? 1 : 0, over = !!state.over;
+  const word = (s) => over ? (s === near ? 'game over' : '') : s === mover ? 'your move' : 'waiting';
+  return { near: { seat: near, name: NAMES[near], turn: word(near) }, far: { seat: far, name: NAMES[far], sub: word(far) }, farTurn: !over && mover === far };
+}
+export const TABLE_START = 'Player 1 this end · Player 2 across the table';

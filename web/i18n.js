@@ -405,6 +405,9 @@ export const FR = {
   'after a draw, the other side goes first': 'après un match nul, l’autre côté commence',
   'You start': 'Vous commencez',
   'pass the phone after each move': 'passez le téléphone après chaque coup',
+  'Player 1 this end · Player 2 across the table': 'Joueur 1 de ce côté · Joueur 2 en face',
+  'Player 1 this end': 'Joueur 1 de ce côté',
+  'Player 2 across the table': 'Joueur 2 en face',
   'A pale ring: those seeds go to their trough, not yours — a pit on their side that makes 4 before your last seed is theirs. Only your last seed takes a 4 over there.': 'Un anneau pâle : ces graines vont dans la réserve d’en face, pas dans la vôtre — un trou de son côté qui fait 4 avant votre dernière graine est à lui. Seule votre dernière graine prend un 4 là-bas.',
   'A pale ring: those seeds go to their trough, not yours.': 'Un anneau pâle : ces graines vont dans la réserve d’en face, pas dans la vôtre.',
   // the lesson
