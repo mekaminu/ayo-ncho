@@ -152,7 +152,10 @@ function buildPathMarks(group) {
   // ring's place (24 short beads, bone-coloured) — the seeds leave the pit, but they are not yours
   const giftG = new THREE.RingGeometry(PIT_R * 0.98, PIT_R * 1.05, 72, 1); { const idx = giftG.index.array, keep = [];
     for (let k = 0; k < 72; k++) if (k % 3 < 2) for (let j = 0; j < 6; j++) keep.push(idx[k * 6 + j]); giftG.setIndex(keep); }
-  const steps = [], dots = [], caps = [], risk = [], gifts = [];
+  // every seed they have (an Ayo grand slam): the capture that is not — an ash-grey ring at the capture ring's place with one
+  // stroke across the pit, the way a sum is struck out; the bar is the ring's child, so it fades and scales with it
+  const slamG = new THREE.RingGeometry(PIT_R * 0.98, PIT_R * 1.04, 72), barG = new THREE.PlaneGeometry(PIT_R * 2.0, PIT_R * 0.055);
+  const steps = [], dots = [], caps = [], risk = [], gifts = [], slams = [];
   for (const [x, z] of pitCenters) {
     steps.push(mk(ringG, new THREE.MeshBasicMaterial({ color: 0xe6b76f, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0025, z));
     // the mark itself: a brass dot on the bowl's inner slope, at the edge nearest the board's centre line, where seeds seldom sit
@@ -160,11 +163,13 @@ function buildPathMarks(group) {
     dots.push(mk(dotG, new THREE.MeshBasicMaterial({ color: 0xf2c57c, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), dx, surfaceY(dx, dz) + 0.0015, dz));
     caps.push(mk(capG, new THREE.MeshBasicMaterial({ color: 0xff6e3a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z));
     gifts.push(mk(giftG, new THREE.MeshBasicMaterial({ color: 0xf3e6c8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z));
+    const sm = mk(slamG, new THREE.MeshBasicMaterial({ color: 0xc9bfae, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0032, z);
+    const bar = new THREE.Mesh(barG, sm.material); bar.rotation.z = Math.PI / 4; bar.renderOrder = 2; sm.add(bar); sm.userData.bar = bar; slams.push(sm);
     // what the move leaves open: a deep ember ring just outside the rim of a pit their best answer would take
     risk.push(mk(riskG, new THREE.MeshBasicMaterial({ color: 0xff3b2b, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0035, z));
   }
   const end = mk(endG, new THREE.MeshBasicMaterial({ map: glowTexture(), color: 0xffc877, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending }), 0, BT + 0.002, 0);
-  return { steps, dots, caps, risk, gifts, end };
+  return { steps, dots, caps, risk, gifts, slams, end };
 }
 
 export function buildTable(scene, q = {}) {

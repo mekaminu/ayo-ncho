@@ -4,6 +4,7 @@
 import { applyMove, legalMoves, sideOf, opponent } from '../engine/ayo.js';
 import { sweepOf, sweepWords } from './last8.js';
 import { endedCircling, calledWords } from './circling.js';
+import { slamOf, slamWords } from './slam.js';
 
 // The path of a move for the player to move, or null when the pit cannot be played:
 //   order     the pits the hand sows into, in the order they are first reached
@@ -16,6 +17,7 @@ import { endedCircling, calledWords } from './circling.js';
 //             goes to its owner (pale rings: "whose 4 is it"); read from each capture event's `by`, never worked out here
 //   got/lost  seeds the mover's store gains, and the other side's
 //   sweep     the Nchò last-8 sweep, if the move makes one: { by, n, pits } (the engine marks it)
+//   slam      an Ayo grand slam the move makes, if any: { pit, pits, n, by } — every seed of theirs, so nothing taken (the engine marks it)
 //   over      whether the move ends the game, and who wins then
 export function sowPath(state, pit) {
   if (!state || state.over || !legalMoves(state).includes(pit)) return null;
@@ -31,7 +33,7 @@ export function sowPath(state, pit) {
     }
   }
   return {
-    pit, order, visits, end, relays, captures, takes, gives, drops, sweep: sweepOf(events),
+    pit, order, visits, end, relays, captures, takes, gives, drops, sweep: sweepOf(events), slam: slamOf(events),
     got: next.stores[me] - state.stores[me], lost: next.stores[opponent(me)] - state.stores[opponent(me)],
     over: next.over, winner: next.over ? next.winner : null,
     called: endedCircling(next), // the game is called on this move: no capture for 60 moves, each keeps their side (web/circling.js)
@@ -54,6 +56,7 @@ export function pathWords(path, { you = 0 } = {}) {
   if (path.got && !path.called) parts.push(`takes ${path.got}`); // a called game hands each side its own seeds: not a capture
   if (path.lost && !path.called) parts.push(`gives ${path.lost}`);
   if (path.sweep) parts.push(sweepWords(path.sweep, { you }));
+  if (path.slam) parts.push(slamWords(path.slam, { you }));
   if (path.called) parts.push(calledWords());
   if (path.over) parts.push(path.winner === 'draw' ? 'ends the game level' : path.winner === you ? 'wins the game' : 'ends the game');
   return parts.join(' · ');
@@ -68,6 +71,7 @@ export function playedWords(path, { you = 0 } = {}) {
   if (path.got && !path.called) parts.push(`took ${path.got}`);
   if (path.lost && !path.called) parts.push(`gave ${path.lost}`);
   if (path.sweep) parts.push(sweepWords(path.sweep, { you, played: true }));
+  if (path.slam) parts.push(slamWords(path.slam, { you, played: true }));
   if (!parts.length || path.over) parts.push(path.end === null ? 'sowed nothing' : `ended in ${pitName(path.end, you)}`);
   if (path.called) parts.push(calledWords());
   if (path.over) parts.push(path.winner === 'draw' ? 'the game ends level' : path.winner === you ? 'you win' : 'they win');

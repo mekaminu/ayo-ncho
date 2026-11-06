@@ -97,6 +97,7 @@ export function legalMoves(state) {
 
 // Apply a move. Returns a NEW state plus an `events` list the UI animates:
 //   {type:"pickup", pit, n} {type:"drop", pit} … {type:"capture", pits:[...], by, n} {type:"end", winner}
+//   (an Ayo grand slam, voided, marks the last drop: {type:"drop", pit, slam:{pits, n}} — the pits and seeds it would have taken)
 //   (the Nchò last-8 / bankruptcy sweep is a capture with last8: true)
 export function applyMove(state, pit) {
   if (state.over) throw new Error("game over");
@@ -130,7 +131,10 @@ export function applyMove(state, pit) {
         let taken = ayoCaptures(pits, i, me);
         const oppTotal = sideOf(opponent(me)).reduce((a, k) => a + pits[k], 0);
         const takeTotal = taken.reduce((a, k) => a + pits[k], 0);
-        if (taken.length && takeTotal === oppTotal) taken = []; // grand slam captures nothing
+        if (taken.length && takeTotal === oppTotal) { // grand slam captures nothing: the last drop says what it would have taken, so the UI can say why
+          events[events.length - 1].slam = { pits: taken.slice(), n: takeTotal };
+          taken = [];
+        }
         if (taken.length) {
           let got = 0; for (const k of taken) { got += pits[k]; pits[k] = 0; }
           stores[me] += got; captured = captured.concat(taken);
