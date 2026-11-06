@@ -82,7 +82,7 @@ test("the game wires the meter in: the loop feeds it, Settings shows it, a choic
   assert.match(g, /prefs\.get\('quality\.measured', null\)\)\)/, "Auto reads what was measured");
   assert.match(g, /prefs\.set\('quality\.measured', ''\)/, "a choice in Settings starts afresh");
   assert.match(g, /lastGameWords\(parseFrames\(prefs\.get\('frames\.last', ''\)\)\)/, "Settings says it");
-  assert.match(g, /if \(!moving \|\| clipping \|\| document\.hidden\) return;/, "only moving frames, never the clip or a hidden tab");
+  assert.match(g, /if \(!moving \|\| clipping \|\| document\.hidden \|\| batt\.plan\.on\) return;/, "only moving frames, never the clip, a hidden tab or a board saving its battery (web/battery.js draws half as often on purpose)");
   assert.match(read("web/sw.js"), /'\.\/frametime\.js'/, "cached for offline play");
 });
 

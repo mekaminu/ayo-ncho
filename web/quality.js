@@ -37,13 +37,15 @@ export function browserEnv(pref, param, measured) {
 //   pref:  'auto' | 'on' | 'off'
 //   lite:  the picture-quality decision above (auto follows it: the lighter board also drops the physics)
 //   param: the ?physics= URL value, if any (for renders and tests)
+//   saver: the battery saver is on (web/battery.js)
 // Returns { physics: boolean, reason: string }.
-export function decidePhysics({ pref = 'auto', lite = false, param } = {}) {
+export function decidePhysics({ pref = 'auto', lite = false, param, saver = false } = {}) {
   if (param === '0' || param === 'false') return { physics: false, reason: 'asked for in the address' };
   if (param === '1' || param === 'true') return { physics: true, reason: 'asked for in the address' };
   if (pref === 'off') return { physics: false, reason: 'chosen in Settings' };
   if (pref === 'on') return { physics: true, reason: 'chosen in Settings' };
   if (lite) return { physics: false, reason: 'the lighter board is on' };
+  if (saver) return { physics: false, reason: 'the battery is low' }; // web/battery.js: Auto goes easy on a low battery
   return { physics: true, reason: 'auto' };
 }
 

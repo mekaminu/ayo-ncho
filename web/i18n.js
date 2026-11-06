@@ -225,6 +225,8 @@ export const FR = {
   'Fast': 'Rapide',
   'Lighter board': 'Plateau allégé',
   'for slow phones and weak signal ·': 'pour les téléphones lents et le réseau faible ·',
+  'Battery saver': 'Économie de batterie',
+  'when the battery is low the board draws less and seeds fly straight, back to full on the charger ·': 'quand la batterie est faible, le plateau dessine moins et les graines volent droit ; tout revient sur le chargeur ·',
   'auto': 'auto',
   'Auto': 'Auto',
   'On': 'Oui',
@@ -325,6 +327,9 @@ export const FR = {
   'From the next game: you always start': 'Dès la prochaine partie : vous commencez toujours',
   'From the next game: they always start': 'Dès la prochaine partie : l’autre commence toujours',
   'Seeds bounce and roll again': 'Les graines rebondissent et roulent de nouveau',
+  'Battery low — the board is going easy on it': 'Batterie faible — le plateau la ménage',
+  'Charging — the board is back to full': 'En charge — le plateau revient au complet',
+  'Battery back up — the board is back to full': 'La batterie remonte — le plateau revient au complet',
   'Seeds fly straight to their pit': 'Les graines volent droit dans leur trou',
   'Player 1': 'Joueur 1',
   'Player 2': 'Joueur 2',
@@ -613,6 +618,8 @@ const lv = (s) => LEVELS[s] || s;
 const pl = (n, one, many) => `${n} ${n === '1' ? one : many}`;
 const OPPS = 'Adaeze|Auntie Bisi|Nnamdi|Mama Ngozi|Papa Ike';
 const at = (g) => (g === 'Ayo' ? 'à l’Ayo' : 'au Nchò');
+// the battery saver's reasons (web/battery.js)
+const batteryReasonFr = (r) => { const m = /^battery at (\d+)%$/.exec(r); if (m) return `batterie à ${m[1]} %`; return { charging: 'en charge', 'chosen in Settings': 'choisi dans les Réglages', 'asked for in the address': 'demandé dans l’adresse', 'this browser cannot tell': 'ce navigateur ne le dit pas' }[r] || r; };
 const who = (s) => FR[s] || s; // a name stays a name; "Player 2" becomes "Joueur 2"
 const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
@@ -641,6 +648,7 @@ export const PATTERNS = [
   [/^(\d+) to win$/, (m) => `${m[1]} pour gagner`], // the race to 25 under a score (web/race.js)
   [/^(\d+) seeds?$/, (m) => `${m[1]} graine${m[1] === '1' ? '' : 's'}`],
   [/^now (lighter|full) \((.+?)\)(?: · (.+))?$/, (m) => `${m[1] === 'lighter' ? 'allégé' : 'complet'} en ce moment (${m[2]})` + (m[3] ? ' · ' + m[3] : '')],
+  [/^now (saving|full) \((.+?)\)$/, (m) => `${m[1] === 'saving' ? 'en économie' : 'au complet'} en ce moment (${batteryReasonFr(m[2])})`],
   [/^now (on|off) \((.+?)\)$/, (m) => `${m[1] === 'on' ? 'activée' : 'désactivée'} en ce moment (${m[2]})`],
   [/^River stones — at (\d+) days played$/, (m) => `Galets — après ${m[1]} jours de jeu`],
   [/^River stones come with (\d+) days played — (\d+) so far$/, (m) => `Les galets viennent après ${m[1]} jours de jeu — ${m[2]} pour l’instant`],

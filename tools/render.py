@@ -178,7 +178,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -206,6 +206,41 @@ def watch(pg, errors, tag=""):
 def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it on this page
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+if battc:  # go easy on a low battery (idea 6 Nov): a fake battery at 15% unplugged, a move sown, then the charger
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=3); pg = ctx.new_page(); watch(pg, errors, "battery: ")
+        pg.add_init_script("""localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done');
+          (() => { const ls = {}; const bat = { level: 0.15, charging: false, addEventListener(k, f) { (ls[k] = ls[k] || []).push(f); } };
+            window.__battery = { getBattery: () => Promise.resolve(bat) };
+            window.__setBattery = (level, charging) => { bat.level = level; bat.charging = charging; for (const k of ['levelchange', 'chargingchange']) for (const f of ls[k] || []) f(); }; })();""")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&lite=0", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=120000)  # the full board, so there is something to go easy on
+        pg.wait_for_function("window.__ayo.battery.on", timeout=5000)
+        B = pg.evaluate("window.__ayo.battery"); print("battery: at 15%", B["reason"], "· drawn at", B["drawn"], "· physics", B["physics"])
+        assert B["reason"] == "battery at 15%" and B["drawn"] <= 1 and B["physics"] is False and B["plan"]["minGap"] == 30, B
+        assert B["log"] == [{"on": True, "reason": "battery at 15%"}], B["log"]  # switched once as the battery was read (its toast has passed by now)
+        m = max(pg.evaluate("window.__ayo.legal"), key=lambda i: pg.evaluate("window.__ayo.state.pits[%d]" % i)); tap(pg, m)
+        pg.wait_for_function("window.__ayo.tweens > 0", timeout=10000); pg.wait_for_timeout(1500)
+        sk = pg.evaluate("window.__ayo.battery.skipped"); mg = pg.evaluate("window.__ayo.battery.minGap")
+        assert sk > 0 or mg >= 26, (sk, mg)  # never two pictures closer than ~30 ms (a slow headless frame may already be that far apart)
+        pg.wait_for_function("!window.__ayo.busy", timeout=240000); pg.wait_for_timeout(600)
+        st = pg.evaluate("window.__ayo.state"); assert st["moves"] and st["moves"][0] == m, st
+        seeds = pg.evaluate("window.__ayo.seeds"); assert all(s[3] == 0 for s in seeds), "no seed left in the physics"
+        print("battery: the move played through, %d frames left undrawn, pictures at least %.0f ms apart" % (sk, mg))
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(200); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.evaluate("window.__setBattery(0.25, false)"); pg.wait_for_timeout(200)
+        assert pg.evaluate("window.__ayo.battery.on"), "25% unplugged stays easy (no flicker)"
+        pg.evaluate("window.__setBattery(0.25, true)"); pg.wait_for_timeout(200)
+        B = pg.evaluate("window.__ayo.battery"); assert not B["on"] and B["reason"] == "charging" and B["drawn"] > 1 and B["physics"], B
+        toasts = pg.evaluate("[...document.querySelectorAll('.toast')].map(x=>x.textContent).join(' | ')"); assert "Charging" in toasts, toasts
+        print("battery: on the charger", B["note"] or "", "· drawn at", B["drawn"])
+        pg.evaluate("window.__setBattery(0.1, false)"); pg.wait_for_timeout(200); assert pg.evaluate("window.__ayo.battery.on")
+        pg.evaluate("localStorage.setItem('ayo.battery', 'off')"); pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=120000); pg.wait_for_timeout(400)
+        B = pg.evaluate("window.__ayo.battery"); assert not B["on"] and B["reason"] == "chosen in Settings", B
+        print("battery: Settings → Off keeps it full at 10%")
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
 if cdnc:  # the board on a slow or patchy line: the line while it loads, three.js from the game's own server when cdnjs can't be reached
     BASE = "http://127.0.0.1:8767/"
     with sync_playwright() as p:

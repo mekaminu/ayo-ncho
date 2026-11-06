@@ -102,7 +102,7 @@ test("a hundred still frames of a real-sized scene cost little", () => {
 test("the game draws through it, the share picture draws first, and it is cached offline", () => {
   const g = read("web/game.js");
   assert.match(g, /from '\.\/rest\.js'/);
-  assert.match(g, /if \(rest\.draw\(scene, camera, view, now, [^)]*moving\)\) \{ renderer\.render\(scene, camera\); rest\.seen\(scene, camera, view\); \}/, "the loop asks before drawing, and reads again after; moving frames are always drawn");
+  assert.match(g, /if \(\(clipping \|\| frames < 3 \|\| drawDue\(now, batt\.lastDrawn, batt\.plan\) \|\| \(batt\.skipped\+\+, false\)\) && rest\.draw\(scene, camera, view, now, [^)]*moving\)\) \{ renderer\.render\(scene, camera\); rest\.seen\(scene, camera, view\); if \(batt\.plan\.on\) batt\.minGap = Math\.min\(batt\.minGap, now - batt\.lastDrawn\); batt\.lastDrawn = now; \}/, "the loop asks before drawing, and reads again after; moving frames are always drawn (at most ~30 a second on a low battery, web/battery.js, never the clip)");
   assert.equal((g.match(/renderer\.render\(scene, camera\)/g) || []).length, 2, "the loop and the share picture only");
   assert.match(g, /renderer\.render\(scene, camera\); const blob = await new Promise\(\(r\) => canvas\.toBlob/, "the share picture is drawn right before it is read");
   assert.match(g, /rest\.reset\(\)/, "back from a hidden tab: drawn afresh");
