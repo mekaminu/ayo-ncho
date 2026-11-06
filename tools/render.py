@@ -171,6 +171,10 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #        add --lastmark (with --smoke) for which pit they played (web/lastmark.js): after their reply, once its ghost marks have faded, the
 #                  faint light still sits on the pit they played (<out>), the pit's label says "played last", it stays while you pick a pit
 #                  of yours, steps aside while their move is watched again, goes with your move and comes back on their next one
+#        --glloss: the board comes back (web/glloss.js) — WEBGL_lose_context takes the board away: nothing said for a blink, the canvas
+#                  steps aside (the dark wood shows), a key picks nothing, then "The board is coming back…" (<out>); given back, it is drawn
+#                  at once with "The board is back" (<out>-back.png) and a move plays; taken away for good, "Bring the board back" (<out>-stuck.png)
+#                  reloads straight into the same game
 #        --win: the win, on the board — a saved game one move from beating Mama Ngozi (tools/endgame.js finds it): Continue, the winning
 #                  move; before the Game over card rises the winning trough's seeds jump in a wave (<out> mid-wave), the lamp warms and the
 #                  score glints; then the card rises with the lamp back as it was. --wide for the Mac
@@ -178,7 +182,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -206,6 +210,47 @@ def watch(pg, errors, tag=""):
 def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it on this page
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+if glc:  # the board comes back (idea 6 Nov): WEBGL_lose_context takes the board away as a phone does, then gives it back; then never
+    from PIL import Image; import io
+    def lit(pg):  # how much of the middle of the screen is board rather than the page's dark wood colour
+        im = Image.open(io.BytesIO(pg.screenshot(timeout=120000))).convert("RGB"); w, h = im.size; n = 0; k = 0
+        for y in range(int(h * .3), int(h * .7), 12):
+            for x in range(int(w * .2), int(w * .8), 12): r, g, bb = im.getpixel((x, y)); k += 1; n += (r + g + bb) > 90
+        return n / k
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "glloss: ")
+        pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done');")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=120000); pg.wait_for_timeout(500)
+        before = lit(pg); assert before > 0.5, before
+        pg.evaluate("window.__lc = document.querySelector('#c').getContext('webgl2').getExtension('WEBGL_lose_context'); window.__lc.loseContext()")
+        pg.wait_for_function("window.__ayo.gl.phase === 'lost'", timeout=5000); pg.wait_for_timeout(250)
+        G = pg.evaluate("window.__ayo.gl"); assert G["lostClass"] and not G["canvasShown"] and G["line"] is None, G  # a blink says nothing
+        pg.keyboard.press("1"); pg.wait_for_timeout(100); assert pg.evaluate("window.__ayo.selected") is None, "no pit picked blind"
+        pg.wait_for_function("window.__ayo.gl.line === 'back'", timeout=5000); pg.wait_for_timeout(450)
+        G = pg.evaluate("window.__ayo.gl"); assert G["title"] == "The board is coming back…" and G["button"] is None, G
+        assert lit(pg) < 0.05, "the page's dark wood shows, never a white canvas"
+        pg.screenshot(path=out, timeout=120000); print("glloss: away —", G["title"])
+        pg.evaluate("window.__lc.restoreContext()"); pg.wait_for_function("window.__ayo.gl.phase === 'ok'", timeout=5000); pg.wait_for_timeout(300)
+        G = pg.evaluate("window.__ayo.gl"); assert G["line"] is None and not G["lostClass"] and G["canvasShown"] and G["restores"] == 1, G
+        toasts = pg.evaluate("[...document.querySelectorAll('.toast')].map(x=>x.textContent).join(' | ')"); assert "The board is back" in toasts, toasts
+        after = lit(pg); assert after > 0.5, after; print("glloss: back at once, %.0f%% of the middle is board (was %.0f%%)" % (after * 100, before * 100))
+        pg.screenshot(path=out.replace(".png", "-back.png"), timeout=120000)
+        m = max(pg.evaluate("window.__ayo.legal"), key=lambda i: pg.evaluate("window.__ayo.state.pits[%d]" % i)); tap(pg, m)
+        pg.wait_for_function("window.__ayo.tweens > 0", timeout=10000); pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length >= 2 && window.__ayo.state.turn === 0", timeout=240000); pg.wait_for_timeout(600)
+        moves = pg.evaluate("window.__ayo.state.moves"); assert moves[0] == m, moves; print("glloss: a move played after it came back, and the reply", moves)
+        pg.evaluate("window.__lc = document.querySelector('#c').getContext('webgl2').getExtension('WEBGL_lose_context'); window.__lc.loseContext()")
+        pg.wait_for_function("window.__ayo.gl.line === 'stuck'", timeout=40000); pg.wait_for_timeout(300)
+        G = pg.evaluate("window.__ayo.gl"); assert G["button"] == "Bring the board back" and G["losses"] == 2, G
+        pg.screenshot(path=out.replace(".png", "-stuck.png"), timeout=120000); print("glloss: not back by itself —", G["title"])
+        with pg.expect_navigation(timeout=60000): pg.click("#glLost button")
+        pg.wait_for_function("window.__done===true", timeout=120000); pg.wait_for_timeout(500)
+        assert pg.evaluate("window.__ayo.state.moves") == moves, "the game came back where it was"
+        assert pg.evaluate("window.__ayo.gl.phase") == "ok" and lit(pg) > 0.5
+        print("glloss: Bring the board back reloaded the game at move", len(moves))
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
 if battc:  # go easy on a low battery (idea 6 Nov): a fake battery at 15% unplugged, a move sown, then the charger
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []

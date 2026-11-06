@@ -48,6 +48,16 @@ button{font-family:inherit}
 #words:has(> :not([hidden])) ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 200px)} /* the first-game tip steps up above the words */
 #words:has(#lastMove:not([hidden])):has(#take:not([hidden])) ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 252px)}
 #badges{position:fixed;inset:0;pointer-events:none}
+/* the board comes back (web/glloss.js): while the phone has taken the GPU away the canvas steps aside (the page's wood colour shows, never a white or black flash), the badges and pit buttons go with it, and a quiet line waits where the board was */
+.gllost canvas,.gllost #badges,.gllost #pits{visibility:hidden}
+#glLost{position:fixed;left:16px;right:16px;top:34%;z-index:60;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;color:#cdb89c;font:calc(14px * var(--ts,1))/1.45 Inter,system-ui,sans-serif;opacity:0;transition:opacity .4s;pointer-events:none}
+#glLost.on{opacity:1}#glLost b{font:600 calc(18px * var(--ts,1)) Fraunces,Georgia,serif;color:#e6b76f}#glLost small{max-width:300px;color:#9c876d;font-size:calc(12.5px * var(--ts,1))}
+#glLost .seeds{display:flex;gap:9px}#glLost .seeds i{width:11px;height:13px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#d9d6c4,#8f9384 55%,#545a4e);box-shadow:0 2px 3px rgba(0,0,0,.6);animation:glSeed 1.2s ease-in-out infinite}
+#glLost .seeds i:nth-child(2){animation-delay:.2s}#glLost .seeds i:nth-child(3){animation-delay:.4s}
+#glLost button{pointer-events:auto;margin-top:4px;padding:11px 20px;border-radius:999px;border:1px solid #b98a4a;background:linear-gradient(#e6b76f,#b98a4a);color:#2a1a0e;font:600 calc(15px * var(--ts,1)) Inter,system-ui,sans-serif;cursor:pointer}
+#glLost.stuck .seeds i{animation:none;opacity:.55}
+@keyframes glSeed{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+@media (prefers-reduced-motion:reduce){#glLost .seeds i{animation:none}}
 .badge{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:calc(11px*var(--ts));font-weight:600;color:var(--brass);background:rgba(13,9,6,.72);border-radius:10px;padding:1px 6px;line-height:15px;margin:-8px 0 0 -9px;transition:opacity .2s}
 .badge.zero{opacity:.35}
 .badge.barred{opacity:.45;color:var(--fg);text-decoration:line-through;text-decoration-color:rgba(230,183,111,.6)} /* feed them: a pit the feed rule bars */
