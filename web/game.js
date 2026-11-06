@@ -13,6 +13,7 @@ import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
+import { makeBackNav, webStep, ROOM_WORDS } from './backnav.js';
 import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink, inApp, plugin, platform } from './app.js';
 import { makeShop, makeTestStore } from './purchase.js';
 import { winWave, waveOrder, hopAt, waveLength, lampAt, HOP_MS, SETTLE_MS } from './winwave.js';
@@ -2652,9 +2653,24 @@ start();
 reminders.onTap(() => { if (online || busy || lesson.on) return; $('#gameover').hidden = true; $('#rules').hidden = true; openPuzzle(); });
 if (reminders.supported) { reminders.perm(false).then(() => remindSync()); document.addEventListener('visibilitychange', () => { if (!document.hidden) remindSync(); }); }
 // ---------- inside the store apps: the phone's back button, share sheet, haptics and keep-awake (web/app.js; nothing on the web link) ----------
-startApp(() => {
+function backUi() {
   const screen = !$('#store').hidden ? 'store' : !$('#settings').hidden ? 'settings' : !$('#rooms').hidden ? 'rooms' : !$('#puzzle').hidden ? 'puzzle' : !$('#home').hidden ? 'home' : 'play';
-  const step = backStep({ rules: !$('#rules').hidden, shouts: !shoutMenu.hidden || !callMenu.hidden, door: !$('#knockCard').hidden || !$('#backCard').hidden, name: !$('#nameCard').hidden, gameover: !$('#gameover').hidden, screen, online, busy });
-  if (step === 'shouts') { toggleShoutMenu(false); toggleCallMenu(false); } else if (step !== 'stay' && step !== 'minimize') $('#' + step).click();
-  return step;
-});
+  return { rules: !$('#rules').hidden, shouts: !shoutMenu.hidden || !callMenu.hidden, door: !$('#knockCard').hidden || !$('#backCard').hidden, name: !$('#nameCard').hidden, gameover: !$('#gameover').hidden, screen, online, busy };
+}
+function backTake(step) { if (step === 'shouts') { toggleShoutMenu(false); toggleCallMenu(false); } else if (step !== 'stay' && step !== 'minimize' && step !== 'leave' && step !== 'room') $('#' + step).click(); return step; }
+startApp(() => backTake(backStep(backUi())));
+// ---------- on the web link: the back gesture steps back through the game's own screens (web/backnav.js) ----------
+const backNav = inApp() ? null : makeBackNav(history);
+const backLog = [];
+function backSync() { if (!backNav) return; const ui = backUi(); backNav.sync(webStep(backStep(ui), ui)); }
+if (backNav) {
+  addEventListener('popstate', (e) => {
+    const r = backNav.pop(e.state); if (r !== 'back') { backLog.push(r); return; }
+    const ui = backUi(); const step = webStep(backStep(ui), ui); backLog.push(step);
+    if (step === 'room') toast(ROOM_WORDS, 2600); else backTake(step);
+    setTimeout(backSync, 0);
+  });
+  for (const ev of ['click', 'keyup', 'pointerup']) addEventListener(ev, () => setTimeout(backSync, 60), { capture: true, passive: true });
+  setInterval(backSync, 400); setTimeout(backSync, 0);
+}
+window.__ayo.back = () => backNav ? { guarded: backNav.guarded, pushes: backNav.pushes, backs: backNav.backs, mark: !!(history.state && history.state.ayoBack), log: backLog.slice() } : null;

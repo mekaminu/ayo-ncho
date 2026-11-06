@@ -28,6 +28,9 @@
 #                  Space hurries it too
 #        add --onetap (with --smoke) to check Sow on the first tap: with the switch on, one tap on a playable pit sows it at once (no pick,
 #                  no marks), a digit still only picks it, and with the switch off a tap picks again
+#        add --back (with --smoke) to check the back gesture on the web link (web/backnav.js): in a game the page holds one history entry of its
+#                  own; a back goes Home (same address), Settings from Home → back → Home, Settings from the game → back → the game, a rules card → back closes it, then back → Home; on Home
+#                  the entry is given back, and the history never grows by more than one (<out>-back.png: Settings just before the back)
 #        add --keep (with --smoke) to check Play keeps your game: four moves in, Home's Play asks once (Continue glowing; <out>-ask.png), goes back after 3 s,
 #                  Continue brings the same game, and two taps start a new one
 #        add --hint (with --smoke) to check "a hint that teaches": the Hint button picks Mama Ngozi's pit for you — the path marks land on it
@@ -190,7 +193,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -2242,6 +2245,32 @@ with sync_playwright() as p:
             pg.evaluate("(() => { const b = document.querySelector('#playBtn'); b.click(); b.click(); })()")  # two taps in quick succession (a software-drawn page can take seconds over a real click)
             pg.wait_for_function("document.querySelector('#home').hidden && window.__ayo.state.moves.length < 2", timeout=30000)
             print("keep: two taps start a new game")
+        if backc:  # back goes back (web/backnav.js): the browser's back steps through the game's own screens
+            B = lambda: pg.evaluate("window.__ayo.back()")
+            hid = lambda sel: pg.evaluate("document.querySelector('%s').hidden" % sel)
+            if not hid("#home"): play_btn(pg)
+            pg.wait_for_function("!window.__ayo.busy && document.querySelector('#home').hidden", timeout=240000)
+            pg.wait_for_function("window.__ayo.back().mark", timeout=5000); url0 = pg.url; L0 = pg.evaluate("history.length")
+            pg.evaluate("history.back()"); pg.wait_for_selector("#home:not([hidden])", timeout=10000)
+            pg.wait_for_function("!window.__ayo.back().guarded && !window.__ayo.back().mark", timeout=5000)
+            assert pg.url == url0, (pg.url, url0); print("back: from the game to Home, the page stays ·", B()["log"])
+            pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])"); pg.wait_for_function("window.__ayo.back().mark", timeout=5000)
+            pg.screenshot(path=out[:-4] + "-back.png", timeout=120000)
+            pg.evaluate("history.back()"); pg.wait_for_function("document.querySelector('#settings').hidden", timeout=10000); pg.wait_for_timeout(500)
+            print("back: Settings closes the way its Back button does ·", "to Home" if not hid("#home") else "to the game under way")
+            if not hid("#home"): pg.click("#continueBtn")
+            pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=240000)
+            pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])"); pg.wait_for_timeout(300)
+            pg.evaluate("history.back()"); pg.wait_for_function("document.querySelector('#settings').hidden", timeout=10000); pg.wait_for_timeout(300)
+            assert hid("#home"), "Settings opened from the game goes back to the game"
+            pg.wait_for_function("window.__ayo.back().mark", timeout=5000); print("back: Settings from the game back to the game")
+            pg.click("#rulesBtn"); pg.wait_for_selector("#rules:not([hidden])"); pg.wait_for_function("window.__ayo.back().mark", timeout=5000)
+            pg.evaluate("history.back()"); pg.wait_for_function("document.querySelector('#rules').hidden", timeout=10000); pg.wait_for_timeout(300)
+            assert hid("#home"), "a card closes, the game stays"
+            pg.wait_for_function("window.__ayo.back().mark", timeout=5000); print("back: the rules card closes, still in the game")
+            pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])"); pg.wait_for_function("!window.__ayo.back().mark && !window.__ayo.back().guarded", timeout=5000)
+            assert pg.evaluate("history.length") <= L0, ("never more than one entry", pg.evaluate("history.length"), L0)
+            assert pg.url == url0; print("back: Home by its own button gives the entry back ·", B())
         if answer:  # what it leaves open: after the path, ember rings on the pits their richest answer would take, and the words
             hint = lambda: pg.evaluate("document.querySelector('#hint').textContent")
             best, bestGot, seen = None, -1, 0

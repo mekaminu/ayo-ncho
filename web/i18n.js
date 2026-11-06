@@ -42,6 +42,8 @@ export const FR = {
   'New game?': 'Nouvelle partie\u00a0?',
   'Start a new game? Your game in progress ends — tap again to start one, or Continue to keep it': 'Commencer une nouvelle partie\u00a0? La partie en cours s’arrête — touchez encore pour en commencer une, ou Continuer pour la garder',
   'Start a new game? Your game in progress ends — press again to start one, or Continue to keep it': 'Commencer une nouvelle partie\u00a0? La partie en cours s’arrête — appuyez encore pour en commencer une, ou Continuer pour la garder',
+  // Back goes back (web/backnav.js): a back gesture in a room stays in it
+  'Back keeps you in the room — Home leaves it': 'Retour vous garde dans la salle — Accueil la quitte',
   'Watch the whole game:': 'Regarder toute la partie\u00a0:',
   'That game link could not be read': 'Impossible de lire le lien de cette partie',
   // the board's toolbar and cards
