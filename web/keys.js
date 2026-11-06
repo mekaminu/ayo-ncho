@@ -3,12 +3,12 @@
 //
 //   1–6     pick your pits, near to far (from your own seat: online at the far end, your pits are still 1–6)
 //   Enter   sow the picked pit (Space too); the same digit twice sows as well, like tapping a pit twice
-//   U       undo        H   hint        Esc   put the pit back
+//   U       undo        H   hint        Esc   put the pit back        0   set the board straight (web/view.js)
 //
 // Screen readers get a hidden button per pit with a label like "Your pit 3 (key 3) · 5 seeds · picked — Enter to sow".
 import { sideOf, PER_SIDE } from '../engine/ayo.js';
 
-export const KEYS = { pits: ['1', '2', '3', '4', '5', '6'], sow: ['Enter', ' '], undo: ['u', 'U'], hint: ['h', 'H'], deselect: ['Escape', 'Esc'] };
+export const KEYS = { pits: ['1', '2', '3', '4', '5', '6'], sow: ['Enter', ' '], undo: ['u', 'U'], hint: ['h', 'H'], deselect: ['Escape', 'Esc'], straight: ['0'] };
 
 // The engine pit a digit means for the player in seat `you`: 1 is the pit nearest you, 6 the farthest.
 export function keyToPit(key, you = 0) { const k = KEYS.pits.indexOf(String(key)); return k < 0 ? null : sideOf(you)[k]; }
@@ -26,6 +26,7 @@ export function keyAction(e, { tag = '', editable = false, you = 0 } = {}) {
   if (KEYS.undo.includes(e.key)) return { type: 'undo' };
   if (KEYS.hint.includes(e.key)) return { type: 'hint' };
   if (KEYS.deselect.includes(e.key)) return { type: 'deselect' };
+  if (KEYS.straight.includes(e.key)) return { type: 'straight' };
   return null;
 }
 

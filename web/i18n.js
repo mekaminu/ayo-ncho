@@ -246,6 +246,8 @@ export const FR = {
   'block someone from the camera button in a game with a friend: their knocks at your rooms are turned away and they cannot call you; only on this phone': 'bloquez quelqu’un depuis le bouton caméra pendant une partie entre amis : on ne lui ouvre plus vos salles et il ne peut plus vous appeler ; sur ce téléphone seulement',
   'Language': 'Langue',
   'Word size': 'Taille des mots',
+  'Double-tap the wood to set the board straight': 'Touchez deux fois le bois pour remettre le plateau droit',
+  'Double-click the wood, or press 0, to set the board straight': 'Double-cliquez sur le bois (ou la touche 0) pour remettre le plateau droit',
   'Large': 'Grande',
   'Larger': 'Plus grande',
   'the hints, the lines under the board, the cards and Settings': 'les indices, les lignes sous le plateau, les cartes et les Réglages',

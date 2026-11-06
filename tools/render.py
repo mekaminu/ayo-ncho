@@ -28,6 +28,9 @@
 #                  Space hurries it too
 #        add --hint (with --smoke) to check "a hint that teaches": the Hint button picks Mama Ngozi's pit for you — the path marks land on it
 #                  and the hint line starts "Mama Ngozi would play this one · …" (screenshot <out>); one more tap on that pit sows it
+#        add --straight (with --smoke) to check setting the board straight: the mouse drags the wood (the board turns and tilts) and the
+#                  first time a toast says "Double-click the wood, or press 0, …"; <out>-off.png is the board left askew; a double-click on the
+#                  wood glides it back to rest (<out>), picking no pit and playing nothing; dragged again, the 0 key does the same
 #        add --hover (with --smoke, best with --wide) to check the mouse on the Mac: over a pit you can play the cursor is a hand, a faint
 #                  brass ring lands on its rim and the hint line says "pit 3 · 5 seeds — click to see where they go" (screenshot <out>);
 #                  over their pit it says "their pit 2 · …" with no ring; over the wood a grab hand; off the board everything goes back
@@ -175,7 +178,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1988,6 +1991,29 @@ with sync_playwright() as p:
             pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.take") is None and pg.evaluate("document.querySelector('#take').hidden"), "with the setting off she says nothing"
             pg.evaluate("localStorage.setItem('ayo.take','1')")
             print("take: Undo cleared it · setting off → no word")
+        if straightc:  # set the board straight: drag it askew, double-click the wood, then the 0 key
+            V = lambda: pg.evaluate("window.__ayo.view")
+            pg.wait_for_function("document.querySelector('#turn').textContent==='your move' && !window.__ayo.busy && !window.__ayo.hurry.playing", timeout=240000)
+            def wood():  # between the two rows, across from pit 2: carved wood, no pit
+                a = pg.evaluate("window.__ayo.pitAt(2)"); b = pg.evaluate("window.__ayo.pitAt(9)"); return ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+            moves = len(pg.evaluate("window.__ayo.state")["moves"]); assert not V()["off"], V()
+            pg.evaluate("localStorage.removeItem('ayo.straightTip')")
+            wx, wy = wood(); pg.mouse.move(wx, wy); pg.mouse.down(); pg.mouse.move(wx + 170, wy + 70, steps=8); pg.mouse.up()
+            v = V(); assert v["off"], ("a drag leaves it askew", v)
+            pg.wait_for_function("[...document.querySelectorAll('.toast')].some(t=>/Double-click the wood, or press 0/.test(t.textContent))", timeout=4000)
+            assert pg.evaluate("localStorage.getItem('ayo.straightTip')") == "1", "the tip is said once on a phone"
+            pg.wait_for_timeout(300); pg.screenshot(path=out.replace(".png", "-off.png"), timeout=120000, animations="disabled")
+            wx, wy = wood(); pg.mouse.move(wx, wy, steps=3); pg.wait_for_function("window.__ayo.hover.pit===null", timeout=5000)
+            pg.mouse.dblclick(wx, wy); pg.wait_for_timeout(1300)
+            v = V(); assert not v["off"], ("the double-click set it straight", v)
+            assert abs(v["phi"] - v["fit"]["phi"]) < 1e-6 and abs(v["dist"] - v["fit"]["dist"]) < 1e-6, v
+            assert pg.evaluate("window.__ayo.selected") is None and len(pg.evaluate("window.__ayo.state")["moves"]) == moves, "a double-click on the wood plays nothing"
+            print("straight: dragged to theta %.2f, double-click → %.2f (rest %.2f), phi %.2f" % (v["theta"], v["theta"], v["fit"]["base"], v["phi"]))
+            pg.mouse.move(2, 2, steps=2); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
+            wx, wy = wood(); pg.mouse.move(wx, wy); pg.mouse.down(); pg.mouse.move(wx - 150, wy - 50, steps=8); pg.mouse.up()
+            assert V()["off"]; assert not pg.evaluate("[...document.querySelectorAll('.toast')].filter(t=>/Double-click the wood/.test(t.textContent)).length>1")
+            pg.keyboard.press("0"); pg.wait_for_timeout(1300); assert not V()["off"], ("the 0 key set it straight", V())
+            print("straight: the 0 key too · tip said once")
         if hoverc:  # the mouse on the Mac: the pit under the pointer says what a click will do
             hv = lambda: pg.evaluate("window.__ayo.hover"); hint = lambda: pg.evaluate("document.querySelector('#hint').textContent")
             base = hint(); legal = pg.evaluate("window.__ayo.legal"); st = pg.evaluate("window.__ayo.state"); you = pg.evaluate("window.__ayo.seat")
@@ -2196,7 +2222,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc or ponderc or lastc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc or ponderc or lastc or straightc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))
