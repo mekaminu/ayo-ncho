@@ -70,7 +70,7 @@ export function faceFor(level, mood = 'calm') {
 }
 
 // Which face goes with each moment the opponent speaks at.
-export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think', waiting: 'calm' };
+export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think', waiting: 'calm', morning: 'happy', afternoon: 'happy', evening: 'happy', night: 'surprised', back: 'happy' };
 
 export const CHARACTERS = {
   easy: {
@@ -86,6 +86,12 @@ export const CHARACTERS = {
       last8: ['Last eight! Whoever catches next gets them ALL.', 'Ooh, the last ones. Mine, mine, mine.'],
       circling: ['Round and round! Somebody catch something!', 'Are we just going in circles?'],
       waiting: ['Hurry up! My turn is getting cold.', 'Are you asleep? Wake up!', 'I can wait. I can\'t wait. Play!'],
+      // the time of day on the phone's clock (web/greet.js), and coming back after a few days away
+      morning: ["Good morning! I had my breakfast already. Go!"],
+      afternoon: ["After school is the best time for seeds. Go!"],
+      evening: ["One game before my bath. Quick!"],
+      night: ["Mummy says I should be asleep. Shh. Play!"],
+      back: ["Finally! I practised the whole time you were gone."],
     },
     // your record against them: what they say when you are on a run (yours: you keep winning; theirs: they do)
     runs: { yours: { 3: 'Three in a row? I\'m telling Mama.', 5: 'Five! Are you magic?', more: (n) => `${n} in a row. I give up. No I don't.` },
@@ -94,7 +100,7 @@ export const CHARACTERS = {
   steady: {
     name: 'Auntie Bisi', level: 'Steady', bio: 'Teaches at the primary school. Counts every pit twice, and makes you count it too.',
     lines: {
-      start: ['Sit up straight. We count before we sow.', 'Good afternoon. Your move, and no rushing.'],
+      start: ['Sit up straight. We count before we sow.', 'Pencils down. Your move, and no rushing.'],
       capture: ['Four. Now you see why we count.', 'Mm. Write that one down.', 'Thank you. Next.'],
       lost: ['Very good. That was well counted.', 'Ah. A star for you.', 'I saw that coming. Too late.'],
       undo: ['Correction is allowed. Once.', 'Rub it out, then. Neatly.'],
@@ -104,6 +110,12 @@ export const CHARACTERS = {
       last8: ['Eight left. Count them, every one.', 'The last eight. Concentrate, please.'],
       circling: ['We are going round in circles. Somebody take something.', 'Round and round. Think, class.'],
       waiting: ['Take your time. Count it twice.', 'I can see you counting. Good.', 'No rush. Wrong answers are quick.'],
+      // the time of day on the phone's clock (web/greet.js), and coming back after a few days away
+      morning: ["Ẹ káàárọ̀. Good morning, class. We count before we sow."],
+      afternoon: ["Ẹ káàsán. Sit up; the afternoon makes us lazy."],
+      evening: ["Ẹ káalẹ́. One game, then homework."],
+      night: ["At this hour? Very well. Quietly."],
+      back: ["Ah, there you are. We will revise what we learnt."],
     },
     runs: { yours: { 3: 'Three in a row. You have been practising.', 5: 'Five! I am telling your mother — good news, this time.', more: (n) => `${n} in a row. Time I moved you up a class.` },
             theirs: { 3: 'Three for me. Count slower.', 5: 'Five. We will go over it again.', more: (n) => `${n}. Patience. Counting is a habit.` } },
@@ -121,6 +133,12 @@ export const CHARACTERS = {
       last8: ['Last eight, cousin. Next chop takes everything.', 'Small seeds left. Big stakes.'],
       circling: ['We are just going round, cousin. Somebody chop.', 'This one is a merry-go-round.'],
       waiting: ['Cousin, today abeg.', 'Are you counting or praying?', 'My suya is getting cold, o.'],
+      // the time of day on the phone's clock (web/greet.js), and coming back after a few days away
+      morning: ["Ụtụtụ ọma, cousin. Early chop is the best chop."],
+      afternoon: ["Afternoon game? I'm supposed to be working, o."],
+      evening: ["Mgbede ọma. Evening seeds, after the traffic."],
+      night: ["This hour? You can't sleep either, abi?"],
+      back: ["Ehen! Where have you been? The board missed you."],
     },
     runs: { yours: { 3: 'Three straight? Who have you been practising with?', 5: 'Five in a row. OK, I\'m actually trying now.', more: (n) => `${n} in a row. Cousin, leave something for me.` },
             theirs: { 3: 'Three–zero. Suya is on you.', 5: 'Five. I\'m not even looking at the board.', more: (n) => `${n} and counting. Buy a bigger board.` } },
@@ -138,6 +156,12 @@ export const CHARACTERS = {
       last8: ['Eight left. Now we see who counts.', 'The last seeds. Sit up.'],
       circling: ['Round and round. Someone must count.', 'The seeds are walking in circles. So are you.'],
       waiting: ['I have sold yams faster than this.', 'Count. I will wait.', 'The seeds are not going anywhere.'],
+      // the time of day on the phone's clock (web/greet.js), and coming back after a few days away
+      morning: ["Ụtụtụ ọma. The market can wait one game."],
+      afternoon: ["Ehihie ọma. Sit in the shade and count."],
+      evening: ["Mgbede ọma. The market is closed; the board is open."],
+      night: ["Still awake? The seeds do not sleep either."],
+      back: ["So, you remembered the board. Sit well."],
     },
     runs: { yours: { 3: 'Three in a row? Mama Ngozi is watching.', 5: 'Five. Now the market will talk.', more: (n) => `${n} in a row. The board is yours. For now.` },
             theirs: { 3: 'Three. Come back when the seeds listen to you.', 5: 'Five. Sit well; we are not finished.', more: (n) => `${n}. I am not counting. You are.` } },
@@ -155,6 +179,12 @@ export const CHARACTERS = {
       last8: ['Eight seeds. Everything was for this.', 'The last eight. I have been waiting.'],
       circling: ['We walk in circles. One of us will tire first.', 'Round we go. I am not tired.'],
       waiting: ['Think. The board will wait for you.', 'Good. The slow ones count further.', 'I waited eleven years for Mama Ngozi\'s move. Go on.'],
+      // the time of day on the phone's clock (web/greet.js), and coming back after a few days away
+      morning: ["Good morning. A clear head counts further."],
+      afternoon: ["The heat of the day. Count slowly."],
+      evening: ["Good evening. The best games are played after dark."],
+      night: ["Late games. Mama Ngozi and I once played till dawn."],
+      back: ["The board waited. So did I."],
     },
     runs: { yours: { 3: 'Three. I will have to think now.', 5: 'Five. They will write songs. Short ones.', more: (n) => `${n} in a row. I am taking notes.` },
             theirs: { 3: 'Three. Patience, my child.', 5: 'Five. Sit with the board a while.', more: (n) => `${n}. The board is a slow teacher.` } },
