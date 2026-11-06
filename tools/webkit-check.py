@@ -1,9 +1,9 @@
 # Safari's own engine (idea 6 Nov, from the friend's iPhone): a friend's iPhone (Safari, iOS 26) got a black screen on the game link
 # and the invite link, while Chrome dressed up as an iPhone starts fine — so it is something only WebKit does. This opens the game in
 # Playwright's WebKit (the engine inside Safari; every browser on an iPhone uses it) dressed as an iPhone, the way the friend did:
-#   1. the game link, as a first visit (nothing kept on the phone): does the board start, or does "The board couldn't start" show?
+#   1. the game link (a phone past its first-game lesson and tips, so a plain game follows): does the board start, or does "The board couldn't start" show?
 #   2. a real move: tap a pit twice and wait for the opponent's reply
-#   3. the invite link (?room=CODE, a code nobody opened): the board starts and says so, no page error
+#   3. the invite link (?room=CODE, a code nobody opened) as a first visit, nothing kept on the phone: the board starts, no page error
 # It writes what it saw — every page error, console error and failed request, the boot screen's small print, the WebGL renderer —
 # to <out>.md (also to the GitHub run's summary) and a picture of each page, and exits 1 if any page did not start or threw.
 # WebKit cannot be downloaded into the build container, so this runs in GitHub Actions (.github/workflows/safari.yml) on every push
@@ -49,6 +49,7 @@ with sync_playwright() as p:
     print("browser:", browser, b.version, "· device:", device)
     def visit(name, path, play=False):
         ctx = b.new_context(**{k: v for k, v in dev.items() if k != "default_browser_type"})
+        if play: ctx.add_init_script("try { localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); } catch (e) {}")  # a phone that has had its lesson and tips: a plain game, nothing over the pits
         pg = ctx.new_page(); errs = []; fails = []; cons = []
         pg.on("pageerror", lambda e: errs.append(str(e) + ((" @ " + e.stack.splitlines()[1].strip()) if getattr(e, "stack", None) and len(e.stack.splitlines()) > 1 else "")))
         pg.on("console", lambda m: cons.append("%s: %s" % (m.type, m.text)) if m.type in ("error", "warning") else None)
@@ -81,7 +82,7 @@ with sync_playwright() as p:
                 if pg.evaluate("window.__ayo.selected") != pit and dev.get("has_touch"):  # say so, then try the mouse, so the rest can still be checked
                     trace.append("a finger's tap on pit %d at (%d, %d) picked nothing (selected: %s, hint: %s)" % (pit, x, y, pg.evaluate("window.__ayo.selected"), pg.evaluate("document.querySelector('#hint').textContent")))
                     bad.append(name + ": " + trace[-1]); how = "the mouse"; pg.evaluate("window.__evs.length = 0"); press(); pg.wait_for_timeout(500)
-                    trace.append("the mouse: events seen: %s · selected: %s" % (pg.evaluate("window.__evs.join(' | ') || 'none'"), pg.evaluate("window.__ayo.selected")))
+                    trace.append("the mouse: events seen: %s · selected: %s · hint: %s · busy %s · body %s" % (pg.evaluate("window.__evs.join(' | ') || 'none'"), pg.evaluate("window.__ayo.selected"), pg.evaluate("document.querySelector('#hint').textContent"), pg.evaluate("window.__ayo.busy"), pg.evaluate("document.body.className")))
                 press()
                 for k in range(24):  # up to two minutes, saying where the game stands every 5 s
                     if pg.evaluate("window.__ayo.state.moves.length >= %d && !window.__ayo.busy || window.__ayo.state.over" % (n0 + 2)): break
