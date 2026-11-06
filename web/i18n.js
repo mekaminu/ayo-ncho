@@ -615,6 +615,7 @@ export const PATTERNS = [
   [/^([^·—:]+?) wins$/, (m) => `${who(m[1])} gagne`],
   [/^Play again — (.+) is ready$/, (m) => `Rejouer — ${m[1]} est prêt`],
   [/^(Nchò|Ayo) · (\d+) moves?$/, (m) => `${m[1]} · ${m[2]} coup${m[2] === '1' ? '' : 's'}`],
+  [/^(\d+) to win$/, (m) => `${m[1]} pour gagner`], // the race to 25 under a score (web/race.js)
   [/^(\d+) seeds?$/, (m) => `${m[1]} graine${m[1] === '1' ? '' : 's'}`],
   [/^now (lighter|full) \((.+?)\)(?: · (.+))?$/, (m) => `${m[1] === 'lighter' ? 'allégé' : 'complet'} en ce moment (${m[2]})` + (m[3] ? ' · ' + m[3] : '')],
   [/^now (on|off) \((.+?)\)$/, (m) => `${m[1] === 'on' ? 'activée' : 'désactivée'} en ce moment (${m[2]})`],

@@ -173,7 +173,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1130,6 +1130,10 @@ with sync_playwright() as p:
         pos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "last8pos.js"), "5"]).decode())
         saved = {"moves": pos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "medium", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 5 * 60 * 1000}}
         pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'medium'); localStorage.setItem('ayo.tutorial', '3');" % json.dumps(json.dumps(saved)))
+    if racec:  # a saved game against Nnamdi near the finish: your move brings you within 3 of 25
+        rpos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "racepos.js"), "3"]).decode())
+        saved = {"moves": rpos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "medium", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 6 * 60 * 1000}}
+        pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'medium'); localStorage.setItem('ayo.tutorial', '3');" % json.dumps(json.dumps(saved)))
     if circ:  # a saved game against Nnamdi one move from the circling line; then (sessionStorage says which) one move from the call
         cpos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "circlepos.js"), "5"]).decode())
         kpos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "circlepos.js"), "5", "call"]).decode())
@@ -1148,7 +1152,7 @@ with sync_playwright() as p:
     if wakec: pg.add_init_script("""(() => { const log = []; window.__wakeLog = log; Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request(kind) { const ls = []; const s = { released: false, type: kind, addEventListener: (e, f) => { if (e === 'release') ls.push(f); }, release() { if (!s.released) { s.released = true; log.push('release'); ls.forEach((f) => f()); } return Promise.resolve(); } }; log.push('request:' + kind); return Promise.resolve(s); } } }); })()""")
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or winc or record or local or masterc or last8 or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or winc or record or local or masterc or last8 or racec or startsc or feedc or circ or givesc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -1451,6 +1455,32 @@ with sync_playwright() as p:
                 if ps and ps.get("sweep"): assert "the last %d go to" % ps["sweep"]["n"] in h, h; print("last8: tap says", h)
                 pg.keyboard.press("Escape"); pg.wait_for_timeout(100)
         print("last8: after their reply the line is", "on" if L["on"] else "off", "·", L["words"])
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
+    if racec:  # the race to 25: "N to win" under each score once close, counting down with the score, brass from 3
+        def rc(): return pg.evaluate("window.__ayo.race")
+        def words(n): return "captured" if n is None else "%d to win" % n
+        def need(a, b): n = 25 - a; return n if 1 <= n <= 10 and 48 - b >= 25 else None
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000); pg.wait_for_timeout(300)
+        st = pg.evaluate("window.__ayo.state"); r = rc(); print("race: before", r["my"], "/", r["opp"], st["stores"])
+        assert r["my"] == words(rpos["before"]) and r["opp"] == words(rpos["theirs"]), (r, rpos)
+        assert not r["myClose"], r
+        tap(pg, rpos["pit"])
+        pg.wait_for_function("window.__ayo.race.myClose", timeout=240000)  # it turns brass as the score ticks into the last 3
+        pg.wait_for_function("window.__ayo.race.my === %s" % json.dumps(words(rpos["after"])), timeout=240000)
+        log = rc()["log"]; mine = [w for k, w in log if k == "mine"]
+        seq = [words(n) for n in range(rpos["before"], rpos["after"] - 1, -1)]
+        assert mine[-len(seq):] == seq, ("counted down seed by seed with the score", log, seq)
+        pg.wait_for_timeout(900); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.wait_for_function("!window.__ayo.busy && (window.__ayo.state.turn === 0 || window.__ayo.state.over)", timeout=240000); pg.wait_for_timeout(500)
+        st = pg.evaluate("window.__ayo.state"); r = rc(); sa, sb = st["stores"]
+        if not st["over"]: assert r["my"] == words(need(sa, sb)) and r["opp"] == words(need(sb, sa)), ("after their reply it matches the scores", r, st["stores"])
+        print("race: after their reply", r["my"], "/", r["opp"], st["stores"])
+        pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])"); pg.click("[data-set=lang] [data-v=fr]"); pg.click("#settingsBack"); pg.wait_for_timeout(400)
+        fr = pg.evaluate("document.querySelector('#myLab').textContent"); print("race: in French", fr)
+        assert fr in ("pris", words(need(sa, sb)).replace(" to win", " pour gagner")), fr
+        pg.click("#settingsBtn"); pg.click("[data-set=lang] [data-v=auto]"); pg.click("#settingsBack")
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)
