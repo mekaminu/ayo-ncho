@@ -29,6 +29,7 @@ import { restOf, isOff, glideMs, glideAt, isDoubleTap, mayStraighten, tipWords a
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
 import { slamOf, slamMoment, SLAM_NOTE } from './slam.js';
 import { sowPath, pickedHint, hintedHint, playedWords, answerOf, giftNoteWords } from './path.js';
+import { turnSaid, standWords } from './sayturn.js';
 import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach.js';
 import { sidewaysAngle, SIDE_PHI } from './sideways.js';
 import { retryOf, isRetry, retryOffer, retryButton, retryToast, retryEyebrow, retryLine, retryShare } from './retry.js';
@@ -966,7 +967,7 @@ async function showMove({ seat, pit, events, state: pub }) {
   else { hideExplain(); const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
   tipFor(events);
   await animate(events, prev);
-  busy = false; refreshStatic();
+  busy = false; refreshStatic(); sayTurn(before, pit);
   if (!state.over && crossedLast8(before, state)) last8Moment();
   if (!state.over && beganCircling(before, state)) circlingMoment();
   if (state.over) { await winMoment(); gameOver(); } else { if (before.over) $('#gameover').hidden = true; if (seat === them) explain(before, pit, events); } // a friend's move, explained too
@@ -1269,6 +1270,17 @@ function fadeMarks(token, ms = 700) {
   return tween(ms, (t) => { if (token !== pathToken) return; for (const [m, o] of all) m.material.opacity = o * (1 - t); }).then(() => { if (token === pathToken) clearPath(); });
 }
 
+// ---------- the turn, read out (web/sayturn.js): a hidden live line a screen reader speaks once each turn has played on the board —
+// who played which pit, what it did, the score, whose move — and S on the keys says where the game stands (a toast shows it too)
+const saidEl = $('#said'); const said = { log: [] };
+function sayOpts() { const n = []; if (local) { n[0] = LNAMES[0]; n[1] = LNAMES[1]; } else { n[you] = 'You'; n[them] = online ? (friend ? friend.name : 'Your friend') : names[level]; } return { you, names: n, local }; }
+function speak(line) {
+  if (!line || !saidEl) return; said.log.push(line); if (said.log.length > 20) said.log.shift();
+  saidEl.textContent = ''; setTimeout(() => { saidEl.textContent = line; }, 60); // emptied first, so the same words twice are read twice
+}
+function sayTurn(before, pit) { try { speak(turnSaid(before, pit, state, sayOpts())); } catch (e) { /* words only: never stop a game */ } }
+function sayStand() { if (puzzle.on || lesson.on) return; const line = standWords(state, sayOpts()); toast(line, 3200); speak(line); }
+
 // ---------- their move, explained: after the opponent's turn, the marks of the move they just played stay faint for a moment with the words
 // under the board ("Nnamdi · picked up again twice · took 4"); tap the words and just that turn replays slowly — the marks first, then the
 // seeds at the slow pace — so a fast relay turn can be read after the fact. Off with the same switch as the path (Settings → Feel).
@@ -1489,10 +1501,11 @@ async function play(pit) {
   if (!local) { if (mover === them && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400); }
   await animate(events, prevStores);
   busy = false; refreshStatic(); save();
+  if (!local || state.over) sayTurn(before, pit); // the turn, read out for a screen reader (two of us: once the board has turned)
   if (state.over) { await winMoment(); return gameOver(); }
   if (crossedLast8(before, state)) last8Moment(); // the board is down to its last 8: whoever captures next takes them all
   if (beganCircling(before, state)) circlingMoment(); // 12 moves with no capture before the game is called: say so, and who keeps what
-  if (local) { await passTurn(); explain(before, pit, events); return; } // two of us: the board turns to the next player, with the move just played explained for them
+  if (local) { await passTurn(); sayTurn(before, pit); explain(before, pit, events); return; } // two of us: the board turns to the next player, with the move just played explained for them
   if (mover === them) explain(before, pit, events); // their move, explained: the ghost of its path and the words, tap to watch it again
   if (state.turn === them) {
     showTurn(); await wait(350); if (mood === 'calm') react('think');
@@ -2491,6 +2504,7 @@ addEventListener('keydown', (e) => {
   else if (a.type === 'undo') undo();
   else if (a.type === 'hint') hint();
   else if (a.type === 'straight') straighten();
+  else if (a.type === 'say') sayStand();
 });
 function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x; board.ring.position.z = z; board.ring.visible = true; tween(260, (t) => { board.ring.position.x = x + Math.sin(t * Math.PI * 4) * 0.006 * (1 - t); }).then(() => { if (selected === null) board.ring.visible = false; else { board.ring.position.x = pitCenters[selected][0]; board.ring.position.z = pitCenters[selected][1]; } }); click(0.5, 0.05); }
 
@@ -2673,4 +2687,5 @@ if (backNav) {
   for (const ev of ['click', 'keyup', 'pointerup']) addEventListener(ev, () => setTimeout(backSync, 60), { capture: true, passive: true });
   setInterval(backSync, 400); setTimeout(backSync, 0);
 }
+window.__ayo.said = () => ({ line: saidEl ? saidEl.textContent : null, log: said.log.slice() });
 window.__ayo.back = () => backNav ? { guarded: backNav.guarded, pushes: backNav.pushes, backs: backNav.backs, mark: !!(history.state && history.state.ayoBack), log: backLog.slice() } : null;

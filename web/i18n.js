@@ -48,7 +48,7 @@ export const FR = {
   'That game link could not be read': 'Impossible de lire le lien de cette partie',
   // the board's toolbar and cards
   'Ayo board': 'Plateau d’Ayo',
-  'The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back': 'Les trous — les touches 1 à 6 choisissent les vôtres du plus proche au plus loin, Entrée sème, U annule, H donne un indice, Échap repose le trou',
+  'The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back, S says the score': 'Les trous — les touches 1 à 6 choisissent les vôtres du plus proche au plus loin, Entrée sème, U annule, H donne un indice, Échap repose le trou, S dit le score',
   'muted': 'son coupé',
   'waiting': 'attend',
   'captured': 'pris',
@@ -739,6 +739,12 @@ export const PATTERNS = [
   [/^takes (\d+)$/, (m) => `prend ${m[1]}`],
   [/^gives (\d+)$/, (m) => `donne ${m[1]}`],
   [/^took (\d+)$/, (m) => `a pris ${m[1]}`],
+  // the turn, read out (web/sayturn.js): the hidden line a screen reader speaks after each turn, and S on the keys
+  [/^You played pit (\d)$/, (m) => `Vous avez joué le trou ${m[1]}`],
+  [/^([^·—:,]+?) played their pit (\d)$/, (m) => `${who(m[1])} a joué le trou ${m[2]} d’en face`],
+  [/^([^·—:,]+?) played pit (\d)$/, (m) => `${who(m[1])} a joué le trou ${m[2]}`],
+  [/^([^·—:,]+?), your move$/, (m) => `${who(m[1])}, à vous`],
+  [/^on the board: (\d+) on your side, (\d+) on theirs$/, (m) => `sur le plateau : ${m[1]} de votre côté, ${m[2]} en face`],
   [/^gave (\d+)$/, (m) => `a donné ${m[1]}`],
   [/^the last (\d+) go to (you|them)$/, (m) => (m[2] === 'you' ? `les ${m[1]} dernières vous reviennent` : `les ${m[1]} dernières reviennent à l’autre`)],
   [/^the last (\d+) went to (you|them)$/, (m) => (m[2] === 'you' ? `les ${m[1]} dernières vous sont revenues` : `les ${m[1]} dernières sont revenues à l’autre`)],
@@ -830,6 +836,9 @@ export const PATTERNS = [
   [/^(.+?) and (.+?) stopped at (\d+)–(\d+) after (\d+) moves$/, (m) => `${who(m[1])} et ${who(m[2])} se sont arrêtés à ${m[3]}–${m[4]} après ${pl(m[5], 'coup', 'coups')}`],
   [/^(.+?) and (.+?) drew (\d+)–(\d+)$/, (m) => `${who(m[1])} et ${who(m[2])} ont fait match nul ${m[3]}–${m[4]}`],
   [/^(.+?) beat (.+?) (\d+)–(\d+)$/, (m) => `${who(m[1])} a battu ${who(m[2])} ${m[3]}–${m[4]}`],
+  // the turn, read out (web/sayturn.js), the loosest shapes: after every line that has its own
+  [/^([^·—:,]+?) (\d+), ([^·—:,]+?) (\d+)$/, (m) => `${who(m[1])} ${m[2]}, ${who(m[3])} ${m[4]}`],
+  [/^([^·—:,]+?)'s move$/, (m) => `à ${who(m[1])} de jouer`],
   ROOMS[ROOMS.length - 1], // a shout in the away title, "Tete: Oya, your move!": last, so it never catches a line that has its own
 ];
 // a pit named from the seat looking at it: "your pit 3" → "votre trou 3", "their pit 3" → "le trou 3 d'en face"; the screen
