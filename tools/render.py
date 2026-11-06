@@ -173,7 +173,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -351,6 +351,66 @@ if playoutc:  # play it out (idea 5 Nov): after your move in the daily puzzle, t
         # the puzzle again (already solved): nothing offered before a move
         pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&puzzle=1", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
         assert not pg.evaluate("window.__ayo.playout.offered")
+        ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
+if retryc:  # try again from where it turned (idea 6 Nov): a game lost to Nnamdi, then the card's offer to go back to the move that let it go
+    R = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "retrypos.js"), "7", "ncho"]).decode())
+    SAVED = {"moves": R["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "medium", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 6 * 60 * 1000}, "local": False}
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "retry: ")
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.level', 'medium'); localStorage.setItem('ayo.speed', 'fast'); localStorage.setItem('ayo.game', %s); }" % json.dumps(json.dumps(SAVED)))
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000)
+        tap(pg, R["pit"]); pg.wait_for_selector("#gameover:not([hidden])", timeout=240000); pg.wait_for_timeout(700)
+        assert pg.evaluate("window.__ayo.state.stores") == R["scores"] and pg.evaluate("window.__ayo.state.winner") == 1, "lost, as the engine says"
+        rec0 = pg.evaluate("JSON.stringify(window.__ayo.record)"); rat0 = pg.evaluate("localStorage.getItem('ayo.rating')")
+        rt = pg.evaluate("window.__ayo.retry"); n = R["at"] + 1
+        assert rt["offered"] == "Try again from move %d · where it turned" % n and rt["at"] == R["at"], rt
+        box = pg.evaluate("document.querySelector('#goRetry').getBoundingClientRect().toJSON()"); assert box["bottom"] <= pg.viewport_size["height"] + 400, box
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-card.png", timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        print("retry: lost %d–%d, the card offers: %s" % (R["scores"][0], R["scores"][1], rt["offered"]))
+        pg.click("#goRetry"); pg.wait_for_function("window.__ayo.busy", timeout=5000)
+        pg.wait_for_timeout(500); pg.screenshot(path=out[:-4] + "-flying.png", timeout=120000)
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.retry.on", timeout=60000)
+        pg.wait_for_function("[...document.querySelectorAll('.toast')].some(x => x.textContent.includes('Back to move %d, where it turned'))" % n, timeout=5000)
+        st = pg.evaluate("window.__ayo.state"); rt = pg.evaluate("window.__ayo.retry")
+        assert st["moves"] == R["moves"][:R["at"]] and st["turn"] == 0 and not st["over"], "back to just before your move"
+        assert rt["from"] == R["at"] and rt["last"] == R["scores"], rt
+        if pg.evaluate("document.querySelectorAll('.badge').length") == 12: assert pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent)") == st["pits"], "the counts read the position"
+        assert pg.evaluate("+document.querySelector('#myScore').textContent") == st["stores"][0] and pg.evaluate("+document.querySelector('#oppScore').textContent") == st["stores"][1], "the scores went back"
+        assert pg.evaluate("document.querySelector('#gameover').hidden")
+        pg.wait_for_timeout(600); pg.mouse.move(5, 5); pg.screenshot(path=out, timeout=120000)
+        print("retry: the seeds flew back to move %d (%d–%d then), your move" % (n, st["stores"][0], st["stores"][1]))
+        k = 0
+        while not pg.evaluate("window.__ayo.state.over") and k < 150:  # play it to the end: the first legal pit each time (fast pace, Space hurries)
+            pg.wait_for_function("window.__ayo.state.over || (window.__ayo.state.turn === 0 && !window.__ayo.busy)", timeout=240000)
+            if pg.evaluate("window.__ayo.state.over"): break
+            legal = pg.evaluate("window.__ayo.legal")
+            if not legal: pg.wait_for_timeout(200); continue
+            tap(pg, legal[0]); k += 1; pg.wait_for_timeout(150); pg.keyboard.press("Space")
+            if k == 1:
+                pg.wait_for_function("window.__ayo.state.turn === 0 && !window.__ayo.busy || window.__ayo.state.over", timeout=240000)
+                if not pg.evaluate("window.__ayo.state.over"):
+                    assert not pg.evaluate("document.querySelector('#undo').disabled"); pg.click("#undo"); pg.wait_for_function("window.__ayo.busy", timeout=5000); pg.wait_for_function("!window.__ayo.busy", timeout=60000)
+                    assert pg.evaluate("window.__ayo.state.moves") == R["moves"][:R["at"]] and pg.evaluate("document.querySelector('#undo').disabled"), "Undo goes back to where it turned and no further"
+            assert pg.evaluate("localStorage.getItem('ayo.game')") == "null", "a retry is never saved"
+        pg.wait_for_selector("#gameover:not([hidden])", timeout=60000); pg.wait_for_timeout(600)
+        eb = pg.evaluate("document.querySelector('#goEyebrow').textContent"); played = len(pg.evaluate("window.__ayo.state.moves")) - R["at"]
+        assert eb.startswith("Nchò · from move %d of your last game · %d move" % (n, played)), eb
+        fin = pg.evaluate("window.__ayo.state.stores"); rt = pg.evaluate("window.__ayo.retry")
+        assert rt["line"] == "last time %d–%d · this time %d–%d" % (R["scores"][0], R["scores"][1], fin[0], fin[1]), rt
+        assert rt["offered"] == "Try again from move %d · where it turned" % n, "the same move offered again"
+        for sel in ("#replayBtn", "#clipBtn", "#goRating", "#goStory", "#goReview", "#goNext"):
+            assert pg.evaluate("document.querySelector('%s').hidden" % sel), sel + " should step aside for a retry"
+        assert pg.evaluate("JSON.stringify(window.__ayo.record)") == rec0 and pg.evaluate("localStorage.getItem('ayo.rating')") == rat0, "no record or rating kept"
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-over.png", timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        print("retry: played on, %s · %s · %s" % (eb, pg.evaluate("document.querySelector('#goTitle').textContent"), rt["line"]))
+        pg.click("#goRetry"); pg.wait_for_function("!window.__ayo.busy && window.__ayo.retry.on && window.__ayo.state.moves.length === %d" % R["at"], timeout=60000)
+        print("retry: and again from move %d" % n)
+        pg.evaluate("document.querySelector('#gameover').hidden = true"); pg.click("#homeBtn", force=True); pg.wait_for_selector("#home:not([hidden])", timeout=10000)
+        assert not pg.evaluate("window.__ayo.retry.on"), "Home ends the retry"
         ctx.close(); b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)
