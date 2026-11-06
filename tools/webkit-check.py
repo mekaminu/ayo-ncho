@@ -37,6 +37,7 @@ STATE = """() => { const f = document.querySelector('#bootFail'); const c = docu
     three: window.__ayo3d || null, canvas: c ? [c.width, c.height] : null, gl, ua: navigator.userAgent,
     hint: (document.querySelector('#hint') || {}).textContent || '', home: !!document.querySelector('#home') && !document.querySelector('#home').hidden }; }"""
 
+SNAP = "JSON.stringify({ moves: window.__ayo.state.moves.length, turn: window.__ayo.state.turn, busy: window.__ayo.busy, selected: window.__ayo.selected, hurry: window.__ayo.hurry.playing, tweens: window.__ayo.tweens, hint: document.querySelector('#hint').textContent, opp: (document.querySelector('#oppSub') || {}).textContent, home: !document.querySelector('#home').hidden, over: !document.querySelector('#gameover').hidden })"
 report = []; bad = []
 def section(title, lines): report.append("### " + title); report.extend(lines); report.append("")
 
@@ -57,7 +58,7 @@ with sync_playwright() as p:
         try: pg.wait_for_function("window.__ayoUp || document.querySelector('#bootFail')", timeout=45000, polling=250)
         except Exception: pass
         s = pg.evaluate(STATE); secs = time.time() - t0
-        moved = None
+        moved = None; trace = []
         if s["up"] and play:
             try:
                 pg.evaluate("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done')")  # past the first-game lesson: a plain game
@@ -65,11 +66,21 @@ with sync_playwright() as p:
                     pg.click("#playBtn", timeout=10000)
                 pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy && window.__ayo.legal.length && window.__ayo.state.turn === 0", timeout=60000)
                 n0 = pg.evaluate("window.__ayo.state.moves.length"); pit = pg.evaluate("window.__ayo.legal[0]")
-                x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
-                pg.touchscreen.tap(x, y) if dev.get("has_touch") else pg.mouse.click(x, y); pg.wait_for_timeout(400)
-                pg.touchscreen.tap(x, y) if dev.get("has_touch") else pg.mouse.click(x, y)
-                pg.wait_for_function("window.__ayo.state.moves.length >= %d && !window.__ayo.busy || window.__ayo.state.over" % (n0 + 2), timeout=120000)
-                moved = "played pit %d, the reply came: %s" % (pit, pg.evaluate("window.__ayo.state.moves.join(' ')"))
+                x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit); how = "a finger"
+                def press():
+                    if how == "a finger": pg.touchscreen.tap(x, y)
+                    else: pg.mouse.click(x, y)
+                press(); pg.wait_for_timeout(500)
+                if pg.evaluate("window.__ayo.selected") != pit and dev.get("has_touch"):  # say so, then try the mouse, so the rest can still be checked
+                    trace.append("a finger's tap on pit %d at (%d, %d) picked nothing (selected: %s, hint: %s)" % (pit, x, y, pg.evaluate("window.__ayo.selected"), pg.evaluate("document.querySelector('#hint').textContent")))
+                    bad.append(name + ": " + trace[-1]); how = "the mouse"; press(); pg.wait_for_timeout(500)
+                press()
+                for k in range(24):  # up to two minutes, saying where the game stands every 5 s
+                    if pg.evaluate("window.__ayo.state.moves.length >= %d && !window.__ayo.busy || window.__ayo.state.over" % (n0 + 2)): break
+                    pg.wait_for_timeout(5000)
+                    trace.append("%ds: %s" % ((k + 1) * 5, pg.evaluate(SNAP)))
+                else: raise Exception("no reply after 2 minutes")
+                moved = "played pit %d with %s, the reply came: %s" % (pit, how, pg.evaluate("window.__ayo.state.moves.join(' ')"))
             except Exception as e:
                 moved = "could not play a move: " + str(e).splitlines()[0][:200]; bad.append(name + ": " + moved)
         pic = "%s-%s.png" % (out, name)
@@ -83,6 +94,7 @@ with sync_playwright() as p:
                  "- 3D library from: %s · canvas %s · %s" % (s["three"] or "(not said)", s["canvas"], s["gl"]),
                  "- browser: `%s`" % s["ua"]]
         if moved: lines.append("- move: " + moved)
+        if trace: lines.append("- while it played:"); lines += ["  - `%s`" % t[:400] for t in trace[:30]]
         lines.append("- page errors: " + (str(len(errs)) if errs else "none")); lines += ["  - `%s`" % e[:400] for e in errs[:8]]
         if cons: lines.append("- console errors/warnings:"); lines += ["  - `%s`" % c[:300] for c in cons[:12]]
         if fails: lines.append("- failed requests:"); lines += ["  - `%s`" % f for f in fails[:12]]
