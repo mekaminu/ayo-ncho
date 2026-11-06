@@ -43,6 +43,7 @@ import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './la
 import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown, haulKind } from './handcount.js';
 import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
+import { decodeGame, watchQuery, titleWords as watchTitle, moveWords as watchMove, endWords as watchEnd, linkWords as watchLink } from './watch.js';
 import { parse as parseTally, record as recordTally, roomKey, entryOf as tallyOf, cardLine as tallyLine, startLine as tallyStart, standingParts, wentUp, played as tallyPlayed } from './tally.js';
 import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
@@ -247,6 +248,7 @@ const easeOut = (t) => 1 - (1 - t) ** 3, easeIn = (t) => t * t, easeInOut = (t) 
 const wait = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? 0 : hurried(ms, hurry.on)));
 // tap to hurry (web/hurry.js): while a turn plays, a tap on the board or Space plays the rest of it faster; the next turn is back at your speed
 const hurry = { on: false, depth: 0, words: false, base: '' };
+const watch = { on: false, stop: false, text: '', done: false, i: 0, n: 0 }; window.__watch = watch; // watching a game sent as a link (web/watch.js)
 function hurryNow() {
   if (!canHurry({ animating: hurry.depth > 0, clipping, screen: body.classList.contains('screen'), already: hurry.on })) return false;
   hurry.on = true; const now = performance.now(); for (const tw of tweens) tw.ms = squeeze(tw, now); // what is already moving speeds up too
@@ -1160,6 +1162,7 @@ function refreshStatic() {
   showTurn();
 }
 function showTurn() {
+  if (watch.on) { paintWatch(); return; } // watching a game sent as a link: its own words, nothing to press
   if (online) { showTurnOnline(); paintPits(); return; }
   if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : pickHint('puzzle'); $('#undo').disabled = true; $('#hintBtn').disabled = true; paintPits(); return; }
   const mine = state.turn === you && !state.over;
@@ -1823,12 +1826,12 @@ $('#settingsStore').addEventListener('click', () => openStore('settings'));
 // ---------- the opponent's face reacts: a mood for a moment, then back to calm; blinks now and then while waiting ----------
 let mood = 'calm', moodTimer = null, blinkTimer = null;
 function react(next, ms = 2600) {
-  if (params.get('still') || online || local) return; clearTimeout(moodTimer); mood = next; const f = $('#oppFace'); f.innerHTML = faceFor(level, mood);
+  if (params.get('still') || online || local || watch.on) return; clearTimeout(moodTimer); mood = next; const f = $('#oppFace'); f.innerHTML = faceFor(level, mood);
   if (next !== 'calm' && next !== 'blink' && next !== 'think') { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); }
   if (next !== 'calm' && next !== 'think') moodTimer = setTimeout(() => react('calm'), ms);
 }
 function blinkLoop() { // a blink every few seconds, only on a calm face, never under reduced motion
-  clearTimeout(blinkTimer); if (reduceMotion || params.get('still') || online || local) return;
+  clearTimeout(blinkTimer); if (reduceMotion || params.get('still') || online || local || watch.on) return;
   blinkTimer = setTimeout(() => { if (mood === 'calm' && body.classList.contains('playing')) { $('#oppFace').innerHTML = faceFor(level, 'blink'); setTimeout(() => { if (mood === 'calm') $('#oppFace').innerHTML = faceFor(level, 'calm'); }, 130); } blinkLoop(); }, 2800 + Math.random() * 4200);
 }
 let bubbleTimer = null;
@@ -1904,7 +1907,7 @@ $('.pill[data-mode="local"]').addEventListener('click', () => { prefs.set('mode'
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
 $('#playBtn').addEventListener('click', () => { if (lessonDueNow()) { openLesson('play'); click(1.3, 0.08); return; } newRound(); showScreen('play'); click(1.3, 0.08); }); // a new phone's first Play: the lesson first
 $('#continueBtn').addEventListener('click', () => { if (resume()) { hideExplain(); layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
-$('#homeBtn').addEventListener('click', () => { if (online) return leaveRoom(); if (!busy) { if (!endPlayout()) save(); showScreen('home'); } });
+$('#homeBtn').addEventListener('click', () => { if (watch.on) { watch.stop = true; hurryNow(); return; } if (online) return leaveRoom(); if (!busy) { if (!endPlayout()) save(); showScreen('home'); } });
 $('#goHome').addEventListener('click', () => { if (online) return leaveRoom(); $('#gameover').hidden = true; showScreen('home'); });
 $('#homeSettings').addEventListener('click', () => { paintSettings(); showScreen('settings'); });
 $('#settingsBtn').addEventListener('click', () => { if (!busy) { paintSettings(); showScreen('settings'); } });
@@ -2086,7 +2089,10 @@ $('#replayBtn').addEventListener('click', async () => {
 });
 function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); $('#myScore').textContent = s.stores[you]; $('#oppScore').textContent = s.stores[them]; }
 $('#shareBtn').addEventListener('click', async () => {
-  const a = state.stores[you], b = state.stores[them]; const text = tLines(local ? localShare(state) : playingOut() ? (isRetry(playout) ? retryShare(state, you, names[level], playout) : playoutShare(state, you, names[level])) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`);
+  const a = state.stores[you], b = state.stores[them]; let text = tLines(local ? localShare(state) : playingOut() ? (isRetry(playout) ? retryShare(state, you, names[level], playout) : playoutShare(state, you, names[level])) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`);
+  const seats = []; if (local) { seats[0] = LNAMES[0]; seats[1] = LNAMES[1]; } else { seats[you] = myName(); seats[them] = online ? oppLabel() : names[level]; }
+  const watchQ = !playingOut() && !puzzle.on && linkable() ? watchQuery({ variant: state.variant, rules: state.rules, first: firstMover(state.moves, state.first || 0), moves: state.moves }, seats) : null; // watch the whole game (web/watch.js): the moves ride in the link
+  if (watchQ) text += '\n' + tLines(watchLink()) + ' ' + publicBase() + watchQ;
   try {
     renderer.render(scene, camera); const blob = await new Promise((r) => canvas.toBlob(r, 'image/png')); const file = blob && new File([blob], 'ayo-ncho.png', { type: 'image/png' }); // drawn now: a resting board may not have drawn this frame
     if (navigator.share && file && navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ text, files: [file] });
@@ -2449,6 +2455,35 @@ $('#rulesClose').addEventListener('click', () => { $('#rules').hidden = true; })
 const soundBtn = $('#soundBtn'); const paintSound = () => soundBtn.setAttribute('aria-pressed', soundOn());
 soundBtn.addEventListener('click', () => { prefs.set('sound', soundOn() ? '0' : '1'); paintSound(); click(1, 0.08); musicCheck(); }); paintSound();
 
+// ---------- watch the whole game (idea 6 Nov, afternoon; web/watch.js): a shared game's link carries its moves, and opening it
+// plays every move of it on this board — the pit lit, every seed flying, the scores ticking, a tap on the board hurrying a long
+// turn — with both players' names on the cards and "Move 12 of 40 · Meka plays" under the board; then who won, and Home.
+// Nothing of this phone's own game is touched: the watched game is its own positions, and the board goes back after.
+function paintWatch() {
+  $('#turn').textContent = watch.done ? 'game over' : 'watching'; $('#oppSub').textContent = '';
+  $('#hint').textContent = watch.text; $('#undo').disabled = true; $('#hintBtn').disabled = true;
+}
+async function watchGame(w) {
+  watch.on = true; watch.stop = false; watch.done = false; watch.text = watchTitle(w); watch.i = 0; watch.n = w.moves.length; busy = true;
+  hideExplain(); $('#gameover').hidden = true; showScreen('play'); deselect();
+  const paintNames = () => { $('#meName').textContent = w.names[0]; $('#goMe span').textContent = w.names[0]; $('#oppName').textContent = w.names[1]; $('#oppFace').innerHTML = initialFace(w.names[1]); };
+  let s = w.states[0]; layoutFromState(s); refreshStaticFrom(s); paintNames(); paintWatch(); toast(watch.text, 2600); buzz(10);
+  await wait(1400);
+  for (let i = 0; i < w.moves.length && !watch.stop; i++) {
+    const m = w.moves[i]; watch.i = i + 1; watch.text = watchMove(w, i);
+    select(m, false); await wait(420); deselect();
+    const r = applyMove(s, m); await animate(r.events, s.stores, Math.round(PACE * 0.85)); s = r.state; refreshStaticFrom(s); paintNames();
+    await wait(260);
+  }
+  if (!watch.stop) {
+    watch.done = true; watch.text = watchEnd(w); paintWatch(); toast(watch.text, 3200);
+    click(1.5, 0.12); setTimeout(() => click(2, 0.12), 120); buzz([15, 40, 15]);
+    for (let t = 0; t < 32 && !watch.stop; t++) await wait(100); // a moment on the last position, unless Home is tapped
+  }
+  watch.on = false; watch.done = false; busy = false; hurry.on = false;
+  layoutFromState(state); refreshStatic(); deselect(); showScreen('home');
+}
+
 // ---------- start ----------
 const glBack = (() => { try { const v = sessionStorage.getItem('ayo.glback'); sessionStorage.removeItem('ayo.glback'); return v === '1'; } catch { return false; } })();
 paintRules(); paintMyName(); layoutFromState(state); refreshStatic();
@@ -2460,6 +2495,10 @@ else if (glBack && savedGame()) { // the board comes back (web/glloss.js): "Brin
   if (params.get('still') === 'late') { state.pits = [0, 1, 0, 2, 1, 0, 0, 1, 1, 0, 1, 1]; state.stores = [18, 22]; }
   else { state.pits = [4, 3, 2, 6, 1, 5, 4, 2, 7, 0, 3, 0]; state.stores = [8, 5]; }
   layoutFromState(state); refreshStatic(); if (!CLOSE) select(3); showScreen('play');
+} else if (params.get('watch')) { // a game sent as a link (web/watch.js): played back on the board, then Home
+  const w = decodeGame(params.get('watch'), params.get('a'), params.get('b'));
+  if (!params.get('capture')) history.replaceState(null, '', location.pathname);
+  if (w) watchGame(w); else { showScreen('home'); toast('That game link could not be read', 2600); }
 } else if (params.get('lesson') && !params.get('stay')) { // ?lesson=1: the lesson straight away, as a new phone (with ?stay=home: Home, as a new phone, so Play opens it)
   openLesson('play');
 } else if (params.get('puzzle')) { // the shared link, and the render: straight to today's puzzle

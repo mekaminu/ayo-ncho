@@ -38,6 +38,8 @@ export function langNote(pref, lang) {
 const LEVELS = { Easy: 'Facile', Steady: 'Posé', Medium: 'Moyen', Hard: 'Difficile', Master: 'Maître' };
 
 export const FR = {
+  'Watch the whole game:': 'Regarder toute la partie\u00a0:',
+  'That game link could not be read': 'Impossible de lire le lien de cette partie',
   // the board's toolbar and cards
   'Ayo board': 'Plateau d’Ayo',
   'The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back': 'Les trous — les touches 1 à 6 choisissent les vôtres du plus proche au plus loin, Entrée sème, U annule, H donne un indice, Échap repose le trou',
@@ -784,6 +786,14 @@ export const PATTERNS = [
   [/^([^·—:]+?) plays you for real now\. Tap a pit once to see where its seeds go, twice to sow\.$/, (m) => `${m[1]} joue contre vous pour de vrai maintenant. Touchez un trou une fois pour voir où vont ses graines, deux fois pour semer.`],
   // the opponents' runs of 10, 15, 20… (slice 4)
   ...SAYS_N.map(([en, fr]) => [new RegExp('^' + en.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace('\\{n\\}', '(\\d+)') + '$'), (m) => fr.replace('{n}', m[1])]),
+  // watch the whole game (web/watch.js): a game sent as a link, played back on the friend's board
+  [/^(.+?) vs (.+?) · (Nchò|Ayo) · (\d+) moves$/, (m) => `${who(m[1])} contre ${who(m[2])} · ${m[3]} · ${pl(m[4], 'coup', 'coups')}`],
+  [/^Move (\d+) of (\d+) · (.+) plays$/, (m) => `Coup ${m[1]} sur ${m[2]} · ${who(m[3])} joue`],
+  [/^Move (\d+) of (\d+)$/, (m) => `Coup ${m[1]} sur ${m[2]}`], // …and its parts, when the hurry words join on with a ·
+  [/^([^·—:]{1,20}) plays$/, (m) => `${who(m[1])} joue`],
+  [/^(.+?) and (.+?) stopped at (\d+)–(\d+) after (\d+) moves$/, (m) => `${who(m[1])} et ${who(m[2])} se sont arrêtés à ${m[3]}–${m[4]} après ${pl(m[5], 'coup', 'coups')}`],
+  [/^(.+?) and (.+?) drew (\d+)–(\d+)$/, (m) => `${who(m[1])} et ${who(m[2])} ont fait match nul ${m[3]}–${m[4]}`],
+  [/^(.+?) beat (.+?) (\d+)–(\d+)$/, (m) => `${who(m[1])} a battu ${who(m[2])} ${m[3]}–${m[4]}`],
   ROOMS[ROOMS.length - 1], // a shout in the away title, "Tete: Oya, your move!": last, so it never catches a line that has its own
 ];
 // a pit named from the seat looking at it: "your pit 3" → "votre trou 3", "their pit 3" → "le trou 3 d'en face"; the screen
