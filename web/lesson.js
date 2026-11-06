@@ -25,14 +25,40 @@ export const STEPS = [
 ];
 export const DONE = { title: "You're ready", words: (name) => `${name} plays you for real now. Tap a pit once to see where its seeds go, twice to sow.` };
 
-export function startState() {
-  return { variant: 'ncho', rules: { ...RULES.ncho }, pits: START.pits.slice(), stores: START.stores.slice(), turn: 0, first: 0, moves: [], quiet: 0, over: false, winner: null };
+// Ayo has its own lesson (idea 6 Nov): with Ayo chosen, Learn to play (and a new phone's first Play) teaches Ayo's rules
+// instead — one lap and the turn ends where the last seed falls (no relay), a capture of 2 or 3 made by the last seed on
+// their side, and the sweep back through their pits that are 2 or 3 too. 18 seeds, the troughs empty.
+export const AYO_START = { pits: [2, 3, 3, 0, 2, 0, 3, 1, 1, 2, 0, 3], stores: [0, 0] };
+export const AYO_STEPS = [
+  { pit: 1, kind: 'sow', title: 'Sowing',
+    ask: 'The lit pit is yours. Tap it: the hand drops one seed in each pit, anticlockwise — the brass marks show where.',
+    after: 'One seed in each pit, and the turn ends where the last seed falls — even on seeds. In Ayo the hand never picks up again.',
+    reply: 11 },
+  { pit: 2, kind: 'capture', title: 'A capture of 2 or 3',
+    ask: 'Its last seed lands in their pit of 1 and makes it 2. Your last seed making a 2 or a 3 on their side wins it. Tap the lit pit.',
+    after: '+2 in your trough. Only your last seed takes, only on their side, and only when it makes 2 or 3.',
+    reply: 6 },
+  { pit: 4, kind: 'sweep', title: 'The sweep back',
+    ask: 'Its last seed makes their pit a 3, and the pit behind it is a 2 now too: the hand sweeps back and takes both. Tap the lit pit.',
+    after: '+5: both pits are yours. But a move that would take every seed they have takes nothing. First to 25 seeds wins. That is Ayo.',
+    reply: null },
+];
+export const DONE_LINE = { ncho: 'Sowing, a capture of 4 and a relay: that is most of the game.', ayo: 'Sowing, a capture of 2 or 3 and the sweep back: that is most of the game.' };
+export const ROW_LINE = { ncho: 'a one-minute lesson on the board: sowing, a capture of 4, a relay', ayo: 'a one-minute lesson on the board: sowing, a capture of 2 or 3, the sweep back' };
+const LESSONS = { ncho: { start: START, steps: STEPS }, ayo: { start: AYO_START, steps: AYO_STEPS } };
+// Which lesson a phone gets: the game it has chosen (anything else is Nchò, the family's game).
+export const lessonGame = (variant) => (variant === 'ayo' ? 'ayo' : 'ncho');
+export const stepsOf = (variant) => LESSONS[lessonGame(variant)].steps;
+
+export function startState(variant = 'ncho') {
+  const v = lessonGame(variant), L = LESSONS[v];
+  return { variant: v, rules: { ...RULES[v] }, pits: L.start.pits.slice(), stores: L.start.stores.slice(), turn: 0, first: 0, moves: [], quiet: 0, over: false, winner: null };
 }
 
 // The position before step k (0-based): the start, then each of your moves and Adaeze's replies in turn.
-export function stateAt(k) {
-  let s = startState();
-  for (let j = 0; j < k; j++) { s = applyMove(s, STEPS[j].pit).state; if (STEPS[j].reply !== null) s = applyMove(s, STEPS[j].reply).state; }
+export function stateAt(k, variant = 'ncho') {
+  const steps = stepsOf(variant); let s = startState(variant);
+  for (let j = 0; j < k; j++) { s = applyMove(s, steps[j].pit).state; if (steps[j].reply !== null) s = applyMove(s, steps[j].reply).state; }
   return s;
 }
 
@@ -42,7 +68,9 @@ export function shape(events) {
   return { drops: events.filter((e) => e.type === 'drop').length, relays: events.filter((e) => e.type === 'pickup' && e.relay).length, caps };
 }
 
-export function eyebrow(k) { return `Learn Nchò · ${k + 1} of ${STEPS.length}`; }
+const gameName = (variant) => (lessonGame(variant) === 'ayo' ? 'Ayo' : 'Nchò');
+export function eyebrow(k, variant = 'ncho') { return `Learn ${gameName(variant)} · ${k + 1} of ${stepsOf(variant).length}`; }
+export const doneEyebrow = (variant = 'ncho') => `Learn ${gameName(variant)} · done`;
 export const SKIP = 'Skip the lesson';
 export const replyWords = (name) => `${name} sows one of hers…`;
 export const wrongPit = 'In the lesson, play the lit pit';

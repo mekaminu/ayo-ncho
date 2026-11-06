@@ -162,7 +162,8 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  picked for you with its path marks, a tap on another pit plays nothing, one tap sows; the card says what happened, Next plays
 #                  Adaeze's move; every position is checked against node (stateAt); the end keeps it done and Play Adaeze starts the game; then
 #                  Settings → Learn to play opens it again and Skip goes home. Pictures: <out> (step 2 asking, the capture ring), <out>-after.png
-#                  (the 4 in your trough and the card), <out>-done.png. --wide for the Mac
+#                  (the 4 in your trough and the card), <out>-done.png; then Home's Ayo switch and Learn to play again teaches Ayo (one lap,
+#                  a capture of 2, the sweep back), each step against node: <out>-ayo.png (the sweep asking), <out>-ayo-after.png. --wide for the Mac
 #        --deal: setting up the board — as --win, then Play again on the Game over card: the seeds in both troughs are dealt back
 #                  four to each pit (<out> mid-deal), the counts tick, Mama Ngozi's opening waits for the board to be set, and
 #                  every seed ends where the new game says. Then Home → Play on a set board deals nothing
@@ -1904,7 +1905,7 @@ with sync_playwright() as p:
             L = pg.evaluate("window.__ayo.lesson"); assert L["title"] == st["title"] and L["top"] == st["ask"] and L["skip"] == "Skip the lesson", L
             assert pg.evaluate("window.__ayo.state.pits") == st["before"]["pits"] and pg.evaluate("window.__ayo.state.stores") == st["before"]["stores"], ("step %d: the board is the lesson's position" % (k + 1))
             assert len(pg.evaluate("window.__ayo.marks.steps")) > 0, "the lit pit's path marks land"
-            if st["kind"] == "capture": assert len(pg.evaluate("window.__ayo.marks.caps")) == 1, "the copper ring on their pit of 3"
+            if st["kind"] == "capture": pg.wait_for_function("window.__ayo.marks.caps.length === 1", timeout=10000)  # the copper ring on their pit of 3 (it lands after the brass marks)
             if k == 1: pg.mouse.move(5, 5); lshot(out)
             other = next(i for i in range(6) if i != st["pit"] and st["before"]["pits"][i] > 0)
             x, y = pt(other); pg.mouse.click(x, y); pg.wait_for_timeout(400)
@@ -1930,6 +1931,33 @@ with sync_playwright() as p:
         pg.wait_for_selector("#home:not([hidden])", timeout=10000); assert not pg.evaluate("window.__ayo.lesson.on") and pg.evaluate("localStorage.getItem('ayo.lesson')") == "done"
         pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden", timeout=20000); assert not pg.evaluate("window.__ayo.lesson.on"), "once: Play is a game now"
         print("lesson: done, the game against Adaeze, Settings → Learn to play and Skip, Play once more is a game")
+        # Ayo's own lesson: Home's Ayo switch, then Settings → Learn to play teaches Ayo, every step against node (stateAt(k, 'ayo'))
+        LA = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", "import { AYO_STEPS, stateAt, ROW_LINE, DONE_LINE } from './web/lesson.js'; import { applyMove } from './engine/ayo.js'; console.log(JSON.stringify({ row: ROW_LINE.ayo, done: DONE_LINE.ayo, steps: AYO_STEPS.map((s, k) => ({ ...s, before: stateAt(k, 'ayo'), end: applyMove(stateAt(k, 'ayo'), s.pit).state })) }))"]).decode())
+        pg.wait_for_function("!window.__ayo.busy", timeout=60000); pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])", timeout=10000)
+        pg.evaluate("[...document.querySelectorAll('[data-game=ayo]')].find((b) => b.offsetParent).click()"); pg.wait_for_timeout(300)  # Home's Nchò / Ayo switch (the streak line can lie over it on a short phone)
+        assert pg.evaluate("localStorage.getItem('ayo.game.variant')") == "ayo"
+        pg.evaluate("document.querySelector('#settingsBtn').click()"); pg.wait_for_selector("#settings:not([hidden])")
+        assert pg.evaluate("document.querySelector('#lessonRow').textContent") == LA["row"], ("the Settings row names Ayo's lesson", pg.evaluate("document.querySelector('#lessonRow').textContent"))
+        pg.click("#lessonBtn"); pg.wait_for_function("window.__ayo.lesson.on && window.__ayo.lesson.phase==='ask'", timeout=20000)
+        for k, st in enumerate(LA["steps"]):
+            pg.wait_for_function("window.__ayo.lesson.k===%d && window.__ayo.lesson.phase==='ask' && window.__ayo.selected===%d && !window.__ayo.busy" % (k, st["pit"]), timeout=60000)
+            L = pg.evaluate("window.__ayo.lesson"); assert L["variant"] == "ayo" and L["eyebrow"] == "Learn Ayo · %d of 3" % (k + 1) and L["title"] == st["title"] and L["top"] == st["ask"], L
+            assert pg.evaluate("window.__ayo.state.pits") == st["before"]["pits"] and pg.evaluate("window.__ayo.state.variant") == "ayo", ("Ayo step %d: the board is the lesson's position" % (k + 1))
+            if st["kind"] != "sow": pg.wait_for_function("window.__ayo.marks.caps.length === %d" % (1 if st["kind"] == "capture" else 2), timeout=10000)  # the copper rings on what it takes
+            if k == 2: pg.mouse.move(5, 5); lshot(out[:-4] + "-ayo.png")
+            x, y = pt(st["pit"]); pg.mouse.click(x, y)
+            if pg.evaluate("window.__ayo.selected") == st["pit"] and pg.evaluate("window.__ayo.lesson.phase") == "ask": pg.mouse.click(x, y)
+            pg.wait_for_function("window.__ayo.lesson.phase==='after' && !window.__ayo.busy", timeout=120000)
+            L = pg.evaluate("window.__ayo.lesson"); assert L["card"] == st["after"], L
+            assert pg.evaluate("window.__ayo.state.pits") == st["end"]["pits"] and pg.evaluate("window.__ayo.state.stores") == st["end"]["stores"], "the Ayo move ends as the engine says"
+            if k == 2: pg.mouse.move(5, 5); lshot(out[:-4] + "-ayo-after.png")
+            print("lesson (Ayo): step %d %s ok · stores %s" % (k + 1, st["kind"], st["end"]["stores"]))
+            pg.click("#lsNext")
+        pg.wait_for_function("window.__ayo.lesson.phase==='done'", timeout=20000)
+        L = pg.evaluate("window.__ayo.lesson"); assert L["eyebrow"] == "Learn Ayo · done" and L["card"] == LA["done"], L
+        pg.click("#pzHome"); pg.wait_for_selector("#home:not([hidden])", timeout=10000); assert not pg.evaluate("window.__ayo.lesson.on")
+        assert pg.evaluate("window.__ayo.state.variant") == "ayo", "back home on the Ayo board"
+        print("lesson (Ayo): Settings → Learn to play with Ayo chosen teaches Ayo: one lap, a capture of 2, the sweep back")
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)

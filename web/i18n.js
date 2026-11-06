@@ -411,6 +411,17 @@ export const FR = {
   'A pale ring: those seeds go to their trough, not yours — a pit on their side that makes 4 before your last seed is theirs. Only your last seed takes a 4 over there.': 'Un anneau pâle : ces graines vont dans la réserve d’en face, pas dans la vôtre — un trou de son côté qui fait 4 avant votre dernière graine est à lui. Seule votre dernière graine prend un 4 là-bas.',
   'A pale ring: those seeds go to their trough, not yours.': 'Un anneau pâle : ces graines vont dans la réserve d’en face, pas dans la vôtre.',
   // the lesson
+  // Ayo's own lesson (idea 6 Nov)
+  'A capture of 2 or 3': 'Une prise de 2 ou 3',
+  'The sweep back': 'Le balayage en arrière',
+  'The lit pit is yours. Tap it: the hand drops one seed in each pit, anticlockwise — the brass marks show where.': 'Le trou éclairé est à vous. Touchez-le : la main dépose une graine dans chaque trou, dans le sens inverse des aiguilles d’une montre — les marques de laiton montrent où.',
+  'One seed in each pit, and the turn ends where the last seed falls — even on seeds. In Ayo the hand never picks up again.': 'Une graine dans chaque trou, et le tour s’arrête là où tombe la dernière graine — même sur des graines. À l’Ayo, la main ne reprend jamais.',
+  'Its last seed lands in their pit of 1 and makes it 2. Your last seed making a 2 or a 3 on their side wins it. Tap the lit pit.': 'Sa dernière graine tombe dans un trou d’en face qui en a 1 et en fait 2. Votre dernière graine qui fait 2 ou 3 de son côté le gagne. Touchez le trou éclairé.',
+  '+2 in your trough. Only your last seed takes, only on their side, and only when it makes 2 or 3.': '+2 dans votre réserve. Seule votre dernière graine prend, seulement de son côté, et seulement quand elle fait 2 ou 3.',
+  'Its last seed makes their pit a 3, and the pit behind it is a 2 now too: the hand sweeps back and takes both. Tap the lit pit.': 'Sa dernière graine fait 3 dans un trou d’en face, et le trou d’avant fait 2 maintenant aussi : la main balaie en arrière et prend les deux. Touchez le trou éclairé.',
+  '+5: both pits are yours. But a move that would take every seed they have takes nothing. First to 25 seeds wins. That is Ayo.': '+5 : les deux trous sont à vous. Mais un coup qui prendrait toutes les graines d’en face ne prend rien. Le premier à 25 graines gagne. C’est ça, l’Ayo.',
+  'Sowing, a capture of 2 or 3 and the sweep back: that is most of the game.': 'Semer, prendre un 2 ou un 3 et balayer en arrière : c’est presque tout le jeu.',
+  'a one-minute lesson on the board: sowing, a capture of 2 or 3, the sweep back': 'une leçon d’une minute sur le plateau : semer, prendre un 2 ou un 3, balayer en arrière',
   'A capture of 4': 'Une prise de 4',
   'The lit pit is yours. Tap it: the hand picks up its seeds and drops one in each pit, anticlockwise — the brass marks show where.': 'Le trou éclairé est à vous. Touchez-le : la main prend ses graines et en dépose une dans chaque trou, dans le sens inverse des aiguilles d’une montre — les marques de laiton montrent où.',
   'One seed in each pit. The turn ends where the last seed lands in an empty pit.': 'Une graine dans chaque trou. Le tour s’arrête là où la dernière graine tombe dans un trou vide.',
@@ -435,6 +446,7 @@ export const FR = {
   'Reminder on': 'Rappel activé',
   'about a minute': 'environ une minute',
   'Learn Nchò · done': 'Apprendre le Nchò · terminé',
+  'Learn Ayo · done': 'Apprendre l’Ayo · terminé',
   'One move. Your pits are on the right. 2s and 3s behind your last seed count too.': 'Un seul coup. Vos trous sont à droite. Les 2 et les 3 derrière votre dernière graine comptent aussi.',
   'Ayo & Nchò daily': 'Ayo & Nchò, l’énigme du jour',
   'Sit. We go over it together.': 'Asseyez-vous. On la revoit ensemble.',
@@ -742,6 +754,7 @@ export const PATTERNS = [
   [/^([^·—:]+?)'s take: (.+)\. Play it through, slowly$/, (m) => `L’avis de ${who(m[1])} : ${need(m[2])}. Le jouer, lentement`],
   [/^([^·—:]+?) starts$/, (m) => `${who(m[1])} commence`],
   [/^Learn Nchò · (\d+) of (\d+)$/, (m) => `Apprendre le Nchò · ${m[1]} sur ${m[2]}`],
+  [/^Learn Ayo · (\d+) of (\d+)$/, (m) => `Apprendre l’Ayo · ${m[1]} sur ${m[2]}`],
   [/^([^·—:]+?) sows one of hers…$/, (m) => `${m[1]} sème un des siens…`],
   // the cards (slice 3)
   [/^(\d+) moves?$/, (m) => pl(m[1], 'coup', 'coups')],

@@ -76,7 +76,8 @@ test("the fixed lines: undo, hurry, the called game, who starts, the lesson, the
     startWords({ first: 1, why: "lost" }, ["You", "Nnamdi"]), startWords({ first: 0, why: "draw" }, ["You", "Nnamdi"]), startWords({ first: 0, why: "pref" }, ["You", "Nnamdi"]),
     `${startWords({ first: 1, why: "lost" }, ["Player 1", "Player 2"], false)} · pass the phone after each move`,
     lesson.SKIP, lesson.wrongPit, lesson.DONE.title, lesson.DONE.words("Adaeze"), lesson.replyWords("Adaeze"), "Finish",
-    ...lesson.STEPS.flatMap((st, k) => [st.title, st.ask, st.after, lesson.eyebrow(k)]), "game over", "passing the phone…", "Her take",
+    ...lesson.STEPS.flatMap((st, k) => [st.title, st.ask, st.after, lesson.eyebrow(k)]), ...lesson.AYO_STEPS.flatMap((st, k) => [st.title, st.ask, st.after, lesson.eyebrow(k, "ayo")]),
+    lesson.doneEyebrow("ayo"), lesson.DONE_LINE.ayo, lesson.DONE_LINE.ncho, lesson.ROW_LINE.ayo, lesson.ROW_LINE.ncho, "game over", "passing the phone…", "Her take",
   ]) french(l, "fixed");
 });
 

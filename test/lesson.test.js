@@ -87,3 +87,64 @@ test("after a first win the next opponent up is offered, never past Mama Ngozi",
   assert.equal(nextUp("hard", "firstWin", names), null);
   assert.equal(nextUp("easy", "run", names), null); assert.equal(nextUp("easy", null, names), null);
 });
+
+// Ayo's own lesson (idea 6 Nov): with Ayo chosen, Learn to play teaches Ayo's rules on the same board.
+import { AYO_STEPS, AYO_START, stepsOf, lessonGame, doneEyebrow, DONE_LINE, ROW_LINE } from "../web/lesson.js";
+
+test("Ayo's lesson: Ayo rules, a small board, your move; anything but Ayo is Nchò's lesson", () => {
+  const s = startState("ayo");
+  assert.equal(s.variant, "ayo"); assert.deepEqual(s.rules, { capture: 23, relay: false, last8: false }); assert.equal(s.turn, 0);
+  assert.deepEqual(s.pits, AYO_START.pits); assert.notEqual(s.pits, AYO_START.pits); assert.deepEqual(s.stores, [0, 0]);
+  assert.equal(stepsOf("ayo"), AYO_STEPS); assert.equal(stepsOf("ncho"), STEPS); assert.equal(stepsOf(undefined), STEPS); assert.equal(lessonGame("custom"), "ncho");
+  assert.deepEqual(startState(), startState("ncho"), "Nchò stays the default");
+  assert.deepEqual(AYO_STEPS.map((x) => x.kind), ["sow", "capture", "sweep"]);
+});
+
+test("Ayo's steps and Adaeze's replies are legal, never end the game, and her replies take nothing", () => {
+  for (let k = 0; k < AYO_STEPS.length; k++) {
+    const s = stateAt(k, "ayo"); assert.equal(s.turn, 0); assert.ok(!s.over); assert.ok(legalMoves(s).includes(AYO_STEPS[k].pit), `step ${k + 1}`);
+    const after = applyMove(s, AYO_STEPS[k].pit); assert.ok(!after.state.over); assert.ok(!after.events.some((e) => e.slam), "no grand slam in the lesson");
+    if (AYO_STEPS[k].reply !== null) {
+      assert.equal(owner(AYO_STEPS[k].reply), 1); assert.ok(legalMoves(after.state).includes(AYO_STEPS[k].reply));
+      const r = applyMove(after.state, AYO_STEPS[k].reply); assert.ok(!r.state.over); assert.equal(shape(r.events).caps.length, 0, "her move takes nothing");
+    }
+  }
+});
+
+test("Ayo step 1: one lap, the last seed lands on seeds and the turn just ends — no relay, nothing taken", () => {
+  const s = stateAt(0, "ayo"); const { events } = applyMove(s, AYO_STEPS[0].pit); const sh = shape(events);
+  assert.ok(sh.drops >= 3); assert.equal(sh.relays, 0); assert.equal(sh.caps.length, 0);
+  const drops = events.filter((e) => e.type === "drop").map((e) => e.pit); drops.forEach((p, i) => assert.equal(p, (AYO_STEPS[0].pit + 1 + i) % 12));
+  assert.ok(s.pits[drops[drops.length - 1]] > 0, "it ends on seeds, which in Nchò would have been picked up");
+  assert.equal(drops.length, s.pits[AYO_STEPS[0].pit], "one seed a pit, the hand empty");
+});
+
+test("Ayo step 2: the last seed makes their pit of 1 a 2, and that one pit is yours (+2)", () => {
+  const s = stateAt(1, "ayo"); const { state, events } = applyMove(s, AYO_STEPS[1].pit); const sh = shape(events);
+  assert.equal(sh.caps.length, 1); const c = sh.caps[0]; assert.equal(c.by, 0); assert.deepEqual(c.pits.length, 1); assert.equal(c.n, 2);
+  assert.equal(owner(c.pits[0]), 1); assert.equal(s.pits[c.pits[0]], 1, "it was a pit of 1"); assert.equal(events.filter((e) => e.type === "drop").pop().pit, c.pits[0]);
+  assert.equal(state.stores[0], 2); assert.match(AYO_STEPS[1].ask, /pit of 1 and makes it 2/); assert.match(AYO_STEPS[1].after, /^\+2 /);
+});
+
+test("Ayo step 3: the last seed makes a 3, the pit behind it is a 2, the hand sweeps back and takes both (+5)", () => {
+  const s = stateAt(2, "ayo"); const { state, events } = applyMove(s, AYO_STEPS[2].pit); const sh = shape(events);
+  assert.equal(sh.caps.length, 1); const c = sh.caps[0]; const last = events.filter((e) => e.type === "drop").pop().pit;
+  assert.equal(c.pits.length, 2); assert.equal(c.pits[0], last, "from the last seed"); assert.equal(c.pits[1], last - 1, "then the pit behind it");
+  assert.ok(c.pits.every((p) => owner(p) === 1)); assert.equal(s.pits[last] + 1, 3); assert.equal(s.pits[last - 1] + 1, 2, "the pit behind is a 2 now");
+  assert.equal(c.n, 5); assert.equal(state.stores[0], 2 + 5); assert.match(AYO_STEPS[2].after, /^\+5:/);
+  assert.ok(state.pits.slice(6).some((n) => n > 0), "they keep seeds: not a grand slam");
+});
+
+test("Ayo's path marks agree: the capture steps say takes, the sowing step never picks up", () => {
+  for (let k = 0; k < AYO_STEPS.length; k++) {
+    const p = sowPath(stateAt(k, "ayo"), AYO_STEPS[k].pit); const w = pathWords(p, { you: 0 });
+    assert.doesNotMatch(w, /picks up/);
+    if (k === 0) assert.doesNotMatch(w, /takes/); else assert.match(w, new RegExp(`takes ${shape(applyMove(stateAt(k, "ayo"), AYO_STEPS[k].pit).events).caps[0].n}`));
+  }
+});
+
+test("Ayo's words: its own eyebrow, the end lines, the Settings row, short enough for the Fold folded", () => {
+  assert.equal(eyebrow(0, "ayo"), "Learn Ayo · 1 of 3"); assert.equal(doneEyebrow("ayo"), "Learn Ayo · done"); assert.equal(doneEyebrow(), "Learn Nchò · done");
+  assert.match(DONE_LINE.ayo, /2 or 3/); assert.match(DONE_LINE.ncho, /capture of 4/); assert.match(ROW_LINE.ayo, /sweep back/); assert.match(ROW_LINE.ncho, /relay/);
+  for (const s of AYO_STEPS) { assert.ok(s.ask.length > 20 && s.ask.length < 160); assert.ok(s.after.length > 20 && s.after.length < 160); assert.doesNotMatch(s.ask + s.after, /relay|picks them|4 on their/i); }
+});
