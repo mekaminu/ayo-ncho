@@ -86,7 +86,7 @@
 #                  finds it): Continue, tap that pit: copper rings land on exactly the pits you would take and pale beaded rings on the pits
 #                  that go to them, and the one-time note says what the pale ring means (picture <out>); Esc clears them; a second tap shows
 #                  no note again; sowing it, the hand that carries their 4 wears a pale number (<out>-haul.png). --wide for the Mac
-#        --looks: the seed sets sold in the store (L10) — a close look at cowries and palm kernels on the board (?still=close&try=looks;
+#        --looks: the seed sets sold in the store (L10; each lands with its own sound, and a handful is heard when one is chosen) — a close look at cowries and palm kernels on the board (?still=close&try=looks;
 #                  <out> cowries, <out>-kernels.png, <out>-jobs.png for comparison, <out>-board.png the whole board in cowries); then Settings
 #                  without the preview: cowries and palm kernels are locked with the lock, a tap says where they come from and the seeds stay
 #                  Job's tears; with ?try=looks a tap on palm kernels swaps every seed on the board in place (<out>-settings.png)
@@ -543,6 +543,8 @@ if looksc:  # the store's seed sets (L10): close renders of each, then the lock 
         assert not pg.evaluate("document.querySelector('[data-set=seeds] [data-v=kernels]').classList.contains('locked')"), "?try=looks opens them"
         pg.click("[data-set=seeds] [data-v=kernels]"); pg.wait_for_timeout(300)
         assert pg.evaluate("window.__ayo.seedSet") == "kernels"
+        v = pg.evaluate("window.__ayo.voice"); assert v["tasted"][-1:] == ["kernels"] and v["id"] in ("kernels", None), ("a handful of palm kernels is heard, in their own voice", v)
+        print("looks: voice ·", v)
         assert pg.evaluate("document.querySelector('[data-set=seeds] [data-v=kernels]').getAttribute('aria-pressed')") == "true"
         assert not pg.evaluate("document.querySelector('[data-set=finish] [data-v=grandpa]').classList.contains('locked')"), "?try=looks opens the boards"
         pg.click("[data-set=finish] [data-v=grandpa]"); pg.wait_for_timeout(600)

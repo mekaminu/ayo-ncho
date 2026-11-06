@@ -38,30 +38,50 @@ export function finish(out, rate) {
 export const TOK = 820; // the main note of a pit's "tok" (Hz); each pit and trough is tuned from it when played
 const WOOD = 0.025; // how quickly carved hardwood stops ringing (its loss factor): each of its tones dies within ~13 cycles
 const woodTau = (f) => 1 / (Math.PI * f * WOOD);
+// Each seed set sounds like what it is (idea 6 Nov): the wood under it is the same board, but the seed's own click,
+// the clack of two seeds and how hard the seed sets the board's body going are its own.
+//   click  — the seed's own tiny rings when it strikes the wood: [Hz, strength, seconds to die to 1/e]
+//   clack  — the rings of two seeds striking each other
+//   thud   — how much of the board's low body a landing wakes (a heavier seed wakes more)
+//   burst  — the moment of contact: [strength, seconds, lowest Hz kept] (a soft, fibrous seed is a longer, duller touch)
+//   under  — how much of the wood is heard under a clack
+// Job's tears: hard, hollow, a little glassy (the sound built 30 Oct). Cowries: porcelain-smooth shell, high and
+// ringing like china. River stones: dense and heavy, a lower, harder clack and more of the board's thud. Palm
+// kernels: a fibrous nut, its rings dying almost at once, a dull, woody touch.
+export const VOICES = {
+  jobs:    { click: [[3900, 0.35, 0.004], [5900, 0.25, 0.0028]], clack: [[2600, 0.7, 0.006], [3800, 0.55, 0.0045], [5300, 0.38, 0.0032], [7400, 0.22, 0.0022]], thud: 1, burst: [1.3, 0.00045, 1500], clackBurst: [1, 0.0003, 2400], under: 1 },
+  cowries: { click: [[4700, 0.42, 0.009], [7100, 0.3, 0.006], [9800, 0.16, 0.004]], clack: [[3300, 0.62, 0.0095], [4900, 0.58, 0.0075], [7000, 0.42, 0.006], [9400, 0.26, 0.0042]], thud: 0.75, burst: [1.1, 0.00035, 2400], clackBurst: [0.8, 0.00025, 3200], under: 0.7 },
+  stones:  { click: [[2900, 0.4, 0.005], [4600, 0.28, 0.0035]], clack: [[1900, 0.75, 0.0075], [3100, 0.6, 0.0055], [4500, 0.4, 0.004], [6400, 0.24, 0.0028]], thud: 1.7, burst: [1.5, 0.0003, 1200], clackBurst: [1.2, 0.00025, 1800], under: 1.2 },
+  kernels: { click: [[2300, 0.18, 0.0018], [3400, 0.12, 0.0013]], clack: [[1500, 0.7, 0.0026], [2300, 0.5, 0.002], [3300, 0.3, 0.0015], [4600, 0.16, 0.0011]], thud: 1.2, burst: [1.4, 0.0009, 700], clackBurst: [1.1, 0.0008, 900], under: 0.6 },
+};
+export const voiceOf = (id) => VOICES[id] || VOICES.jobs;
 // A seed landing on the wood of a pit: the pit's tok (a cluster of the wood's own tones, the main one split in two as
 // in real carved wood, the higher ones dying quicker; a low thud from the body of the board) and the seed's own click.
-// `take` picks one of several (no two landings alike).
-export function knock(rate, take = 0, f = TOK) {
-  const r = rng(1009 + take * 7919), j = (x, s) => x * (1 + (r() * 2 - 1) * s), out = new Float32Array(Math.ceil(rate * 0.14));
+// `take` picks one of several (no two landings alike); `voice` the seed set.
+export function knock(rate, take = 0, f = TOK, voice = 'jobs') {
+  const v = voiceOf(voice), r = rng(1009 + take * 7919), j = (x, s) => x * (1 + (r() * 2 - 1) * s), out = new Float32Array(Math.ceil(rate * 0.14));
   for (const [ratio, a] of [[0.27, 0.22], [1, 0.8], [1.035, 0.5], [1.52, 0.62], [2.17, 0.5], [2.83, 0.4], [3.71, 0.3], [4.66, 0.22]]) {
-    const fm = j(f * ratio, ratio === 1 ? 0.02 : 0.05); ring(out, rate, fm, j(a, 0.2), j(ratio < 0.5 ? 0.018 : woodTau(fm), 0.15)); // the thud is damped by the table under the board
+    const fm = j(f * ratio, ratio === 1 ? 0.02 : 0.05); ring(out, rate, fm, j(ratio < 0.5 ? a * v.thud : a, 0.2), j(ratio < 0.5 ? 0.018 : woodTau(fm), 0.15)); // the thud is damped by the table under the board
   }
-  ring(out, rate, j(3900, 0.08), 0.35, j(0.004, 0.2)); // the seed itself, hard and a little hollow: a tiny bright ring
-  ring(out, rate, j(5900, 0.08), 0.25, j(0.0028, 0.2));
-  burst(out, rate, 1.3, j(0.00045, 0.2), 1500, r); // the moment of contact
+  for (const [cf, a, tau] of v.click) ring(out, rate, j(cf, 0.08), a, j(tau, 0.2)); // the seed itself
+  burst(out, rate, v.burst[0], j(v.burst[1], 0.2), v.burst[2], r); // the moment of contact
   return finish(out, rate);
 }
 // A seed landing on another seed: the two seeds' own high, quick rings, the click of contact, the wood under them faintly.
-export function clack(rate, take = 0) {
-  const r = rng(2003 + take * 6151), j = (x, s) => x * (1 + (r() * 2 - 1) * s), out = new Float32Array(Math.ceil(rate * 0.07));
-  ring(out, rate, j(2600, 0.08), 0.7, j(0.006, 0.2));
-  ring(out, rate, j(3800, 0.08), 0.55, j(0.0045, 0.2));
-  ring(out, rate, j(5300, 0.08), 0.38, j(0.0032, 0.2));
-  ring(out, rate, j(7400, 0.08), 0.22, j(0.0022, 0.2));
-  ring(out, rate, j(TOK, 0.05), 0.12, j(0.016, 0.2)); // the wood under them
-  ring(out, rate, j(TOK * 1.62, 0.05), 0.07, j(0.011, 0.2));
-  burst(out, rate, 1, j(0.0003, 0.2), 2400, r);
+export function clack(rate, take = 0, voice = 'jobs') {
+  const v = voiceOf(voice), r = rng(2003 + take * 6151), j = (x, s) => x * (1 + (r() * 2 - 1) * s), out = new Float32Array(Math.ceil(rate * 0.07));
+  for (const [cf, a, tau] of v.clack) ring(out, rate, j(cf, 0.08), a, j(tau, 0.2));
+  ring(out, rate, j(TOK, 0.05), 0.12 * v.under, j(0.016, 0.2)); // the wood under them
+  ring(out, rate, j(TOK * 1.62, 0.05), 0.07 * v.under, j(0.011, 0.2));
+  burst(out, rate, v.clackBurst[0], j(v.clackBurst[1], 0.2), v.clackBurst[2], r);
   return finish(out, rate);
+}
+// A handful of seeds let fall into a pit, to hear a seed set when it is chosen: the first on the wood, the rest
+// on the seeds already down, each a little softer and a little later (a hand opening, not a drum roll).
+export function handful(n = 5) {
+  const out = []; let t = 0;
+  for (let i = 0; i < n; i++) { out.push({ k: Math.max(0.25, 0.85 - i * 0.13), onSeed: i > 0, when: +t.toFixed(3) }); t += 0.055 + i * 0.012; }
+  return out;
 }
 // A small, warm room for the board: a few early reflections off the table and walls, then a soft tail that darkens
 // as it dies (two ears, each a little different). Used quietly, so the knocks sound like they are somewhere.
@@ -76,9 +96,11 @@ export function room(rate, seed = 7) {
 }
 
 // The board's sound, wired to a Web Audio context `a` (live, or offline for a recording).
-export function boardAudio(a) {
+export function boardAudio(a, voice = 'jobs') {
   const rate = a.sampleRate, mono = (d) => { const b = a.createBuffer(1, d.length, rate); b.getChannelData(0).set(d); return b; };
-  const bank = { knock: [0, 1, 2, 3, 4, 5].map((t) => mono(knock(rate, t))), clack: [0, 1, 2, 3].map((t) => mono(clack(rate, t))) };
+  const banks = {}; // each seed set's landings, made the first time that set is on the board
+  const bankFor = (id) => banks[id] || (banks[id] = { knock: [0, 1, 2, 3, 4, 5].map((t) => mono(knock(rate, t, TOK, id))), clack: [0, 1, 2, 3].map((t) => mono(clack(rate, t, id))) });
+  let voiceId = VOICES[voice] ? voice : 'jobs', bank = bankFor(voiceId);
   // everything goes through a gentle limiter (a capture drops a dozen seeds at once), with a little of the room
   const limit = a.createDynamicsCompressor(); limit.threshold.value = -8; limit.knee.value = 6; limit.ratio.value = 6; limit.attack.value = 0.001; limit.release.value = 0.12; limit.connect(a.destination);
   const bus = a.createGain(); bus.gain.value = 0.75; bus.connect(limit);
@@ -95,6 +117,9 @@ export function boardAudio(a) {
   }
   return {
     ctx: a,
+    get voiceId() { return voiceId; },
+    // the seed set on the board: its own click and clack from the next landing on
+    voice(id) { id = VOICES[id] ? id : 'jobs'; if (id !== voiceId) { voiceId = id; bank = bankFor(id); } return voiceId; },
     // a seed touching down: k how hard (0..1), on another seed or on the wood, pan −1 (left) … 1 (right),
     // tune the bowl's note (1 = TOK), when (s from now)
     land(k, onSeed, pan = 0, tune = 1, when = 0) {
