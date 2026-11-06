@@ -46,7 +46,7 @@
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --frrooms (French, L18 slice 5: two French phones meet in a room — the Rooms screen, the name card, the door, a shout, the take-back card and the call card all French, the WhatsApp invite French; pictures <out>, <out>-door.png, <out>-back.png, <out>-call.png)
-#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, a weak line going voice only on both phones and Video again bringing the pictures back (picture <out>-weak.png), mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, a weak line going voice only on both phones and Video again bringing the pictures back (picture <out>-weak.png), mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also their hand over the board: the host's first tap lights that pit faintly on Tete's board with "weighing their pit 5", follows a second pick, and goes on Esc (picture <out>-online-peek.png); also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -1023,6 +1023,23 @@ if online:
         assert host.evaluate("document.querySelector('#turn').textContent") == "your move", "the host should move first"
         assert friend.evaluate("document.querySelector('#turn').textContent") != "your move", "the friend must wait"
         before = friend.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
+        # their hand over the board (web/peek.js): the host's first tap on a pit lights it faintly on Tete's board and the line under
+        # Meka's name says so; another pit moves the light; Esc puts it back and the light goes; then the host sows
+        def first(pg, pit): x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit); pg.mouse.click(x, y)
+        first(host, 4)
+        friend.wait_for_function("window.__ayo.peek.pit===4 && window.__ayo.peek.lit", timeout=20000)
+        pk = friend.evaluate("window.__ayo.peek"); assert pk["words"] == "weighing their pit 5", pk
+        assert not host.evaluate("window.__ayo.peek.lit"), "the host's own board shows no friend's light"
+        host.wait_for_timeout(250); first(host, 1)
+        friend.wait_for_function("window.__ayo.peek.pit===1 && window.__ayo.peek.lit", timeout=20000)
+        friend.wait_for_timeout(500)
+        outp = out[:-4] + "-online-peek.png" if out.endswith(".png") else out + "-online-peek.png"
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=outp, timeout=120000, animations="disabled"); friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        print("peek: Tete's board follows Meka's finger ·", friend.evaluate("window.__ayo.peek.words"), "·", [e["pit"] for e in friend.evaluate("window.__ayo.peek.log")])
+        host.keyboard.press("Escape")
+        friend.wait_for_function("window.__ayo.peek.pit===-1 && !window.__ayo.peek.lit && document.querySelector('#oppSub').textContent!=='weighing their pit 2'", timeout=20000)
+        print("peek: put back, the light goes ·", friend.evaluate("document.querySelector('#oppSub').textContent"))
+        host.wait_for_timeout(250)
         tap(host, 2)  # the host sows their third pit; the friend's board must follow
         friend.wait_for_function("document.querySelector('#turn').textContent==='your move'", timeout=240000)
         host.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===1", timeout=240000)

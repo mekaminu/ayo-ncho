@@ -201,6 +201,8 @@ export function roomPatterns({ who, item, need }) {
     [R(`${N} decides`), (m) => `${who(m[1])} décide`],
     [R(`${N} joined`), (m) => `${who(m[1])} a rejoint la salle`],
     [R(`Waiting for ${N}…`), (m) => `On attend ${who(m[1])}…`],
+    // their hand over the board (web/peek.js): the line under the friend's name while their finger is on a pit
+    [R(`weighing their pit (\\d+)`), (m) => `hésite sur le trou ${m[1]} d’en face`],
     // the away titles
     [R(`${N} played`), (m) => `${who(m[1])} a joué`],
     [R(`${N} won`), (m) => `${who(m[1])} a gagné`],

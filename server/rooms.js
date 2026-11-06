@@ -23,6 +23,7 @@ import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, 
 import { isShout, mayShout } from "../web/shouts.js";
 import { callMessage, passGate } from "../web/call.js";
 import { cleanTag } from "../web/block.js";
+import { isPeek, mayPeek, passPeek } from "../web/peek.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
 export const CODE_LENGTH = 4;
@@ -276,6 +277,20 @@ export class Rooms {
     if (!mayShout(room.seats[seat].shoutAt, t)) fail("hush", "one shout at a time");
     room.seats[seat].shoutAt = t; room.touchedAt = t;
     return { seat, id };
+  }
+
+  // Their hand over the board (web/peek.js): the pit the seat to move has picked (its first tap), or -1 when it is put back,
+  // passed to the OTHER seat only. Only on its own move, only a pit the engine lets it play; nothing is kept but the gate.
+  // Returns {seat, to, pit, n}; index.js sends it to the sockets of seat `to`.
+  peek(code, token, pit) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
+    if (!isPeek(pit)) fail("bad", "not a pit");
+    if (!mayPeek(room.game, seat, pit)) fail("notnow", "not your move");
+    const me = room.seats[seat]; if (!me.peekGate) me.peekGate = {};
+    if (!passPeek(me.peekGate, pit, this.now())) fail("slow", "slow down a moment");
+    return { seat, to: 1 - seat, pit, n: room.game.moves.length };
   }
 
   // Video and voice at the board (web/call.js): a call message from one seated player, passed to the OTHER seat only.

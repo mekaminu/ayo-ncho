@@ -12,6 +12,7 @@
 //   net.on('askback', ({ seat, n }) => …)     // that seat asks to take back the move it just played (n: moves played); the other seat answers
 //   net.on('takeback', ({ seat, state, undone, before }) => …) // yes: that seat's last move (pit `undone`) is gone, state is the position before it
 //   net.on('backno', ({ seat }) => …)          // no: the move stands
+//   net.on('peek',   ({ seat, pit, n }) => …)  // the friend's pick on their move, -1 put back (web/peek.js)
 //   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
 //   net.on('call',   ({ seat, kind, data }) => …) // a call message from the friend (web/call.js): video and voice at the board
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
@@ -127,6 +128,7 @@ export class Online {
   askBack() { return this.send({ t: 'askback' }); } // ask to take back the move just played
   answerBack(yes) { return this.send({ t: 'backanswer', yes: !!yes }); }
   shout(id) { return this.send({ t: 'shout', id }); }
+  peek(pit) { return this.send({ t: 'peek', pit }); } // the pit picked on our move (-1 put back), to the friend's board only (web/peek.js)
   call(kind, data = {}) { return this.send({ t: 'call', kind, data }); } // video and voice at the board (web/call.js): to the friend's seat only
   leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; this.knock = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
 
@@ -195,6 +197,7 @@ export class Online {
         return this.emit('takeback', { seat: m.seat, state: r.state, undone: r.undone, before });
       }
       case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
+      case 'peek': return this.emit('peek', { seat: m.seat, pit: m.pit, n: m.n });
       case 'call': return this.emit('call', { seat: m.seat, kind: m.kind, data: m.data || {} });
       case 'error':
         if (m.code === 'swept' || (m.code === 'notfound' && m.re === 'rejoin') || m.code === 'token') { this.token = null; this.intent = null; this.held = null; } // nothing left to come back to
