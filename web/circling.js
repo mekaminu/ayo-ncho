@@ -32,7 +32,7 @@ export function circling(state) {
 export function began(before, after) { return !!before && movesLeft(before) === null && movesLeft(after) !== null; }
 
 // did this game end by the call (no capture for QUIET_LIMIT moves), rather than by 25 seeds, a side run dry or giving up
-export function endedCircling(state) { return !!state && state.over && state.resigned == null && (state.quiet || 0) >= QUIET_LIMIT; }
+export function endedCircling(state) { return !!state && state.over && state.resigned == null && !state.agreed && (state.quiet || 0) >= QUIET_LIMIT; }
 
 // who would win, from your seat: "you'd win 26–22" / "you'd lose 21–27" / "level 24–24"; `me` / `other` name the sides
 // when the near player is not "you" (two of us: "Player 2 would win 26–22")

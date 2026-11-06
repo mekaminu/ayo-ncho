@@ -212,6 +212,15 @@ export function resign(state, player) {
   return { state: next, events: [{ type: "end", winner, resigned: player }] };
 }
 
+// Agreeing a draw (a room's "Offer a draw", once the friend says yes): the game ends now, level, whatever the score — at a
+// real board two players who see it going nowhere shake hands over it. The seeds stay where they lie; `agreed` says it was
+// agreed, so the server, both boards and a reload all read the same result. Returns the new state and the one event to show.
+export function agreeDraw(state) {
+  if (state.over) throw new Error("game over");
+  const next = { ...state, pits: state.pits.slice(), stores: state.stores.slice(), moves: state.moves.slice(), over: true, winner: "draw", agreed: true };
+  return { state: next, events: [{ type: "end", winner: "draw", agreed: true }] };
+}
+
 // Taking a move back (a room's "Take it back?", once the friend says yes): only the move just played can go, and only by
 // whoever played it, while the game is still in play. The position is rebuilt from the move list without it, so the seeds,
 // the scores, the quiet count and whose move it is all come back exactly as they were. Returns the earlier state.

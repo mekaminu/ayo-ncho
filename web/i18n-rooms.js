@@ -55,6 +55,19 @@ export const FR_ROOMS = nb({
   'take it back?': `reprendre le coup${NB}?`,
   'Their seeds go back where they were and it is their move again. Or play on and the move stands.': 'Ses graines reviennent où elles étaient et c’est de nouveau à son tour. Ou continuez, et le coup reste.',
   'the move stands': 'le coup reste',
+  // offering a draw (web/draw.js)
+  'Offer a draw': 'Proposer le match nul',
+  'A draw?': `Match nul${NB}?`,
+  'Draw offered — waiting': 'Match nul proposé — on attend',
+  'They offered a draw': 'Match nul proposé en face',
+  'Draw offered at this move': 'Match nul déjà proposé à ce coup',
+  'The game ends level, whatever the seeds say. Or play on — your move is a no.': 'La partie s’arrête à égalité, quelles que soient les graines. Ou continuez — jouer votre coup, c’est dire non.',
+  'Agree a draw': 'Accepter le match nul',
+  'agreed': 'accepté',
+  'no draw': 'pas de match nul',
+  'Agreed a draw': 'Match nul accepté',
+  'agreed a draw': 'match nul accepté',
+  'A draw · agreed': 'Match nul · accepté',
 
   // the call (web/call.js) and its menu
   'Stop asking': 'Ne plus demander',
@@ -211,6 +224,10 @@ export function roomPatterns({ who, item, need }) {
     [R(`You won`), () => 'Vous avez gagné'],
     [R(`A draw (\\d+)–(\\d+)`), (m) => `Match nul ${m[1]}–${m[2]}`],
     [R(`${N} asks to take back a move`), (m) => `${who(m[1])} demande à reprendre un coup`],
+    [R(`${N} offers a draw`), (m) => `${who(m[1])} propose le match nul`],
+    [R(`${N} agreed a draw`), (m) => `${who(m[1])} a accepté le match nul`],
+    [R(`Offered ${N} a draw — waiting`), (m) => `Match nul proposé à ${who(m[1])} — on attend`],
+    [R(`agreed a draw after move (\\d+)`), (m) => `match nul accepté après le coup ${m[1]}`],
     [R(`${N} would like video at the board`), (m) => `${who(m[1])} aimerait la vidéo au plateau`],
     [R(`${N} would like to talk(?: at the board)?`), (m) => `${who(m[1])} aimerait parler au plateau`],
     // taking back

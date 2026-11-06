@@ -19,7 +19,7 @@
 // the moves through the engine, and the friend's token works again as before. The secret is ROOM_SECRET (Render makes it once,
 // from render.yaml); without one a random secret is made at start, which only lasts as long as the process.
 import { randomUUID, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
-import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, RULES } from "../engine/ayo.js";
+import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, agreeDraw, RULES } from "../engine/ayo.js";
 import { isShout, mayShout } from "../web/shouts.js";
 import { callMessage, passGate } from "../web/call.js";
 import { cleanTag } from "../web/block.js";
@@ -44,9 +44,11 @@ export const SIG_LENGTH = 12;    // base64url characters of the seal: 72 bits, c
 export const MAX_TICKET_MOVES = 2000;
 
 // The signed form of a room: the same fields, in the same order, whether read from the server's room or from a board's ticket.
-export function sealText({ code, rid, variant, rules, games, names, first, moves, resigned }) {
+// An agreed draw adds one last field (1); every other room seals exactly as before, so tickets kept before draws existed still check.
+export function sealText({ code, rid, variant, rules, games, names, first, moves, resigned, drawn }) {
   const r = {}; for (const k of Object.keys(rules || {}).sort()) r[k] = rules[k];
-  return JSON.stringify([1, code, rid, variant, r, games, names, first, moves, resigned ?? null]);
+  const fields = [1, code, rid, variant, r, games, names, first, moves, resigned ?? null]; if (drawn) fields.push(1);
+  return JSON.stringify(fields);
 }
 export class RoomError extends Error {
   constructor(code, message) { super(message); this.code = code; }
@@ -67,7 +69,7 @@ export class Rooms {
   seal(room) { return this.mac(sealText(this.sealFields(room))).slice(0, SIG_LENGTH); }
   sealFields(room) {
     const g = room.game;
-    return { code: room.code, rid: room.rid, variant: room.variant, rules: room.rules, games: room.games, names: room.seats.map((s) => (s ? s.name : null)), first: g.first ?? 0, moves: g.moves, resigned: g.resigned ?? null };
+    return { code: room.code, rid: room.rid, variant: room.variant, rules: room.rules, games: room.games, names: room.seats.map((s) => (s ? s.name : null)), first: g.first ?? 0, moves: g.moves, resigned: g.resigned ?? null, drawn: !!g.agreed };
   }
 
   // The host opens a room and takes seat 0. The friend's seat stays empty until join().
@@ -159,10 +161,11 @@ export class Rooms {
     const t = ticket;
     if (!t || typeof t !== "object" || typeof t.sig !== "string" || t.sig.length !== SIG_LENGTH || typeof t.rid !== "string" || !/^[A-Za-z0-9_-]{8,40}$/.test(t.rid)) gone();
     if (!RULES[t.variant] || !t.rules || typeof t.rules !== "object" || Array.isArray(t.rules)) gone();
-    if (!Number.isInteger(t.games) || t.games < 0 || ![0, 1].includes(t.first) || ![null, 0, 1].includes(t.resigned ?? null)) gone();
+    if (!Number.isInteger(t.games) || t.games < 0 || ![0, 1].includes(t.first) || ![null, 0, 1].includes(t.resigned ?? null) || ![undefined, false, true].includes(t.drawn)) gone();
     if (!Array.isArray(t.names) || t.names.length !== 2 || typeof t.names[0] !== "string" || !(t.names[1] === null || typeof t.names[1] === "string")) gone();
     if (!Array.isArray(t.moves) || t.moves.length > MAX_TICKET_MOVES || !t.moves.every((m) => Number.isInteger(m) && m >= 0 && m < 12)) gone();
-    const fields = { code, rid: t.rid, variant: t.variant, rules: t.rules, games: t.games, names: t.names, first: t.first, moves: t.moves, resigned: t.resigned ?? null };
+    const fields = { code, rid: t.rid, variant: t.variant, rules: t.rules, games: t.games, names: t.names, first: t.first, moves: t.moves, resigned: t.resigned ?? null, drawn: !!t.drawn };
+    if (fields.drawn && fields.resigned !== null) gone();
     const want = Buffer.from(this.mac(sealText(fields)).slice(0, SIG_LENGTH)), got = Buffer.from(t.sig);
     if (want.length !== got.length || !timingSafeEqual(want, got)) gone();
     let game;
@@ -170,6 +173,7 @@ export class Rooms {
       game = newGame(t.variant, t.rules, t.first);
       for (const m of t.moves) { if (game.over || !legalMoves(game).includes(m)) gone(); game = applyMove(game, m).state; }
       if (fields.resigned !== null) { if (game.over) gone(); game = resign(game, fields.resigned).state; }
+      if (fields.drawn) { if (game.over) gone(); game = agreeDraw(game).state; }
     } catch (e) { if (e instanceof RoomError) throw e; gone(); }
     return { fields, game };
   }
@@ -182,7 +186,7 @@ export class Rooms {
     const room = {
       code, rid: f.rid, variant: f.variant, rules: { ...f.rules },
       seats: f.names.map((name, i) => (name === null ? null : { token: this.tokenFor(code, f.rid, i), name, online: false, wantsRematch: false })),
-      knocks: [], game, games: f.games, ask: null,
+      knocks: [], game, games: f.games, ask: null, drawAsk: null,
       createdAt: t, touchedAt: t, restored: true,
     };
     this.rooms.set(code, room);
@@ -194,9 +198,9 @@ export class Rooms {
     const { fields: f, game } = checked; const cur = room.game;
     if (f.rid !== room.rid) return false;
     const extends_ = f.moves.length >= cur.moves.length && cur.moves.every((m, i) => f.moves[i] === m);
-    const newer = f.games > room.games || (f.games === room.games && extends_ && (f.moves.length > cur.moves.length || (f.resigned !== null && (cur.resigned ?? null) === null)));
+    const newer = f.games > room.games || (f.games === room.games && extends_ && (f.moves.length > cur.moves.length || (f.resigned !== null && (cur.resigned ?? null) === null) || (f.drawn && !cur.agreed)));
     if (!newer) return false;
-    room.game = game; room.games = f.games; room.ask = null;
+    room.game = game; room.games = f.games; room.ask = null; room.drawAsk = null;
     if (!room.seats[1] && f.names[1] !== null) room.seats[1] = { token: this.tokenFor(room.code, room.rid, 1), name: f.names[1], online: false, wantsRematch: false };
     return true;
   }
@@ -224,6 +228,7 @@ export class Rooms {
     }
     const { state, events } = applyMove(g, pit);
     room.game = state; room.touchedAt = this.now(); room.ask = null; room.restored = false; // playing on is a no to any "take it back?" still asked
+    if (room.drawAsk) { if (room.drawAsk.seat === seat) room.drawAsk.n = state.moves.length; else room.drawAsk = null; } // a draw offered stands through the offerer's own move; the friend playing on is a no
 
     return { seat, pit, events, state: publicState(state), sig: this.seal(room) };
   }
@@ -236,8 +241,34 @@ export class Rooms {
     if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
     if (room.game.over) fail("over", "the game is over");
     const { state } = resign(room.game, seat);
-    room.game = state; room.touchedAt = this.now(); room.ask = null; room.restored = false;
+    room.game = state; room.touchedAt = this.now(); room.ask = null; room.drawAsk = null; room.restored = false;
     return { seat, state: publicState(state), sig: this.seal(room) };
+  }
+
+  // "Offer a draw": either seat may offer, on either player's move, once per move played; the friend agrees (the game ends level
+  // with the engine, whatever the score) or plays on. The offer stands through the offerer's own move; the friend moving is a no.
+  offerDraw(code, token) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    if (!room.seats[1]) fail("waiting", "your friend has not joined yet");
+    const g = room.game;
+    if (g.over) fail("over", "the game is over");
+    if (room.drawAsk) fail(room.drawAsk.seat === seat ? "offered" : "theyoffered", room.drawAsk.seat === seat ? "already offered — waiting for an answer" : "your friend has offered a draw — answer it");
+    const n = g.moves.length;
+    if (room.seats[seat].drawN === n) fail("offeredonce", "you have offered once at this move");
+    room.drawAsk = { seat, n }; room.seats[seat].drawN = n; room.touchedAt = this.now();
+    return { seat, n };
+  }
+  answerDraw(code, token, yes) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    const ask = room.drawAsk;
+    if (!ask || ask.n !== room.game.moves.length || room.game.over) { room.drawAsk = null; fail("nodraw", "no draw to answer"); }
+    if (ask.seat === seat) fail("owndraw", "your friend answers this one");
+    room.drawAsk = null; room.touchedAt = this.now();
+    if (!yes) return { seat: ask.seat, yes: false, n: ask.n };
+    room.game = agreeDraw(room.game).state; room.ask = null; room.restored = false;
+    return { seat: ask.seat, yes: true, n: room.game.moves.length, state: publicState(room.game), sig: this.seal(room) };
   }
 
   // "Take it back?": the seat that has just moved asks to take that move back; the friend says yes (the move is undone
@@ -263,7 +294,7 @@ export class Rooms {
     if (ask.seat === seat) fail("ownask", "your friend answers this one");
     room.ask = null; room.touchedAt = this.now();
     if (!yes) return { seat: ask.seat, yes: false, n: ask.n };
-    room.game = takeBack(room.game, ask.seat); room.restored = false;
+    room.game = takeBack(room.game, ask.seat); room.restored = false; room.drawAsk = null;
     return { seat: ask.seat, yes: true, n: room.game.moves.length, state: publicState(room.game), sig: this.seal(room) };
   }
 
@@ -319,8 +350,8 @@ export class Rooms {
     if (!both) return { started: false, room: this.snapshot(code) };
     const g = newGame(room.variant, room.rules);
     g.turn = g.first = room.game.winner === 0 ? 1 : room.game.winner === 1 ? 0 : (room.games % 2); // the loser starts; after a draw, alternate
-    room.game = g; room.games += 1; room.ask = null; room.restored = false;
-    for (const s of room.seats) if (s) { s.wantsRematch = false; s.backN = null; }
+    room.game = g; room.games += 1; room.ask = null; room.drawAsk = null; room.restored = false;
+    for (const s of room.seats) if (s) { s.wantsRematch = false; s.backN = null; s.drawN = null; }
     return { started: true, room: this.snapshot(code) };
   }
 
@@ -332,6 +363,7 @@ export class Rooms {
       players: room.seats.map((s, i) => s ? { seat: i, name: s.name, ...(s.tag ? { tag: s.tag } : {}), online: s.online, wantsRematch: s.wantsRematch } : null), // tag: each phone's random tag, for block (web/block.js)
       knocks: room.knocks.map((k) => ({ id: k.id, name: k.name, ...(k.tag ? { tag: k.tag } : {}) })), // who is at the door (the host's board shows them; never shown to the knockers)
       ask: room.ask ? { seat: room.ask.seat, n: room.ask.n } : null, // a "take it back?" waiting for its answer (a rejoin sees it)
+      drawAsk: room.drawAsk ? { seat: room.drawAsk.seat, n: room.drawAsk.n } : null, // a draw offered and not yet answered
       state: publicState(room.game),
       rid: room.rid, sig: this.seal(room), // the board keeps these with the moves, so the room can be rebuilt after a restart (ticketOf in web/online.js)
     };
@@ -355,7 +387,7 @@ export class Rooms {
 // The game as the clients see it. moves lets a client rebuild the position with the shared engine (replay) and check it matches;
 // quiet (moves since the last capture) is sent too, so a board that applies the next move itself ends a stalemate on the same move the server does.
 export function publicState(g) {
-  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, resigned: g.resigned ?? null, first: g.first ?? 0, variant: g.variant, rules: { ...g.rules } };
+  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, resigned: g.resigned ?? null, ...(g.agreed ? { agreed: true } : {}), first: g.first ?? 0, variant: g.variant, rules: { ...g.rules } };
 }
 
 // What travels for a move: the seat, the pit, how many moves have been played and both scores — a few dozen bytes.
@@ -371,4 +403,6 @@ export function resignMessage({ seat, state, sig }) {
 }
 // "Take it back?" travels as small: who asked (or whose move went back) and the move count.
 export function backMessage({ seat, yes, n, sig }) { return yes === undefined ? { t: "askback", seat, n } : yes ? { t: "takeback", seat, n, ...(sig ? { sig } : {}) } : { t: "backno", seat, n }; }
+// "Offer a draw" travels as small: who offered and the move count; a yes says the game ended level, a no that it plays on.
+export function drawMessage({ seat, yes, n, sig }) { return yes === undefined ? { t: "drawoffer", seat, n } : yes ? { t: "draw", seat, n, ...(sig ? { sig } : {}) } : { t: "drawno", seat, n }; }
 export { replay };

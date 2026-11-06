@@ -12,25 +12,27 @@
 //   net.on('askback', ({ seat, n }) => …)     // that seat asks to take back the move it just played (n: moves played); the other seat answers
 //   net.on('takeback', ({ seat, state, undone, before }) => …) // yes: that seat's last move (pit `undone`) is gone, state is the position before it
 //   net.on('backno', ({ seat }) => …)          // no: the move stands
+//   net.on('drawoffer', ({ seat, n }) => …)   // that seat offers a draw; the other seat answers (playing a move is a no)
+//   net.on('draw', ({ seat, events, state }) => …) // yes: the game ended level (events: one 'end', agreed) · net.on('drawno', ({ seat }) => …)
 //   net.on('peek',   ({ seat, pit, n }) => …)  // the friend's pick on their move, -1 put back (web/peek.js)
 //   net.on('shout',  ({ seat, id }) => …)      // a shout from either seat (web/shouts.js has the words)
 //   net.on('call',   ({ seat, kind, data }) => …) // a call message from the friend (web/call.js): video and voice at the board
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
 //   net.on('ticket', ({ code, token, ticket }) => …) // the room as this board holds it, sealed by the server: keep it (with the token) so a reload can rebuild the room after a restart
-//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token, ticket?) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.resign() / net.askBack() / net.answerBack(yes) / net.leave()
+//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token, ticket?) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.resign() / net.askBack() / net.answerBack(yes) / net.offerDraw() / net.answerDraw(yes) / net.leave()
 
-import { applyMove, resign, takeBack, mayTakeBack, firstMover } from '../engine/ayo.js';
+import { applyMove, resign, takeBack, mayTakeBack, agreeDraw, firstMover } from '../engine/ayo.js';
 
 export const BACKOFF_MS = [800, 1600, 3200, 6400, 10000]; // between reconnect attempts, then every 10 s
 
 // The game as the server shows it, made into an engine-shaped state the board can read (legalMoves, replay for undo-less play).
 export function stateFrom(pub) {
-  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null, resigned: pub.resigned ?? null, first: pub.first ?? firstMover(pub.moves, pub.moves.length ? 0 : pub.turn) };
+  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null, resigned: pub.resigned ?? null, ...(pub.agreed ? { agreed: true } : {}), first: pub.first ?? firstMover(pub.moves, pub.moves.length ? 0 : pub.turn) };
 }
 // The other way round: an engine state as the server would show it (what a 'move' carries once rebuilt).
 export function publicFrom(s) {
-  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, resigned: s.resigned ?? null, first: s.first ?? 0, variant: s.variant, rules: { ...s.rules } };
+  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, resigned: s.resigned ?? null, ...(s.agreed ? { agreed: true } : {}), first: s.first ?? 0, variant: s.variant, rules: { ...s.rules } };
 }
 
 // A move arrives small — {seat, pit, n, stores} — because every board has the same engine as the server. Rebuild the
@@ -52,6 +54,13 @@ export function rebuildResign(pub, m) {
   return { events: r.events, state: publicFrom(r.state) };
 }
 
+// An agreed draw arrives as {seat, n}: the same engine ends the room's game level on this board; n must match the moves played here.
+export function rebuildDraw(pub, m) {
+  if (!pub || !Array.isArray(pub.moves) || pub.moves.length !== m.n || pub.over) return null;
+  let r; try { r = agreeDraw(stateFrom(pub)); } catch { return null; }
+  return { events: r.events, state: publicFrom(r.state) };
+}
+
 // "Take it back?" said yes arrives as {seat, n}: the same engine takes that seat's last move back on this board; n (the
 // moves left once it is gone) must match, or the whole room is fetched instead.
 export function rebuildTakeBack(pub, m) {
@@ -66,7 +75,7 @@ export function rebuildTakeBack(pub, m) {
 // seal over all of it (sig, sent with the room and with every move). Nothing here can be changed without the seal failing.
 export function ticketOf(room) {
   if (!room || !room.rid || !room.sig || !room.state || !Array.isArray(room.players)) return null;
-  return { rid: room.rid, variant: room.variant, rules: { ...room.rules }, games: room.games || 0, names: [0, 1].map((i) => (room.players[i] ? room.players[i].name : null)), first: room.state.first ?? 0, moves: room.state.moves.slice(), resigned: room.state.resigned ?? null, sig: room.sig };
+  return { rid: room.rid, variant: room.variant, rules: { ...room.rules }, games: room.games || 0, names: [0, 1].map((i) => (room.players[i] ? room.players[i].name : null)), first: room.state.first ?? 0, moves: room.state.moves.slice(), resigned: room.state.resigned ?? null, ...(room.state.agreed ? { drawn: true } : {}), sig: room.sig };
 }
 
 // The invite link for a room: the app's own address with ?room=CODE.
@@ -127,6 +136,8 @@ export class Online {
   resign() { return this.send({ t: 'resign' }); } // give up the game in play
   askBack() { return this.send({ t: 'askback' }); } // ask to take back the move just played
   answerBack(yes) { return this.send({ t: 'backanswer', yes: !!yes }); }
+  offerDraw() { return this.send({ t: 'offerdraw' }); } // offer the friend a draw
+  answerDraw(yes) { return this.send({ t: 'drawanswer', yes: !!yes }); }
   shout(id) { return this.send({ t: 'shout', id }); }
   peek(pit) { return this.send({ t: 'peek', pit }); } // the pit picked on our move (-1 put back), to the friend's board only (web/peek.js)
   call(kind, data = {}) { return this.send({ t: 'call', kind, data }); } // video and voice at the board (web/call.js): to the friend's seat only
@@ -179,7 +190,7 @@ export class Online {
           if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'move' }); } // behind, somehow: ask for the whole room rather than guess
           events = r.events; state = r.state;
         }
-        if (this.room) { this.room.state = state; this.room.ask = null; this.sealed(m.sig); } // playing on ends any "take it back?"
+        if (this.room) { this.room.state = state; this.room.ask = null; if (this.room.drawAsk) { if (this.room.drawAsk.seat === m.seat) this.room.drawAsk = { seat: m.seat, n: state.moves.length }; else this.room.drawAsk = null; } this.sealed(m.sig); } // playing on ends any "take it back?" (and a draw the other seat offered)
         return this.emit('move', { seat: m.seat, pit: m.pit, events, state });
       }
       case 'resign': {
@@ -195,6 +206,14 @@ export class Online {
         if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'takeback' }); }
         if (this.room) { this.room.state = r.state; this.room.ask = null; this.sealed(m.sig); }
         return this.emit('takeback', { seat: m.seat, state: r.state, undone: r.undone, before });
+      }
+      case 'drawoffer': if (this.room) this.room.drawAsk = { seat: m.seat, n: m.n }; return this.emit('drawoffer', { seat: m.seat, n: m.n });
+      case 'drawno': if (this.room) this.room.drawAsk = null; return this.emit('drawno', { seat: m.seat, n: m.n });
+      case 'draw': {
+        const r = rebuildDraw(this.room && this.room.state, m);
+        if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'draw' }); }
+        if (this.room) { this.room.state = r.state; this.room.drawAsk = null; this.sealed(m.sig); }
+        return this.emit('draw', { seat: m.seat, events: r.events, state: r.state });
       }
       case 'shout': return this.emit('shout', { seat: m.seat, id: m.id });
       case 'peek': return this.emit('peek', { seat: m.seat, pit: m.pit, n: m.n });

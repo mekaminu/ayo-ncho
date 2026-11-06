@@ -46,7 +46,7 @@
 #                  Picture: <out> (her opening move explained, your move to make); --wide for the Mac
 #        add --page (with --smoke) to screenshot the whole page after the move, the opponent's face reacting (mood given as --page=sulk; default happy)
 #        --frrooms (French, L18 slice 5: two French phones meet in a room — the Rooms screen, the name card, the door, a shout, the take-back card and the call card all French, the WhatsApp invite French; pictures <out>, <out>-door.png, <out>-back.png, <out>-call.png)
-#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, a weak line going voice only on both phones and Video again bringing the pictures back (picture <out>-weak.png), mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also their hand over the board: the host's first tap lights that pit faintly on Tete's board with "weighing their pit 5", follows a second pick, and goes on Esc (picture <out>-online-peek.png); also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
+#        --online (also video and voice at the board, with Chromium's test cameras: the lighter board offers voice only, the host asks, Tete's card says so and nothing opens before the yes, both live with each other's picture, a weak line going voice only on both phones and Video again bringing the pictures back (picture <out>-weak.png), mute, a hidden picture and hang up — pictures <out>-video-ask.png and <out>-video.png; also restarts the server mid-game and checks both boards come back to the same position and play on; also their hand over the board: the host's first tap lights that pit faintly on Tete's board with "weighing their pit 5", follows a second pick, and goes on Esc (picture <out>-online-peek.png); also checks take it back: the host plays, asks with the Undo chip, Tete's card says so and Let them puts both boards back; the away title: the host's tab goes out of sight, the friend moves, the title says it; offering a draw: Tete's offer played on, the host's agreed, both cards say A draw (pictures <out>-draw-ask.png and <out>-draw.png), then Play again on both; giving up: the host gives up from the shout row, both Game over cards say so; and block and report: the camera menu ends with Report a problem (opens /support#report) and Block Tete, two taps leave the room, Tete's knock at the next room is turned away with no card, Settings → Privacy lists and unblocks — picture <out>-block.png): start the real server (node server/index.js); one phone goes Home → With friends (name card, then the Rooms screen opens a room
 #                  and shows its code), a second does the same, is refused a wrong code under the field, then joins by the real code and knocks;
 #                  the host's door card shows over the Rooms screen, the friend is let in, both go to the board, play a move each (both boards
 #                  must follow) and shout both ways. Pictures: <out> the Rooms screen with its code, <out>-door.png the door card over it,
@@ -1265,7 +1265,7 @@ if online:
         host.wait_for_function("!document.querySelector('#undo').disabled", timeout=10000)
         assert host.evaluate("document.querySelector('#undo').getAttribute('aria-label')") == "Ask to take back your move"
         host.click("#undo"); friend.wait_for_selector("#backCard:not([hidden])", timeout=10000)
-        assert friend.evaluate("document.querySelector('#backTitle').textContent") == "Meka asks to take back their move"
+        assert friend.evaluate("[document.querySelector('#backEyebrow').textContent, document.querySelector('#backTitle').textContent]") == ["Take it back?", "Meka asks to take back their move"]
         assert host.evaluate("document.querySelector('#undo').classList.contains('asking') && document.querySelector('#hint').textContent") == "Asked Tete to take back your move — waiting"
         out6 = out[:-4] + "-takeback.png" if out.endswith(".png") else out + "-takeback.png"
         friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=out6, timeout=120000, animations="disabled"); friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
@@ -1285,6 +1285,35 @@ if online:
         for pg in (host, friend): pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===3", timeout=240000)
         assert host.evaluate(badges) == friend.evaluate(badges), "the boards disagree after a move played across the restart"
         print("restart: the server restarted mid-game; both boards came back to the same position and played on")
+        # offering a draw: Tete offers from the shout row and Meka plays on (a no); then Meka offers and Tete agrees — both boards end level
+        friend.click("#shoutBtn"); friend.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
+        assert friend.evaluate("!document.querySelector('#drawBtn').hidden && !document.querySelector('#drawBtn').disabled && document.querySelector('#drawBtn').textContent") == "Offer a draw"
+        friend.click("#drawBtn"); host.wait_for_selector("#backCard:not([hidden])", timeout=10000)
+        assert host.evaluate("[document.querySelector('#backTitle').textContent, document.querySelector('#backYes').textContent, document.querySelector('#backNo').textContent]") == ["Tete offers a draw", "Agree a draw", "Play on"], host.evaluate("document.querySelector('#backTitle').textContent")
+        host.click("#backNo")
+        for pg in (host, friend): pg.wait_for_function("document.querySelector('#backCard').hidden && !window.__ayo.state.over", timeout=10000)
+        friend.click("#shoutBtn"); friend.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
+        assert friend.evaluate("[document.querySelector('#drawBtn').textContent, document.querySelector('#drawBtn').disabled]") == ["Draw offered at this move", True]
+        friend.click("#shoutBtn")
+        host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000); host.click("#drawBtn")
+        friend.wait_for_selector("#backCard:not([hidden])", timeout=10000)
+        assert friend.evaluate("[document.querySelector('#backEyebrow').textContent, document.querySelector('#backTitle').textContent]") == ["A draw?", "Meka offers a draw"]
+        outd = out[:-4] + "-draw-ask.png" if out.endswith(".png") else out + "-draw-ask.png"
+        friend.evaluate("window.__freeze=true"); friend.wait_for_timeout(200); friend.screenshot(path=outd, timeout=120000, animations="disabled"); friend.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        dpre = host.evaluate(badges)
+        friend.click("#backYes")
+        for pg in (host, friend): pg.wait_for_function("!document.querySelector('#gameover').hidden && window.__ayo.state.agreed===true", timeout=60000)
+        hd = host.evaluate("[document.querySelector('#goTitle').textContent, document.querySelector('#goEyebrow').textContent, document.querySelector('#goMe').classList.contains('win'), document.querySelector('#goOpp').classList.contains('win')]")
+        fd = friend.evaluate("[document.querySelector('#goTitle').textContent, document.querySelector('#goEyebrow').textContent]")
+        assert hd[0] == "A draw" and hd[1].endswith("Agreed a draw") and not hd[2] and not hd[3], hd
+        assert fd[0] == "A draw" and fd[1].endswith("Agreed a draw"), fd
+        assert host.evaluate(badges) == dpre == friend.evaluate(badges), "an agreed draw moves no seed"
+        assert host.evaluate("window.__ayo.state.winner") == "draw" == friend.evaluate("window.__ayo.state.winner")
+        outd2 = out[:-4] + "-draw.png" if out.endswith(".png") else out + "-draw.png"
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(200); host.screenshot(path=outd2, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        print("draw: Tete's offer played on; Meka's agreed — both cards", hd[:2])
+        host.click("#rematch"); friend.click("#rematch")
+        for pg in (host, friend): pg.wait_for_function("!window.__ayo.busy && !window.__ayo.state.over && window.__ayo.state.moves.length===0 && document.querySelector('#gameover').hidden", timeout=60000)
         # giving up: the last button in the host's shout row asks once more, then the game ends on both boards for Tete
         host.click("#shoutBtn"); host.wait_for_selector("#shoutMenu:not([hidden])", timeout=5000)
         assert host.evaluate("!document.querySelector('#giveUpBtn').hidden && document.querySelector('#giveUpBtn').textContent") == "Give up this game"

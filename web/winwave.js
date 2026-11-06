@@ -25,7 +25,7 @@ export function notes(kind) {
 // near player in two of us). Returns null when nothing should happen.
 export function winWave(state, near = 0, { puzzle = false, replaying = false, local = false } = {}) {
   if (!state || !state.over || puzzle || replaying) return null;
-  if (state.resigned != null) return null; // a game given up has its own push across the board
+  if (state.resigned != null || state.agreed) return null; // a game given up has its own push across the board, an agreed draw its handshake
   if (state.winner === 'draw') return { troughs: [near, 1 - near], kind: 'draw', hop: DRAW_HOP, notes: notes('draw') };
   const w = state.winner; if (w !== 0 && w !== 1) return null;
   if (!state.stores[w]) return null; // nothing in the trough to jump

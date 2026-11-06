@@ -434,6 +434,11 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 #shoutMenu .giveup.armed{color:#f6d9c8;border-style:solid;border-color:#d67048;background:rgb(84,32,15);animation:armPulse 1s ease-in-out infinite}
 @keyframes armPulse{50%{box-shadow:0 0 0 4px rgba(214,112,72,.22),0 8px 24px rgba(0,0,0,.45)}}
 #shoutMenu .giveup[hidden]{display:none}
+#shoutMenu .drawoffer{flex-basis:100%;max-width:240px;margin-top:6px;background:rgb(24,15,9);color:var(--muted);border-color:rgba(214,170,90,.4);border-style:dashed}
+#shoutMenu .drawoffer:hover:not(:disabled){border-color:#d6aa5a;color:var(--fg)}
+#shoutMenu .drawoffer:disabled{opacity:.6;cursor:default}
+#shoutMenu .drawoffer.waiting{opacity:1;color:#f3e2bd;border-style:solid;border-color:#d6aa5a}
+#shoutMenu .drawoffer[hidden]{display:none}
 #myBubble{position:fixed;right:max(18px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 124px);max-width:min(70vw,280px);background:rgba(230,183,111,.18);border:1px solid rgba(230,183,111,.5);color:var(--fg);border-radius:14px 14px 4px 14px;padding:9px 12px;font-size:calc(13px*var(--ts));line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.5);animation:pop .25s ease-out;pointer-events:none;z-index:2}
 .wide #shoutMenu{left:auto;right:max(84px,calc(env(safe-area-inset-right,0px) + 84px));bottom:50%;transform:translateY(50%);width:min(32vw,320px);justify-content:flex-end}
 .wide #myBubble{right:auto;left:max(24px,env(safe-area-inset-left,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 118px);border-radius:14px 14px 14px 4px}
@@ -757,7 +762,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 
 <!-- Take it back?: the friend asks to take back the move they just played; you let them, or play on -->
 <div class="card door" id="backCard" hidden role="dialog" aria-labelledby="backTitle">
-  <div class="col"><span class="eyebrow">Take it back?</span><div class="who"><span class="face m" id="backFace"></span><h2 id="backTitle">Tete asks to take back their move</h2></div></div>
+  <div class="col"><span class="eyebrow" id="backEyebrow">Take it back?</span><div class="who"><span class="face m" id="backFace"></span><h2 id="backTitle">Tete asks to take back their move</h2></div></div>
   <p id="backSub">Their seeds go back where they were and it is their move again. Or play on and the move stands.</p>
   <div class="two" style="gap:8px"><button class="btn ghost" id="backNo" type="button" style="flex:1">Play on</button><button class="btn" id="backYes" type="button" style="flex:1">Let them</button></div>
 </div>

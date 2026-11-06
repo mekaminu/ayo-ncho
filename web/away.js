@@ -7,8 +7,8 @@
 
 export const BASE = 'Ayo & Nchò';
 
-// What one thing that happened while you were away says. kind: 'move' | 'knock' | 'joined' | 'rematch' | 'over' | 'shout' | 'askback' | 'call'
-// d: { name, mine (true when it is now your move), text (a shout's words), result ('won' | 'lost' | 'draw'), score: [yours, theirs], gaveUp (someone gave the game up) }
+// What one thing that happened while you were away says. kind: 'move' | 'knock' | 'joined' | 'rematch' | 'over' | 'shout' | 'askback' | 'drawoffer' | 'call'
+// d: { name, mine (true when it is now your move), text (a shout's words), result ('won' | 'lost' | 'draw'), score: [yours, theirs], gaveUp (someone gave the game up), agreed (a draw agreed) }
 export function awayWords(kind, d = {}) {
   const name = d.name || 'Your friend';
   switch (kind) {
@@ -18,11 +18,13 @@ export function awayWords(kind, d = {}) {
     case 'rematch': return `${name} wants to play again`;
     case 'over': {
       const s = Array.isArray(d.score) ? ` ${d.score[0]}–${d.score[1]}` : '';
+      if (d.agreed) return `${name} agreed a draw`; // an agreed draw, whatever the seeds said
       if (d.gaveUp) return d.result === 'won' ? `${name} gave up · you won` : `You gave up · ${name} won`; // whatever the seeds said
       return d.result === 'won' ? `You won${s}` : d.result === 'lost' ? `${name} won${s ? ` ${d.score[1]}–${d.score[0]}` : ''}` : `A draw${s}`;
     }
     case 'shout': return `${name}: ${d.text || '…'}`;
     case 'askback': return `${name} asks to take back a move`;
+    case 'drawoffer': return `${name} offers a draw`;
     case 'call': return d.mode === 'video' ? `${name} would like video at the board` : `${name} would like to talk`;
     default: return '';
   }

@@ -15,7 +15,7 @@ const ONE_OF = {
   game: ['ncho', 'ayo'],
   vs: [...LEVELS, 'local', 'friend'],
   result: ['win', 'loss', 'draw'],
-  ended: ['played', 'gave_up', 'circling'],
+  ended: ['played', 'gave_up', 'draw_agreed', 'circling'],
   how: ['done', 'skipped', 'whatsapp', 'copy', 'share'],
   as: ['host', 'friend'],
   from: ['home', 'settings'],

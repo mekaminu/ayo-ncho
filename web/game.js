@@ -64,6 +64,7 @@ import { nextLine, nextTick, dayTurned } from './nextday.js';
 import { raceOf, raceWords, raceGlint } from './race.js';
 import { makeSender as peekSender, peekShown, peekWords, OPACITY as PEEK_OP, GLIDE as PEEK_GLIDE } from './peek.js';
 import { ponderOn, ponderPlan, ponderAt, GLANCE_MS, SETTLE_MS as PONDER_SETTLE_MS, GLIDE as PONDER_GLIDE } from './ponder.js';
+import { mayOfferDraw, drawButton, drawWords } from './draw.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 
 const $ = (s) => document.querySelector(s);
@@ -615,7 +616,7 @@ function paintRoomStatus() { // what the room card says, from the connection and
 }
 function stopOnline() { // leave before anyone joined (Back on the Rooms screen, or a knock the host refused): the board is yours again, no reload
   callEnd(); away.back(); if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
-  $('#knockCard').hidden = true; hideBackCard(); backAsk.pending = false; backAsk.askedN = -1; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
+  $('#knockCard').hidden = true; hideBackCard(); backAsk.pending = false; backAsk.askedN = -1; drawAsk.pending = false; drawAsk.theirs = false; drawAsk.offeredN = -1; body.classList.remove('online'); if (location.search) history.replaceState(null, '', location.pathname);
   hideExplain(); if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
 }
 function joinByCode(code) { // Got a code? Join their room: your own room closes and you knock on theirs
@@ -713,7 +714,22 @@ function paintFeed() {
 const shoutMenu = $('#shoutMenu'); let shoutAt = -1e9, myBubbleTimer = null;
 for (const s of SHOUTS) { const b = document.createElement('button'); b.className = 'pill'; b.type = 'button'; b.textContent = s.text; b.dataset.id = s.id; b.addEventListener('click', () => sendShout(s.id)); shoutMenu.appendChild(b); }
 // giving up: the last button in the row, apart from the phrases; it asks once more ("Tap again to give up") before it goes
+// offering a draw: just before it, one tap offers (the friend answers on a card; their move is a no) — web/draw.js
+const drawBtn = document.createElement('button'); drawBtn.className = 'pill drawoffer'; drawBtn.type = 'button'; drawBtn.id = 'drawBtn'; shoutMenu.appendChild(drawBtn);
 const giveUp = document.createElement('button'); giveUp.className = 'pill giveup'; giveUp.type = 'button'; giveUp.id = 'giveUpBtn'; shoutMenu.appendChild(giveUp);
+let cardMode = 'back'; // the door-like card on this board answers a "take it back?" or a draw offered
+const drawAsk = { pending: false, theirs: false, offeredN: -1 }; // this board's offer out, theirs waiting on this board, the move count last offered at
+const drawState = () => ({ online, friend, seated: !!(net && net.seat !== null), over: state.over, pending: drawAsk.pending, theirs: drawAsk.theirs, offeredN: drawAsk.offeredN, moves: state.moves.length });
+function paintDraw() {
+  const d = drawState(); drawBtn.hidden = !(d.online && d.friend && d.seated && !d.over); drawBtn.textContent = drawButton(d);
+  drawBtn.disabled = !mayOfferDraw(d); drawBtn.classList.toggle('waiting', drawAsk.pending);
+}
+function resetDraw() { drawAsk.pending = false; drawAsk.theirs = false; drawAsk.offeredN = -1; if (cardMode === 'draw') hideBackCard(); paintDraw(); }
+drawBtn.addEventListener('click', () => {
+  if (!mayOfferDraw(drawState())) return paintDraw();
+  if (net.offerDraw()) { drawAsk.pending = true; drawAsk.offeredN = state.moves.length; toast(drawWords(friend ? friend.name : undefined).offered); click(1.2, 0.07); setTimeout(() => click(1.2, 0.07), 140); buzz(12); }
+  toggleShoutMenu(false);
+});
 const giveGuard = makeGuard(); let giveTimer = null;
 function paintGiveUp() { const armed = giveGuard.armed; giveUp.textContent = armed ? (keysLikely() ? GIVEUP_KEYS.armed : GIVEUP.armed) : GIVEUP.idle; giveUp.classList.toggle('armed', armed); giveUp.setAttribute('aria-label', armed ? 'Give up this game — press again to confirm' : 'Give up this game'); }
 giveUp.addEventListener('click', () => {
@@ -726,6 +742,7 @@ function toggleShoutMenu(open = shoutMenu.hidden) {
   shoutMenu.hidden = !open; $('#shoutBtn').setAttribute('aria-expanded', String(open));
   clearTimeout(giveTimer); giveGuard.reset(); paintGiveUp();
   giveUp.hidden = !mayGiveUp({ online, friend, over: state.over, seated: net && net.seat !== null }); // only while a game with a friend is in play
+  paintDraw();
 }
 function sendShout(id) {
   toggleShoutMenu(false); if (!net || !friend) return false;
@@ -912,7 +929,9 @@ function syncRoom(room) { // the room as the server shows it: the friend's seat 
   const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
   state = s; if (!same) { layoutFromState(state); peekIn.pit = -1; peekOut.reset(); }
   const ask = room.ask || null; backAsk.pending = !!(ask && ask.seat === you); if (ask && ask.seat === you) backAsk.n = backAsk.askedN = ask.n; // a rejoin sees a "take it back?" still out
-  if (ask && ask.seat === them && !state.over) showBackCard(); else hideBackCard();
+  const dask = room.drawAsk || null; drawAsk.pending = !!(dask && dask.seat === you && !state.over); drawAsk.theirs = !!(dask && dask.seat === them && !state.over); if (drawAsk.pending) drawAsk.offeredN = dask.n; // a rejoin sees a draw still offered
+  if (ask && ask.seat === them && !state.over) showBackCard(); else if (drawAsk.theirs) showDrawCard(); else hideBackCard();
+  paintDraw();
   refreshStatic(); paintRules(); paintDoor(); paintRoomStatus(); callRoom();
   if (friend && blocked.has(friend.tag)) { const n = friend.name; setTimeout(() => blockedOut(blockWords('seated', n)), 0); } // a room still open with someone this phone has since blocked
 }
@@ -925,7 +944,7 @@ let moveQueue = Promise.resolve();
 function sendMove(pit) { if (busy || !net || !net.move(pit)) return; peekOut.reset(); busy = true; deselect(); } // the move itself takes their light away
 async function showMove({ seat, pit, events, state: pub }) {
   if (backAsk.pending && seat === them) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).gone); } // playing on is a no
-  hideBackCard();
+  hideBackCard(); if (drawAsk.theirs && !pub.over) showDrawCard(); // a draw they offered stands through their own move
   const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; peekIn.pit = -1; deselect(); $('#undo').disabled = true; teleStart(state);
   if (seat === them) { select(pit); await wait(550); deselect(); }
   else { hideExplain(); const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
@@ -951,25 +970,49 @@ async function showResign({ seat, state: pub }) {
   await wait(380); busy = false; refreshStatic(); gameOver();
 }
 // ---------- "take it back?": the Undo chip in a room asks the friend; a yes flies the seeds back (web/takeback.js) ----------
+// a move played while a draw is offered: the offerer's own move keeps it standing; the other side moving is their no
+function drawOnMove(seat) {
+  if (drawAsk.pending && seat === them) { drawAsk.pending = false; toast(drawWords(friend ? friend.name : undefined).goneMine); }
+  if (drawAsk.theirs && seat === you) { drawAsk.theirs = false; if (cardMode === 'draw') hideBackCard(); }
+  paintDraw();
+}
 const backAsk = { pending: false, n: -1, askedN: -1 }; // this board's ask; askedN: the move count it last asked about (once a move)
 function askBack() {
   if (!net || !friend || net.seat === null) return;
   if (!mayAskBack({ online, friend, seated: true, over: state.over, busy, moves: state.moves, turn: state.turn, you, pending: backAsk.pending, askedN: backAsk.askedN })) { shake(state.moves[state.moves.length - 1] ?? you * 6); return; }
   if (net.askBack()) { backAsk.pending = true; backAsk.n = backAsk.askedN = state.moves.length; click(1.1, 0.07); setTimeout(() => click(1.4, 0.07), 120); buzz(12); showTurn(); }
 }
+function showDrawCard() {
+  const w = drawWords(friend ? friend.name : undefined); cardMode = 'draw'; $('#backEyebrow').textContent = 'A draw?'; $('#backTitle').textContent = w.title; $('#backSub').textContent = w.sub;
+  $('#backFace').innerHTML = initialFace(friend ? friend.name : '?'); $('#backYes').textContent = w.yes; $('#backNo').textContent = w.no;
+  $('#backYes').disabled = false; $('#backNo').disabled = false; $('#backCard').hidden = false; $('#backCard').dataset.mode = 'draw';
+}
+function answerDraw(yes) { if (!net) return; if (net.answerDraw(yes)) { $('#backYes').disabled = true; $('#backNo').disabled = true; click(yes ? 1.5 : 0.7, 0.08); } }
+// an agreed draw: every seed on the board lifts together and settles, twice, as two hands shake over it; two soft knocks
+async function showDraw({ state: pub }) {
+  state = stateFrom(pub); busy = true; deselect(); hideExplain(); $('#undo').disabled = true; selected = null; backAsk.pending = false; resetDraw();
+  toast(drawWords(friend ? friend.name : undefined).yesToast); buzz([15, 60, 15]);
+  [1.15, 1.15].forEach((p, k) => setTimeout(() => click(p, 0.07), k * 260));
+  if (!reduceMotion) {
+    const ms = [...Array(12).keys()].flatMap((i) => homes[i]).map((m) => [m, m.position.y]);
+    await tween(640, (t) => { const k = Math.abs(Math.sin(t * Math.PI * 2)) * (1 - 0.35 * t); ms.forEach(([m, y0]) => { m.position.y = y0 + k * 0.007; }); })
+      .then(() => ms.forEach(([m, y0]) => { m.position.y = y0; }));
+  }
+  await wait(380); busy = false; refreshStatic(); gameOver();
+}
 function showBackCard() {
-  const w = backWords(friend ? friend.name : undefined); $('#backTitle').textContent = w.title; $('#backSub').textContent = w.sub;
+  const w = backWords(friend ? friend.name : undefined); cardMode = 'back'; $('#backCard').dataset.mode = 'back'; $('#backEyebrow').textContent = 'Take it back?'; $('#backTitle').textContent = w.title; $('#backSub').textContent = w.sub;
   $('#backFace').innerHTML = initialFace(friend ? friend.name : '?'); $('#backYes').textContent = w.yes; $('#backNo').textContent = w.no;
   $('#backYes').disabled = false; $('#backNo').disabled = false; $('#backCard').hidden = false;
 }
 function hideBackCard() { $('#backCard').hidden = true; }
 function answerBack(yes) { if (!net) return; if (net.answerBack(yes)) { $('#backYes').disabled = true; $('#backNo').disabled = true; click(yes ? 1.5 : 0.7, 0.08); } }
-$('#backYes').addEventListener('click', () => answerBack(true));
-$('#backNo').addEventListener('click', () => answerBack(false));
+$('#backYes').addEventListener('click', () => (cardMode === 'draw' ? answerDraw(true) : answerBack(true)));
+$('#backNo').addEventListener('click', () => (cardMode === 'draw' ? answerDraw(false) : answerBack(false)));
 // a yes: every seed the move moved flies back to where it lay — out of the troughs first, then back round the board into the pit played
 async function showTakeBack({ seat, state: pub, undone, before }) {
   const b = stateFrom(before), a = stateFrom(pub); peekIn.pit = -1; hideBackCard(); hideExplain(); deselect(); busy = true; $('#undo').disabled = true;
-  if (seat === you) backAsk.pending = false;
+  if (seat === you) backAsk.pending = false; drawAsk.pending = false; drawAsk.theirs = false; paintDraw(); // the server drops a draw offer with the move
   const w = backWords(friend ? friend.name : undefined); toast(seat === you ? w.yesMine : w.yesTheirs);
   sim.finish(); layoutFromState(b); // from the position the boards agree on
   await flyBack(b, a, undone);
@@ -1015,13 +1058,16 @@ function startOnline(code, { stay = false } = {}) {
     const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
     if (!had && friend) { tele.track('invite_joined', { as: 'host' }, `j:${net && net.code}`); if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
-    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
+    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); resetDraw(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); toast('New game — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`)); }
     else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); awayNote('rematch'); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
   });
-  on('move', (m) => { if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
-  on('resign', (m) => { if (m.seat === them) { const s = stateFrom(m.state); awayNote('over', { result: s.winner === you ? 'won' : 'lost', gaveUp: true }); } moveQueue = moveQueue.then(() => showResign(m)).catch((e) => console.error(e)); });
+  on('move', (m) => { drawOnMove(m.seat); if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
+  on('resign', (m) => { resetDraw(); if (m.seat === them) { const s = stateFrom(m.state); awayNote('over', { result: s.winner === you ? 'won' : 'lost', gaveUp: true }); } moveQueue = moveQueue.then(() => showResign(m)).catch((e) => console.error(e)); });
   on('askback', ({ seat }) => { if (seat === them) { showBackCard(); knockSound(); awayNote('askback'); } else showTurn(); });
-  on('backno', ({ seat }) => { hideBackCard(); if (seat === you) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).noMine); click(0.7, 0.08); } else toast(backWords().noTheirs); showTurn(); });
+  on('backno', ({ seat }) => { hideBackCard(); if (drawAsk.theirs) showDrawCard(); if (seat === you) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).noMine); click(0.7, 0.08); } else toast(backWords().noTheirs); showTurn(); });
+  on('drawoffer', ({ seat }) => { if (seat === them) { drawAsk.theirs = true; if ($('#backCard').hidden) showDrawCard(); knockSound(); awayNote('drawoffer'); } else drawAsk.pending = true; paintDraw(); });
+  on('drawno', ({ seat }) => { if (cardMode === 'draw') hideBackCard(); const w = drawWords(friend ? friend.name : undefined); if (seat === you) { drawAsk.pending = false; toast(w.noMine); click(0.7, 0.08); } else { drawAsk.theirs = false; toast(w.noTheirs); } paintDraw(); });
+  on('draw', (m) => { if (m.seat === you) awayNote('over', { result: 'draw', agreed: true }); moveQueue = moveQueue.then(() => showDraw(m)).catch((e) => console.error(e)); });
   on('takeback', (m) => { moveQueue = moveQueue.then(() => showTakeBack(m)).catch((e) => console.error(e)); });
   on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
   on('ticket', ({ code, token, ticket }) => { if (code && token) prefs.set('room', JSON.stringify({ code, token, ticket })); }); // kept with the seat, so even after a reload the room can be rebuilt if the server restarted
@@ -1873,7 +1919,7 @@ const win = { waves: 0, hops: 0, last: null, peak: 1, swept: 0, samples: 0 };
 // a game that ends with seeds still on the board (their side could not be fed, or the 60-move call) gives each pit's seeds
 // to whoever keeps them; the engine moves no seed for it, so the seeds left in the pits fly into that trough here, pit by pit
 async function sweepLeft() {
-  if (!state.over || state.resigned != null || clipping) return;
+  if (!state.over || state.resigned != null || state.agreed || clipping) return;
   const left = [...Array(12).keys()].filter((i) => homes[i].length > state.pits[i]); if (!left.length) return;
   for (let k = 0; k < 30 && sim.live.length; k++) await wait(40); sim.finish();
   const flights = [];
@@ -1913,13 +1959,13 @@ async function winMoment() {
 // game over card, as approved
 function gameOver() {
   const a = state.stores[you], b = state.stores[them]; const win = state.winner === you; const draw = state.winner === 'draw';
-  const gave = online && state.resigned != null ? gaveUpWords(state.resigned, you, oppLabel()) : null; // a game someone gave up: the result is theirs to give, whatever the seeds say
+  const gave = online && state.resigned != null ? gaveUpWords(state.resigned, you, oppLabel()) : online && state.agreed ? { ...drawWords(oppLabel()), title: 'A draw' } : null; // a game someone gave up (or both agreed level): the result is theirs to give, whatever the seeds say
   const out = playingOut(); // a play-out: no record, rating, review, story, replay or clip (the moves before the puzzle were nobody's)
   $('#goEyebrow').textContent = out ? (isRetry(playout) ? retryEyebrow(state.variant, playout.n, playedOut(playout, state)) : playoutEyebrow(state.variant, playedOut(playout, state))) + (endedCircling(state) ? ' · ' + circlingEnded() : '') : `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves${gave ? ' · ' + gave.who : endedCircling(state) ? ' · ' + circlingEnded() : ''}`; // a called game says why it ended
   $('#goTitle').textContent = gave ? gave.title : local ? localTitle(state) : draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
   $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = oppLabel();
   $('#rematch').textContent = online ? (friend && friend.wantsRematch ? `Play again — ${friend.name} is ready` : 'Play again') : 'Play again'; $('#rematch').disabled = false;
-  $('#goMe').classList.toggle('win', gave ? win : a >= b); $('#goOpp').classList.toggle('win', gave ? state.winner === them : b > a);
+  $('#goMe').classList.toggle('win', gave ? win : a >= b); $('#goOpp').classList.toggle('win', gave ? state.winner === them : b > a); // an agreed draw lights neither
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
   $('#replayBtn').hidden = out; $('#clipBtn').hidden = out;
@@ -1928,7 +1974,7 @@ function gameOver() {
   else { word = paintRecord(a, b); paintRating(a, b); paintStory(); startReview(); }
   paintRetry(a, b, out);
   if (!puzzle.on && !out) { const first = prefs.get('tele.first', null) === 'started'; if (first) prefs.set('tele.first', 'finished');
-    tele.track('game_end', { game: state.variant, vs: teleVs(), result: resultOf(state, you), ended: state.resigned != null ? 'gave_up' : endedCircling(state) ? 'circling' : 'played', moves: state.moves.length, first }, online ? `e:${net && net.code}:${state.moves.join('')}` : `e:${stats.started}`); }
+    tele.track('game_end', { game: state.variant, vs: teleVs(), result: resultOf(state, you), ended: state.resigned != null ? 'gave_up' : state.agreed ? 'draw_agreed' : endedCircling(state) ? 'circling' : 'played', moves: state.moves.length, first }, online ? `e:${net && net.code}:${state.moves.join('')}` : `e:${stats.started}`); }
   if (!online && !puzzle.on && !out) { starts = recordStart(starts, startKey(local), firstMover(state.moves, state.first || 0), state.winner); prefs.set('starts', JSON.stringify(starts)); }
   $('#gameover').hidden = false; if (!online && !out) prefs.set('game', 'null'); // a play-out leaves your saved game alone
   if (word) sayText(word.text, word.mood); else say(win ? 'lose' : 'win'); // a run or a first win is worth their word more than the usual line
@@ -1966,7 +2012,7 @@ function paintStory() {
     + `<path class="ln" pathLength="1" d="${p.line}"/>`
     + (p.big ? `<circle class="big pop" style="animation-delay:1.35s" cx="${p.big.x}" cy="${p.big.y}" r="5"/>` : '')
     + (p.mark ? `<circle class="good pop" style="animation-delay:1.55s" cx="${p.mark.x}" cy="${p.mark.y}" r="3.4"/>` : '');
-  const words = storyWords(st, { me, them: other, gaveUp: online && state.resigned != null ? gaveUpWords(state.resigned, you, other).story : undefined }); $('#goStoryWords').textContent = words; $('#goStoryMe').textContent = me === 'You' ? 'you' : me; $('#goStoryThem').textContent = other;
+  const words = storyWords(st, { me, them: other, gaveUp: online && state.resigned != null ? gaveUpWords(state.resigned, you, other).story : online && state.agreed ? drawWords(other).story : undefined }); $('#goStoryWords').textContent = words; $('#goStoryMe').textContent = me === 'You' ? 'you' : me; $('#goStoryThem').textContent = other;
   box.querySelector('.words svg').style.display = st.biggest ? '' : 'none'; box.disabled = !st.biggest;
   box.setAttribute('aria-label', `How the game went: ${words}${st.biggest ? '. Tap to watch that move again' : ''}`);
   box.hidden = false; story = st;
