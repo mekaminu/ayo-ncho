@@ -340,6 +340,10 @@ export const FR = {
   'Battery back up — the board is back to full': 'La batterie remonte — le plateau revient au complet',
   'Seeds fly straight to their pit': 'Les graines volent droit dans leur trou',
   'Player 1': 'Joueur 1',
+  'Our names': 'Nos noms',
+  "Player 1's name": 'Nom du joueur 1',
+  "Player 2's name": 'Nom du joueur 2',
+  'two of us: the names on the cards, the turn and the Game over card · kept on this phone': 'à deux : les noms sur les cartes, au tour de jeu et en fin de partie · gardés sur ce téléphone',
   'Player 2': 'Joueur 2',
   // parts of the lines Settings builds (each part of a "a · b · c" line is looked up on its own)
   'mahogany': 'acajou', 'iroko': 'iroko', 'ebony': 'ébène',
@@ -655,6 +659,10 @@ Object.assign(FR, SAYS);
 // French sets a thin space before : ; ? ! so they never start a line
 for (const k in FR) FR[k] = FR[k].replace(/ ([:;?!])/g, '\u00a0$1');
 // names and words that stay as they are when a line is put together from parts
+// the names two players typed for two of us (web/local.js, Settings → Opponent → Our names): kept as they are, like the opponents'
+const TYPED = new Set();
+export function keepTyped(names = []) { TYPED.clear(); for (const n of names) if (n && !Object.prototype.hasOwnProperty.call(FR, n)) TYPED.add(n); }
+const kept = (p) => KEEP.has(p) || TYPED.has(p);
 const KEEP = new Set(['Adaeze', 'Auntie Bisi', 'Nnamdi', 'Mama Ngozi', 'Papa Ike', 'Nchò', 'Ayo', 'Gold', 'Tete', 'Player', 'Iroko']);
 const LOOK_FR = { 'river stones': 'les galets', 'benin bronze': 'le bronze du Bénin', "grandpa's board": 'le plateau de grand-père', cowries: 'les cauris', 'palm kernels': 'les noix de palme' };
 const look = (s) => LOOK_FR[s.toLowerCase()] || s;
@@ -689,7 +697,7 @@ export const PATTERNS = [
   ...ROOMS.slice(0, -1), // slice 5: playing a friend, the store, the reminder (before the store lines below, which would catch "… in the store")
   [/^vs (.+?) · (Easy|Steady|Medium|Hard|Master)(?: · (.+) starts)?$/, (m) => `contre ${m[1]} · ${lv(m[2])}` + (m[3] ? ` · ${who(m[3])} commence` : '')],
   [/^(.+?) · (Easy|Steady|Medium|Hard|Master)$/, (m) => `${need(m[1])} · ${lv(m[2])}`],
-  [/^(Player [12]) starts · on this phone$/, (m) => `${who(m[1])} commence · sur ce téléphone`],
+  [/^([^·—:]+?) starts · on this phone$/, (m) => `${who(m[1])} commence · sur ce téléphone`],
   [/^(.+) starts — the loser goes first$/, (m) => `${who(m[1])} commence — le perdant joue en premier`],
   [/^([^·—:]+?) wins$/, (m) => `${who(m[1])} gagne`],
   [/^Play again — (.+) is ready$/, (m) => `Rejouer — ${m[1]} est prêt`],
@@ -773,7 +781,9 @@ export const PATTERNS = [
   [/^Your rating (\d+)$/, (m) => `Votre classement ${m[1]}`],
   [/^([+−±]\d+) last game$/, (m) => `${m[1]} à la dernière partie`],
   [/^(\d+) more games? to settle$/, (m) => `encore ${pl(m[1], 'partie', 'parties')} pour se caler`],
-  [/^(Player [12]) leads (\d+) – (\d+)$/, (m) => `${who(m[1])} mène ${m[2]} – ${m[3]}`],
+  [/^([^·—:]+?) this end$/, (m) => `${who(m[1])} de ce côté`],
+  [/^([^·—:]+?) across the table$/, (m) => `${who(m[1])} en face`],
+  [/^([^·—:]+?) leads (\d+) – (\d+)$/, (m) => `${who(m[1])} mène ${m[2]} – ${m[3]}`],
   [/^level (\d+) – (\d+)$/, (m) => `égalité ${m[1]} – ${m[2]}`],
   [/^(\d+) moves? in$/, (m) => `${pl(m[1], 'coup joué', 'coups joués')}`],
   [/^going over the game… (\d+) of (\d+)$/, (m) => `elle revoit la partie… ${m[1]} sur ${m[2]}`],
@@ -796,8 +806,8 @@ export const PATTERNS = [
   // the words that are shared (the share sheet, the clipboard): game.js puts them through t() line by line
   [/^captured (\d+)\/(\d+)$/, (m) => `pris ${m[1]}/${m[2]}`],
   [/^Ayo & Nchò — I (beat|drew with|lost to) (.+?) (\d+)–(\d+) in (\d+) moves\.$/, (m) => `Ayo & Nchò — ${{ beat: 'J’ai battu', 'drew with': 'J’ai fait match nul avec', 'lost to': 'J’ai perdu contre' }[m[1]]} ${m[2]} ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}.`],
-  [/^Ayo & Nchò — (Player [12]) beat (Player [12]) (\d+)–(\d+) in (\d+) moves, both on one phone\.$/, (m) => `Ayo & Nchò — ${who(m[1])} a battu ${who(m[2])} ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}, tous deux sur un seul téléphone.`],
-  [/^Ayo & Nchò — (Player [12]) and (Player [12]) drew (\d+)–(\d+) in (\d+) moves, both on one phone\.$/, (m) => `Ayo & Nchò — ${who(m[1])} et ${who(m[2])} ont fait match nul ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}, tous deux sur un seul téléphone.`],
+  [/^Ayo & Nchò — (.+?) beat (.+?) (\d+)–(\d+) in (\d+) moves, both on one phone\.$/, (m) => `Ayo & Nchò — ${who(m[1])} a battu ${who(m[2])} ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}, tous deux sur un seul téléphone.`],
+  [/^Ayo & Nchò — (.+?) and (.+?) drew (\d+)–(\d+) in (\d+) moves, both on one phone\.$/, (m) => `Ayo & Nchò — ${who(m[1])} et ${who(m[2])} ont fait match nul ${m[3]}–${m[4]} en ${pl(m[5], 'coup', 'coups')}, tous deux sur un seul téléphone.`],
   [/^My best turn against (.+?) at (Nchò|Ayo): (.+)\. Ayo & Nchò — Nigerian Mancala in 3D\.$/, (m) => `Mon meilleur tour contre ${who(m[1])} ${at(m[2])} : ${m[3].split(', ').map(clipBit).join(', ')}. Ayo & Nchò — le mancala nigérian en 3D.`],
   [/^([^·—:]+?) plays you for real now\. Tap a pit once to see where its seeds go, twice to sow\.$/, (m) => `${m[1]} joue contre vous pour de vrai maintenant. Touchez un trou une fois pour voir où vont ses graines, deux fois pour semer.`],
   // the opponents' runs of 10, 15, 20… (slice 4)
@@ -850,10 +860,10 @@ function sub(core) {
     if (!out.includes(null)) return out.join(' — ');
   }
   if (core.includes(' · ')) {
-    const out = core.split(' · ').map((p) => whole(p) ?? (KEEP.has(p) || !/\p{L}/u.test(p) ? p : null));
+    const out = core.split(' · ').map((p) => whole(p) ?? (kept(p) || !/\p{L}/u.test(p) ? p : null));
     if (!out.includes(null)) return out.join(' · ');
   }
-  return KEEP.has(core) || !/\p{L}/u.test(core) ? core : null;
+  return kept(core) || !/\p{L}/u.test(core) ? core : null;
 }
 function whole(core) {
   if (Object.prototype.hasOwnProperty.call(FR, core)) return FR[core];

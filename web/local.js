@@ -3,7 +3,36 @@
 // next player (Settings → Feel → Pass the phone; off when the phone lies flat and each side already has its pits nearest it).
 // Pure helpers, no DOM, tested in node (test/local.test.js). The rules stay in engine/ayo.js.
 
-export const NAMES = ['Player 1', 'Player 2'];
+export const DEFAULT_NAMES = ['Player 1', 'Player 2'];
+// the two names in use — Player 1 and Player 2 until the players type their own (Settings → Opponent → Two of us → Our names);
+// one array, changed in place, so every module that imported it sees the names of the moment
+export const NAMES = [...DEFAULT_NAMES];
+export const NAME_MAX = 16;
+
+// a typed name as it is kept and shown: no control characters or angle brackets, spaces closed up, at most NAME_MAX letters
+// (counted as the eye counts them, so an accented letter or an emoji is one); empty → '' (the default name is used)
+export function cleanName(v) {
+  const s = String(v ?? '').replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
+  return [...s].slice(0, NAME_MAX).join('').trim();
+}
+// the two names from what was typed (or kept): an empty one is Player 1 / Player 2, and two the same (whatever the case)
+// would leave nobody able to tell whose turn it is, so the second then keeps its default
+export function namesFrom(a, b) {
+  const x = cleanName(a) || DEFAULT_NAMES[0]; let y = cleanName(b) || DEFAULT_NAMES[1];
+  if (y.toLowerCase() === x.toLowerCase()) y = x.toLowerCase() === DEFAULT_NAMES[1].toLowerCase() ? DEFAULT_NAMES[0] : DEFAULT_NAMES[1];
+  return [x, y];
+}
+export function setNames(a, b) { const n = namesFrom(a, b); NAMES[0] = n[0]; NAMES[1] = n[1]; return [...NAMES]; }
+// what is kept on the phone: the typed names only ('' for a default), as JSON; anything unreadable reads as no names
+export function keepNames(a, b) { return JSON.stringify([cleanName(a), cleanName(b)]); }
+export function readNames(raw) {
+  try { const v = JSON.parse(raw || '[]'); return Array.isArray(v) ? [cleanName(v[0]), cleanName(v[1])] : ['', '']; } catch { return ['', '']; }
+}
+export const named = (seat) => NAMES[seat] !== DEFAULT_NAMES[seat];
+// the far card's face: the player's number on a brass ring, or the first letter of the name they typed
+export const faceMark = (seat) => named(seat) ? NAMES[seat] : String(seat + 1);
+// the small line under the Home pill: "on this phone", or the two names once typed ("Meka & Tete")
+export const pillLine = () => named(0) || named(1) ? `${NAMES[0]} & ${NAMES[1]}` : 'on this phone';
 export const TAU = Math.PI * 2;
 
 // the seat whose pits should be nearest: the player to move (at the end of the game, whoever would have moved next)
@@ -27,7 +56,7 @@ export function turnWords(state) { return state.over ? { turn: 'game over', sub:
 // the Game over card's title
 export function overTitle(state) { return state.winner === 'draw' ? 'A draw' : `${NAMES[state.winner]} wins`; }
 
-// Continue on Home: where the shared game stands, from Player 1's side
+// Continue on Home: where the shared game stands, from the first player's side
 export function continueLine(s) {
   const [a, b] = s.stores; const lead = a > b ? `${NAMES[0]} leads` : b > a ? `${NAMES[1]} leads` : 'level';
   return `Two of us · ${lead} ${a} – ${b} · ${s.moves.length} moves in`;
@@ -57,4 +86,4 @@ export function tableCards(state, near) {
   const word = (s) => over ? (s === near ? 'game over' : '') : s === mover ? 'your move' : 'waiting';
   return { near: { seat: near, name: NAMES[near], turn: word(near) }, far: { seat: far, name: NAMES[far], sub: word(far) }, farTurn: !over && mover === far };
 }
-export const TABLE_START = 'Player 1 this end · Player 2 across the table';
+export const tableStart = () => `${NAMES[0]} this end · ${NAMES[1]} across the table`;

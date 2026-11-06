@@ -2013,6 +2013,29 @@ with sync_playwright() as p:
             pg.screenshot(path=out[:-4] + "-table.png", timeout=120000, animations="disabled")
         pg.evaluate("localStorage.setItem('ayo.swing','1')")
         print("local: Pass the phone off → seat passed, board stayed ·", cont)
+        # our names: typed in Settings → Opponent → Our names, they take the cards, the far face, Home's pill and Continue at once
+        pg.click("#homeBtn"); pg.wait_for_selector("#home:not([hidden])", timeout=5000)
+        pg.evaluate("document.querySelector('#settingsBtn').click()"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000)
+        pg.locator("#localName0").scroll_into_view_if_needed(); pg.fill("#localName0", "  Meka "); pg.fill("#localName1", "Tete"); pg.press("#localName1", "Enter")
+        assert json.loads(pg.evaluate("localStorage.getItem('ayo.localNames')")) == ["Meka", "Tete"], pg.evaluate("localStorage.getItem('ayo.localNames')")
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("Settings scrolls sideways with the name fields", W)
+        pg.wait_for_timeout(300); pg.locator(".row.names").screenshot(path=out[:-4] + "-names-row.png", timeout=60000, animations="disabled")
+        pg.evaluate("document.querySelector('#settingsBack').click()"); pg.wait_for_function("!document.querySelector('#settings').hidden === false", timeout=5000); pg.wait_for_timeout(200)
+        if pg.evaluate("document.querySelector('#home').hidden"):  # back to the game under way: its cards already carry the names; then Home
+            seat = pg.evaluate("window.__ayo.seat"); assert pg.evaluate("document.querySelector('#meName').textContent") == ["Meka", "Tete"][seat], "the names show at once in the game under way"
+            pg.evaluate("document.querySelector('#homeBtn').click()"); pg.wait_for_selector("#home:not([hidden])", timeout=5000); pg.wait_for_timeout(200)
+        pill = pg.evaluate("document.querySelector('.pill[data-mode=\"local\"] small.rec').textContent"); assert pill == "Meka & Tete", pill
+        cont = pg.evaluate("document.querySelector('#continueSub').textContent"); assert "Player" not in cont and cont.startswith("Two of us · "), cont
+        pg.evaluate("document.querySelector('#continueBtn').click()"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000); settled()
+        seat = pg.evaluate("window.__ayo.seat"); names = ["Meka", "Tete"]
+        assert pg.evaluate("document.querySelector('#meName').textContent") == names[seat] and pg.evaluate("document.querySelector('#oppName').textContent") == names[1 - seat], ("the cards carry the typed names", seat)
+        assert pg.evaluate("document.querySelector('#oppFace text').textContent") == names[1 - seat][0], "the far face shows the first letter of their name"
+        tap(pg, max(pg.evaluate("window.__ayo.legal")))
+        pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===3", timeout=240000); pg.wait_for_timeout(600)
+        ex = pg.evaluate("window.__ayo.explain"); assert ex and ex["name"] == names[seat], ("the move just played is explained under its player's name", ex)
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out[:-4] + "-names.png", timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        print("local: our names → pill", pill, "· cards", pg.evaluate("[document.querySelector('#meName').textContent, document.querySelector('#oppName').textContent]"), "· explained", ex["name"])
+        pg.evaluate("localStorage.removeItem('ayo.localNames')")
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)

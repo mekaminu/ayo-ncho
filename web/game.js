@@ -32,12 +32,12 @@ import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach
 import { sidewaysAngle, SIDE_PHI } from './sideways.js';
 import { retryOf, isRetry, retryOffer, retryButton, retryToast, retryEyebrow, retryLine, retryShare } from './retry.js';
 import { playoutOf, isPlayout, canPlayOut, playedOut, undoOk, undoReady, playoutButton, playoutToast, playoutEyebrow, playoutShare } from './playout.js';
-import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare, nearSeatAt, tableCards, TABLE_START } from './local.js';
+import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare, nearSeatAt, tableCards, tableStart, setNames as setLocalNames, readNames, keepNames, faceMark, pillLine } from './local.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT, BT, BW, BL, R as CORNER } from './board.js';
 import { pour, place, reach } from './slots.js';
 import { boardAudio, handful } from './sound.js';
 import { makeMusic, musicWanted, musicNote } from './music.js';
-import { makeI18n, pickLang, langNote } from './i18n.js';
+import { makeI18n, pickLang, langNote, keepTyped } from './i18n.js';
 import { applyScale, sizePref, sizeNote, sizeToast } from './textsize.js';
 import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './last8.js';
 import { gameStory, storyWords, storyPath } from './story.js';
@@ -119,6 +119,7 @@ const finish = finishId();
 const board = buildBoard(scene, finish, Q); buildTable(scene, Q); const lamp = buildLights(scene, Q.lite ? Q.shadow : phone || (window.devicePixelRatio || 1) > 2 ? 1024 : 2048);
 // seed set: Job's tears; river stones once the calm streak has unlocked them; cowries and palm kernels once bought (or ?try=looks)
 let streak = parseStreak(prefs.get('streak', null));
+keepTyped(setLocalNames(...readNames(prefs.get('localNames', '')))); // two of us: the names typed in Settings → Opponent → Our names (web/local.js)
 const seedSetId = () => shop.trySeeds || seedSetFor(prefs.get('seeds', 'jobs'), { stones: unlocked(streak, 'stones'), owned: owned(), preview: GOLD_PREVIEW });
 let SET = SEED_SETS[seedSetId()]; let seedMat = seedMaterialFor(seedSetId(), Q); const seedMats = { [seedSetId()]: seedMat }; let seedGeometry = seedGeometryFor(Q, seedSetId()), seedGeometryOver = seedGeometryFor(Q, seedSetId(), true);
 function applySeedSet() { // swap every seed's look and shape in place (no new game needed)
@@ -504,7 +505,7 @@ function paintRating(a, b) {
   num.textContent = r.before; const steps = Math.min(Math.abs(r.change), 24), t0 = 700, dt = 45; let last = r.before; // the number ticks, a soft tick on the wood each step
   for (let i = 1; i <= steps; i++) setTimeout(() => { const v = tickAt(r.before, r.after, i / steps); if (v !== last) { last = v; num.textContent = v; click(r.change > 0 ? 1.4 + i * 0.02 : 1.1 - i * 0.01, 0.025); } if (i === steps) { ch.classList.add('pop'); setTimeout(() => ch.classList.remove('pop'), 260); } }, t0 + i * dt);
 }
-function paintRecordPills() { document.querySelectorAll('.pill[data-level] small.rec').forEach((s) => { s.textContent = standing(records[s.closest('.pill').dataset.level]); }); }
+function paintRecordPills() { document.querySelectorAll('.pill[data-level] small.rec').forEach((s) => { s.textContent = standing(records[s.closest('.pill').dataset.level]); }); const lp = $('.pill[data-mode="local"] small.rec'); if (lp) lp.textContent = pillLine(); } // two of us: the names once typed
 
 // ---------- a friend online: the board joins a room (?room=CODE from the invite link) and animates the moves the server sends ----------
 // The server runs the same engine and is the referee; this board only asks for a move and shows what comes back. A move
@@ -663,7 +664,7 @@ $('#knockYes').addEventListener('click', () => answerDoor(true));
 $('#knockNo').addEventListener('click', () => answerDoor(false));
 function knockSound() { [1.1, 1.1, 1.4].forEach((p, i) => setTimeout(() => click(p, 0.12), i * 130)); buzz([30, 60, 30, 60, 60]); }
 function initialFace(name) { // a friend has no drawn character yet: their initial on a brass ring
-  const ch = (String(name || '?').trim()[0] || '?').toUpperCase();
+  const ch = ([...String(name || '?').trim()][0] || '?').toUpperCase().replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); // a typed name's first letter (an emoji is one), never markup
   return `<svg viewBox="0 0 44 44" width="44" height="44" aria-hidden="true"><circle cx="22" cy="22" r="22" fill="#3a2718"/><circle cx="22" cy="22" r="19" fill="none" stroke="#e6b76f" stroke-opacity=".55"/><text x="22" y="29" text-anchor="middle" font-size="20" font-weight="700" fill="#e6b76f" font-family="inherit">${ch}</text></svg>`;
 }
 function undoLabel(room) { const u = $('#undo'); const l = room ? backWords().chip : 'Undo'; if (u.getAttribute('aria-label') !== l) { u.setAttribute('aria-label', l); u.title = room ? l + ' · U' : 'Undo · U'; } if (!room) u.classList.remove('asking'); }
@@ -1141,7 +1142,7 @@ async function hint() {
 }
 
 function paintFaces() {
-  $('#oppFace').innerHTML = online ? initialFace(friend ? friend.name : '?') : local ? initialFace(String(2 - nearCard())) : faceFor(level, mood); // two of us: the far player's number on a brass ring
+  $('#oppFace').innerHTML = online ? initialFace(friend ? friend.name : '?') : local ? initialFace(faceMark(1 - nearCard())) : faceFor(level, mood); // two of us: the far player's number on a brass ring
   document.querySelectorAll('.pill[data-level]').forEach((b) => { b.querySelector('.face').innerHTML = CHARACTERS[b.dataset.level].face; });
   document.querySelectorAll('[data-face]').forEach((f) => { f.innerHTML = CHARACTERS[f.dataset.face].face; });
 }
@@ -1739,7 +1740,7 @@ function paintSettings() {
   $('#boardSub').textContent = boardsLine({ owned: owned(), preview: GOLD_PREVIEW });
   $('#seedsSub').textContent = seedsLine({ stones, days: streak.days.length, need: MILESTONES[0].days, owned: owned(), preview: GOLD_PREVIEW });
   const sw = (name, on) => $(`[data-set="${name}"].sw`).setAttribute('aria-checked', String(on));
-  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('music', musicOn()); $('#musicNow').textContent = musicNote({ on: musicOn(), sound: soundOn(), call: callLive() }) ? ` · ${musicNote({ on: musicOn(), sound: soundOn(), call: callLive() })}` : ''; sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : ''; paintRemind(); paintBlocked();
+  sw('last8', r.last8); sw('badges', prefs.get('badges', '1') === '1'); sw('sound', soundOn()); sw('music', musicOn()); $('#musicNow').textContent = musicNote({ on: musicOn(), sound: soundOn(), call: callLive() }) ? ` · ${musicNote({ on: musicOn(), sound: soundOn(), call: callLive() })}` : ''; sw('haptics', prefs.get('haptics', '1') === '1'); sw('path', pathOn()); sw('answer', answerOn()); sw('swing', swingOn()); sw('take', takeOn()); sw('wake', wakeOn()); sw('tele', teleOn()); $('#teleNow').textContent = ` · ${teleNote(tele, inApp())}`; $('#wakeNow').textContent = wakeNote(navigator) ? ` · ${wakeNote(navigator)}` : ''; paintRemind(); paintBlocked(); paintLocalNames();
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})` + (lastGameWords(parseFrames(prefs.get('frames.last', ''))) ? ' · ' + lastGameWords(parseFrames(prefs.get('frames.last', ''))) : '');
   set('lang', prefs.get('lang', 'auto')); set('textsize', textSizeNow()); $('#sizeNow').textContent = sizeNote(textSizeNow()); paintLegal(); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
   set('battery', prefs.get('battery', 'auto')); $('#batteryNow').textContent = noteFor(batt.s);
@@ -1868,6 +1869,22 @@ function goldLocked(lv) { if (levelOpen(lv, owned(), GOLD_PREVIEW)) return false
 function paintGold() { document.querySelectorAll('[data-level]').forEach((b) => { if (!GOLD_LEVELS.includes(b.dataset.level)) return; const shut = !levelOpen(b.dataset.level, owned(), GOLD_PREVIEW); b.classList.toggle('locked', shut); const row = b.closest('.row'); if (row) row.classList.toggle('locked', shut); }); }
 function toast(text, ms = 1800) { const t = document.createElement('div'); t.className = ms > 1800 ? 'toast long' : 'toast'; t.textContent = text; body.appendChild(t); setTimeout(() => t.remove(), ms); }
 
+// Settings → Opponent → Our names (two of us): kept as typed, shown at once — the cards, the faces, the turn, Home's pill and
+// Continue line — in a game under way too; an empty field is Player 1 / Player 2 again
+function paintLocalNames() {
+  const kept = readNames(prefs.get('localNames', ''));
+  [0, 1].forEach((i) => { const f = $('#localName' + i); if (f && document.activeElement !== f) f.value = kept[i]; });
+}
+function localNamesTyped() {
+  const a = $('#localName0').value, b = $('#localName1').value; prefs.set('localNames', keepNames(a, b)); keepTyped(setLocalNames(a, b));
+  paintRecordPills(); if (!$('#home').hidden) paintHome(); if (local && !busy) refreshStatic(); else if (local) { paintMyName(); paintFaces(); $('#oppName').textContent = oppLabel(); }
+}
+['#localName0', '#localName1'].forEach((id) => {
+  const f = $(id); if (!f) return;
+  f.addEventListener('input', localNamesTyped);
+  f.addEventListener('change', () => { localNamesTyped(); paintLocalNames(); click(1.1, 0.04); });
+  f.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); f.blur(); } e.stopPropagation(); }); // the game's keys never take a letter typed here
+});
 // settings wiring: rules changes start a new game; everything else applies at once
 document.querySelectorAll('#settings [data-set]').forEach((el) => {
   const name = el.dataset.set;
@@ -2163,7 +2180,7 @@ function newRound() {
   if (!dealsIn(plan, { reduceMotion, clipping })) layoutFromState(state);
   refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); faceSeat();
   const dealt = dealsIn(plan, { reduceMotion, clipping }) ? dealIn(plan, state) : Promise.resolve();
-  if (local) setTimeout(() => toast(`${startWords(st, LNAMES, false)} · ${tableOn() ? TABLE_START : 'pass the phone after each move'}`), 600);
+  if (local) setTimeout(() => toast(`${startWords(st, LNAMES, false)} · ${tableOn() ? tableStart() : 'pass the phone after each move'}`), 600);
   else { setTimeout(greet, 600); if (st.first === them || st.why !== 'first') setTimeout(() => toast(startWords(st, ['You', names[level]])), 600); dealt.then(() => { if (deal.again) return; kickAi(); }); } // the computer opens when it is their start, once the board is set
   dealt.then(() => { if (deal.again) { deal.again = false; newRound(); } });
 }
