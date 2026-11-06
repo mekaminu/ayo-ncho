@@ -1,0 +1,30 @@
+name: safari
+# Safari's own engine (idea 6 Nov): opens the game and an invite link in Playwright's WebKit dressed as an iPhone, plays a move,
+# and writes what it saw (page errors, the boot screen's small print, failed requests) to this run's summary, with pictures kept
+# as the artifact "safari-check". It reports and does not hold up the game: a WebKit-only failure shows here as a red job while
+# the run stays green, so main is never blocked by it. Runs on pushes that touch the game, and by hand (Run workflow).
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "engine/**", "server/**", "tools/webkit-check.py", ".github/workflows/safari.yml"]
+  workflow_dispatch:
+jobs:
+  webkit:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci || npm install
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install playwright==1.63.0 && python -m playwright install --with-deps webkit
+      - run: mkdir -p out && python tools/webkit-check.py out/safari --browser webkit --device "iPhone 15"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safari-check
+          path: out/
+          retention-days: 14
