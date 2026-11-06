@@ -70,10 +70,18 @@ with sync_playwright() as p:
                 def press():
                     if how == "a finger": pg.touchscreen.tap(x, y)
                     else: pg.mouse.click(x, y)
+                pg.evaluate("""() => { const c = document.querySelector('canvas'); window.__evs = [];
+                  for (const k of ['pointerdown', 'pointerup', 'pointercancel', 'touchstart', 'touchend', 'mousedown', 'mouseup', 'click'])
+                    document.addEventListener(k, (e) => window.__evs.push(k + (e.pointerType ? ':' + e.pointerType : '') + '@' + (e.target.id || e.target.tagName) + (e.clientX != null ? ' ' + Math.round(e.clientX) + ',' + Math.round(e.clientY) : '')), true); }""")
+                trace.append("before the tap: at (%d, %d) the page has %s; the board's own hit test says %s; canvas %s" % (x, y,
+                    pg.evaluate("(([x, y]) => { const e = document.elementFromPoint(x, y); return e ? (e.id || e.tagName) + (e.className && typeof e.className === 'string' ? '.' + e.className.split(' ').join('.') : '') : 'nothing'; })", [x, y]),
+                    pg.evaluate("window.__ayo.hitTest(%d, %d)" % (x, y)), pg.evaluate("JSON.stringify(document.querySelector('canvas').getBoundingClientRect())")))
                 press(); pg.wait_for_timeout(500)
+                trace.append("events seen: %s" % pg.evaluate("window.__evs.join(' | ') || 'none'"))
                 if pg.evaluate("window.__ayo.selected") != pit and dev.get("has_touch"):  # say so, then try the mouse, so the rest can still be checked
                     trace.append("a finger's tap on pit %d at (%d, %d) picked nothing (selected: %s, hint: %s)" % (pit, x, y, pg.evaluate("window.__ayo.selected"), pg.evaluate("document.querySelector('#hint').textContent")))
-                    bad.append(name + ": " + trace[-1]); how = "the mouse"; press(); pg.wait_for_timeout(500)
+                    bad.append(name + ": " + trace[-1]); how = "the mouse"; pg.evaluate("window.__evs.length = 0"); press(); pg.wait_for_timeout(500)
+                    trace.append("the mouse: events seen: %s · selected: %s" % (pg.evaluate("window.__evs.join(' | ') || 'none'"), pg.evaluate("window.__ayo.selected")))
                 press()
                 for k in range(24):  # up to two minutes, saying where the game stands every 5 s
                     if pg.evaluate("window.__ayo.state.moves.length >= %d && !window.__ayo.busy || window.__ayo.state.over" % (n0 + 2)): break

@@ -172,7 +172,8 @@ test("the WebRTC side: media opens, the offer and answer carry both phones' trac
   await b.open("video"); assert.equal(b.mode, "voice", "no camera on that phone: it falls back to voice only");
   await a.open("video"); assert.equal(a.mode, "video");
   await a.offer();
-  await new Promise((r) => setTimeout(r, 60));
+  for (let k = 0; k < 200 && !(states.a.length && states.b.length && got.a && got.b); k++) await new Promise((r) => setTimeout(r, 10)); // a busy CI runner can take longer than 60 ms over the timer chain
+  await new Promise((r) => setTimeout(r, 20));
   assert.deepEqual(states.a, ["connected"]); assert.deepEqual(states.b, ["connected"]);
   assert.deepEqual(got.b.getTracks().map((t) => t.kind), ["audio", "video"], "the far phone gets the camera and the voice");
   assert.deepEqual(got.a.getTracks().map((t) => t.kind), ["audio"]);
