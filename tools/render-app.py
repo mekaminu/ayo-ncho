@@ -11,6 +11,9 @@ and keep-awake stand in for the browser's. Writes a picture of the board after t
 """
 import functools, http.server, json, os, subprocess, sys, threading
 from playwright.sync_api import sync_playwright
+def play_btn(pg, **kw):  # Home's Play; over a game under way it asks once first (web/keepgame.js), so a second click starts the new game
+    pg.click("#playBtn", **kw)
+    if pg.evaluate("document.querySelector('#playBtn').classList.contains('armed')"): pg.click("#playBtn", **kw)
 
 out = sys.argv[1]; wide = "--wide" in sys.argv; ios = "--ios" in sys.argv
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -68,7 +71,7 @@ with sync_playwright() as p:
         # back on Home puts the app away
         pg.evaluate("window.__back()"); assert ["App", "minimizeApp", None] in pg.evaluate("window.__appLog"), "back on Home did not put the app away"
     # a real game: Play, a move, the reply
-    pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+    play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
     legal = pg.evaluate("window.__ayo.legal"); pit = max(legal, key=lambda i: pg.evaluate("window.__ayo.state.pits[%d]" % i))
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit); pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
     pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy", timeout=240000)

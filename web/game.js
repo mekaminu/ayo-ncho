@@ -69,6 +69,7 @@ import { ponderOn, ponderPlan, ponderAt, GLANCE_MS, SETTLE_MS as PONDER_SETTLE_M
 import { mayOfferDraw, drawButton, drawWords } from './draw.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 import { oneTapOn, pressAction } from './onetap.js';
+import { makeGuard as makeKeepGuard, ARM_MS as KEEP_MS, playAsks, askWords as keepAsk } from './keepgame.js';
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -479,6 +480,7 @@ async function passTurn() { // two of us: the player to move takes the near seat
 }
 const names = { easy: 'Adaeze', steady: 'Auntie Bisi', medium: 'Nnamdi', hard: 'Mama Ngozi', master: 'Papa Ike' };
 const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
+const playAsk = { guard: makeKeepGuard(KEEP_MS), timer: 0 }; // Play keeps your game: Play asks once while a game is under way (web/keepgame.js)
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
 let stats = { biggest: 0, captures: 0, started: Date.now() };
 // your record against each opponent, kept on this phone (web/record.js): wins–losses and your best win, on their Home pill and the Game over card
@@ -1693,6 +1695,7 @@ $('#goNext').addEventListener('click', () => { const lv = $('#goNext').dataset.l
 // ---------- screens ----------
 const body = document.body;
 function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle' | 'store'
+  if (which !== 'home') playDisarm(false); // Play's question goes with Home
   if (which !== 'play' && review.on) endReview(false);
   if (which !== 'store' && (shop.tryFinish || shop.trySeeds)) { shop.tryFinish = shop.trySeeds = null; applyLooks(); } // leaving the store puts your own look back
   $('#store').hidden = which !== 'store'; $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms'; $('#puzzle').hidden = which !== 'puzzle';
@@ -1931,7 +1934,23 @@ document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('clic
 document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { if (goldLocked(b.dataset.level)) return; level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); paintHome(); click(1.2, 0.05); }));
 $('.pill[data-mode="local"]').addEventListener('click', () => { prefs.set('mode', 'local'); paintHome(); click(1.2, 0.05); }); // two of us on this phone: no computer plays
 function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
-$('#playBtn').addEventListener('click', () => { if (lessonDueNow()) { openLesson('play'); click(1.3, 0.08); return; } newRound(); showScreen('play'); click(1.3, 0.08); }); // a new phone's first Play: the lesson first
+function playDisarm(repaint = true) { // Play goes back to saying Play (after three seconds, or leaving Home)
+  clearTimeout(playAsk.timer); const was = playAsk.guard.armed; playAsk.guard.reset(); const b = $('#playBtn');
+  if (!b.classList.contains('armed') && !was) return;
+  b.classList.remove('armed'); $('#continueBtn').classList.remove('keep'); b.querySelector('b').textContent = 'Play'; b.removeAttribute('aria-label');
+  if (repaint && !$('#home').hidden) paintHome();
+}
+$('#playBtn').addEventListener('click', () => {
+  if (lessonDueNow()) { openLesson('play'); click(1.3, 0.08); return; } // a new phone's first Play: the lesson first
+  const saved = savedGame(); // the one game kept on this phone: a Play over it asks once, Continue glowing beside it
+  if (playAsks(saved) && playAsk.guard.tap(performance.now()) === 'armed') {
+    const w = keepAsk(saved, { keys: keysLikely(), local: saved.local, names: LNAMES }), b = $('#playBtn');
+    b.querySelector('b').textContent = w.title; $('#playSub').textContent = w.sub; b.setAttribute('aria-label', w.label);
+    b.classList.remove('armed'); void b.offsetWidth; b.classList.add('armed'); $('#continueBtn').classList.add('keep');
+    click(0.7, 0.1); buzz(18); clearTimeout(playAsk.timer); playAsk.timer = setTimeout(() => playDisarm(), KEEP_MS); return;
+  }
+  playDisarm(false); newRound(); showScreen('play'); click(1.3, 0.08);
+});
 $('#continueBtn').addEventListener('click', () => { if (resume()) { hideExplain(); layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
 $('#homeBtn').addEventListener('click', () => { if (watch.on) { watch.stop = true; hurryNow(); return; } if (online) return leaveRoom(); if (!busy) { if (!endPlayout()) save(); showScreen('home'); } });
 $('#goHome').addEventListener('click', () => { if (online) return leaveRoom(); $('#gameover').hidden = true; showScreen('home'); });

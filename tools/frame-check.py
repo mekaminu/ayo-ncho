@@ -40,6 +40,9 @@ threading.Thread(target=srv.serve_forever, daemon=True).start()
 ARGS = ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"]
 errors = []
 
+def play_btn(pg, **kw):  # Home's Play; over a game under way it asks once first (web/keepgame.js), so a second click starts the new game
+    pg.click("#playBtn", **kw)
+    if pg.evaluate("document.querySelector('#playBtn').classList.contains('armed')"): pg.click("#playBtn", **kw)
 def page(b, extra="", init=""):
     ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True, is_mobile=True)
     pg = ctx.new_page()
@@ -65,7 +68,7 @@ def play(pg, moves):  # your richest pit each time (relays, captures), then the 
 
 def tier(b, lite):
     ctx, pg = page(b, "&lite=%d&drawscale=%s" % (1 if lite else 0, DRAWSCALE))
-    pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=60000)
+    play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=60000)
     pg.wait_for_function("window.__ayo.tweens === 0", timeout=60000)
     cdp = ctx.new_cdp_session(pg); cdp.send("Emulation.setCPUThrottlingRate", {"rate": THROTTLE})
     pg.evaluate("window.__ayo.framesReset(); window.__frameParts = {}"); t0 = time.time()
@@ -85,7 +88,7 @@ def judge(b):  # Auto's own judgement: a full board drawn slowly here is remembe
     # a phone with cores and memory to spare, so Auto starts on the full board (this container has 2 cores, which Auto calls slow)
     ctx, pg = page(b, "&judge=60&drawscale=%s" % DRAWSCALE, " Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8 }); Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });")
     q = pg.evaluate("window.__ayo.quality"); assert not q["lite"] and q["reason"] == "auto", ("the check starts on the full board, Auto", q)
-    pg.click("#playBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=60000)
+    play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=60000)
     pg.evaluate("window.__frameGap = 45")  # the meter is told every frame came 45 ms after the last: under 25 a second
     for _ in range(12):
         if pg.evaluate("window.__ayo.frames.judged") or pg.evaluate("window.__ayo.state.over"): break

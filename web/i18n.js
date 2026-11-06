@@ -38,6 +38,10 @@ export function langNote(pref, lang) {
 const LEVELS = { Easy: 'Facile', Steady: 'Posé', Medium: 'Moyen', Hard: 'Difficile', Master: 'Maître' };
 
 export const FR = {
+  // Play keeps your game (web/keepgame.js): Play asks once while a game is under way
+  'New game?': 'Nouvelle partie\u00a0?',
+  'Start a new game? Your game in progress ends — tap again to start one, or Continue to keep it': 'Commencer une nouvelle partie\u00a0? La partie en cours s’arrête — touchez encore pour en commencer une, ou Continuer pour la garder',
+  'Start a new game? Your game in progress ends — press again to start one, or Continue to keep it': 'Commencer une nouvelle partie\u00a0? La partie en cours s’arrête — appuyez encore pour en commencer une, ou Continuer pour la garder',
   'Watch the whole game:': 'Regarder toute la partie\u00a0:',
   'That game link could not be read': 'Impossible de lire le lien de cette partie',
   // the board's toolbar and cards
@@ -775,6 +779,7 @@ export const PATTERNS = [
   [/^([^·—:]+?) led from the start$/, (m) => (m[1] === 'You' ? 'Vous avez mené' : `${who(m[1])} a mené`) + ' dès le début'],
   [/^([^·—:]+?) led for good from move (\d+)$/, (m) => (m[1] === 'You' ? 'Vous avez mené' : `${who(m[1])} a mené`) + ` pour de bon dès le coup ${m[2]}`],
   [/^biggest swing: move (\d+), (\d+) seeds? (your|.+?'s) way$/, (m) => `plus grand basculement : coup ${m[1]}, ${pl(m[2], 'graine', 'graines')} ${m[3] === 'your' ? 'pour vous' : 'pour ' + who(m[3].slice(0, -2))}`],
+  [/^(Tap|Click) again — your game ends \((.+)\)$/, (m) => { const k = m[2].match(/^(.+?) leads (\d+)–(\d+)$/); return `${m[1] === 'Tap' ? 'Touchez' : 'Cliquez'} encore — votre partie s’arrête (${k ? `${who(k[1])} mène ${k[2]}–${k[3]}` : need(m[2])})`; }], // Play keeps your game
   [/^you (lead|trail) (\d+)–(\d+)$/, (m) => `vous ${m[1] === 'lead' ? 'menez' : 'êtes mené'} ${m[2]}–${m[3]}`],
   [/^(new )?best win (\d+)–(\d+)$/, (m) => `${m[1] ? 'nouvelle ' : ''}meilleure victoire ${m[2]}–${m[3]}`],
   [/^(\d+) draws?$/, (m) => pl(m[1], 'nul', 'nuls')],
