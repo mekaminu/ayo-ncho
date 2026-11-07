@@ -40,6 +40,7 @@ export function privacyFr(c, updated) {
 <li>l’étiquette de votre téléphone (voir plus bas) et la liste des personnes que vous avez bloquées, avec les noms qu’elles utilisaient.</li>
 </ul>
 <p>Rien de tout cela ne nous est envoyé, sauf votre nom et vos coups quand vous jouez avec un ami en ligne (voir plus bas). Effacer les données du site dans votre navigateur, ou supprimer l’appli, efface tout.</p>
+<p>Réglages → Nouveau téléphone → Envoyer met tout cela (jamais vos achats) dans un lien que vous vous envoyez, à ouvrir sur un nouveau téléphone. La progression se trouve après le # du lien, une partie qu’un navigateur n’envoie jamais à un serveur : elle ne nous parvient pas ; elle va seulement là où vous l’envoyez, et quiconque ouvre ce lien peut la récupérer, alors gardez-le pour vous.</p>
 
 <h2>Jouer avec un ami en ligne</h2>
 <p>Quand vous ouvrez une salle ou frappez à celle d’un ami, notre serveur reçoit le nom que vous avez tapé, vos coups, les cris de la liste fixe que vous envoyez (« Oya, à toi ! » et les autres), un code au hasard pour votre place, et l’étiquette de votre téléphone : une suite de caractères au hasard créée sur votre téléphone la première fois que vous jouez avec un ami, liée à rien d’autre (ni compte, ni nom, ni identifiant de l’appareil). Le téléphone de votre ami voit votre nom et votre étiquette, pour que, s’il vous bloque, son téléphone puisse refuser vos visites plus tard. C’est nécessaire pour faire tourner la partie entre vous, et cela ne sert à rien d’autre.</p>

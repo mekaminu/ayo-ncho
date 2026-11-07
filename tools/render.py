@@ -236,6 +236,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
 out = sys.argv[1]; talkc = "--talk" in sys.argv; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; tablec = "--table" in sys.argv; leftyc = "--lefty" in sys.argv; warmc = "--warm" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; ratedc = "--rated" in sys.argv; fullc = "--fullscreen" in sys.argv; record = record or story or bestsc
 keyhelpc = "--keyhelp" in sys.argv
+carryc = "--carry" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -679,6 +680,56 @@ if keyhelpc:  # the keys, on How to play (idea 7 Nov): on the Mac ? opens the ca
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     print("keyhelp ok · ? opens the list, a key glints its line and still works, Esc and ? close it, French, none on the phone · wrote", out); sys.exit(0)
+if carryc:  # move to a new phone (idea 7 Nov): Send makes a link of this phone's progress; opened on a new phone it asks, then brings it in
+    import json as _json
+    OLD = {"ayo.tutorial": "3", "ayo.lesson": "done", "ayo.name": "Meka", "ayo.level": "hard", "ayo.owned": '["gold"]',
+           "ayo.streak": _json.dumps({"days": ["2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-05", "2026-11-06", "2026-11-07"], "seen": ["stones"]}),
+           "ayo.record": _json.dumps({"easy": {"w": 6, "l": 1, "d": 0, "best": [31, 17], "run": 3}, "medium": {"w": 9, "l": 7, "d": 1, "best": [28, 20], "run": 1}, "hard": {"w": 2, "l": 5, "d": 0, "best": [26, 22], "run": -1}, "last": "g31"}),
+           "ayo.rating": _json.dumps({"r": 1240, "n": 31, "last": "g31", "change": 9}),
+           "ayo.daily": _json.dumps({"days": {"2026-11-06:ncho": {"got": 8, "target": 8, "tries": 1, "solved": True}}, "solved": ["2026-11-02", "2026-11-06"]})}
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        old = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1); pg = old.new_page(); watch(pg, errors, "old: ")
+        old.grant_permissions(["clipboard-read", "clipboard-write"], origin="http://127.0.0.1:8766")
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); const o = %s; for (const k in o) localStorage.setItem(k, o[k]); }" % _json.dumps(OLD))
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); pg.wait_for_timeout(400)
+        pg.evaluate("navigator.share = undefined")
+        pg.evaluate("document.querySelector('#homeSettings').click()"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000)
+        pg.evaluate("document.querySelector('#carrySend').scrollIntoView({block:'center'})"); pg.click("#carrySend"); pg.wait_for_function("window.__ayo.carry.sent === 1", timeout=5000)
+        link = pg.evaluate("window.__ayo.carry.link"); clip = pg.evaluate("navigator.clipboard.readText()")
+        print("carry: link", len(link), "chars"); assert clip == link and "#carry=z" in link and "?" not in link.split("#")[0][len("http://127.0.0.1:8766/web/index.html"):], (link[:80], clip[:80])
+        old.close()
+        new = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); ph = new.new_page(); watch(ph, errors, "new: ")
+        ph.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.streak', JSON.stringify({days: ['2026-11-04'], seen: []})); }")
+        ph.goto(link.replace("#", "?capture=1&stay=home#"), wait_until="load"); ph.wait_for_function("window.__done===true", timeout=180000)
+        ph.wait_for_function("window.__ayo.carry.sure", timeout=8000)
+        assert "#" not in ph.url and "carry" not in ph.url, ph.url
+        ph.wait_for_timeout(1300); c = ph.evaluate("window.__ayo.carry"); print("carry: asks", repr(c["what"]))
+        assert c["open"] and c["yes"] and c["what"].startswith("9 days played · 31 games · rating 1240 · 2 puzzles solved — it replaces"), c["what"]
+        ph.evaluate("window.__freeze=true"); ph.wait_for_timeout(200); ph.screenshot(path=out, animations="disabled"); ph.evaluate("window.__freeze=false")
+        ph.click("#carryYes"); ph.wait_for_function("window.__done===true && window.__ayo.carry.after", timeout=180000); ph.wait_for_timeout(900)
+        ls = ph.evaluate("({...localStorage})")
+        assert _json.loads(ls["ayo.rating"])["r"] == 1240 and ls["ayo.name"] == "Meka" and ls["ayo.level"] == "hard", ls
+        assert "ayo.owned" not in ls, "purchases never travel"
+        assert len(_json.loads(ls["ayo.streak"])["days"]) == 10, "the new phone's own day is kept with the old ones"
+        t = ph.evaluate("[...document.querySelectorAll('.toast')].map(t => t.textContent).join(' | ')"); print("carry: toast", repr(t)); assert "Brought across · 10 days played" in t, t
+        assert not ph.evaluate("document.querySelector('#home').hidden"), "back on Home"
+        new.close()
+        fr = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1); pf = fr.new_page(); watch(pf, errors, "paste: ")
+        pf.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.lang', 'fr'); localStorage.setItem('ayo.tutorial', '3'); }")
+        pf.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pf.wait_for_function("window.__done===true", timeout=180000)
+        pf.evaluate("document.querySelector('#homeSettings').click()"); pf.wait_for_selector("#settings:not([hidden])", timeout=5000)
+        pf.evaluate("document.querySelector('#carryBring').scrollIntoView({block:'center'})"); pf.click("#carryBring"); pf.wait_for_timeout(300)
+        assert pf.evaluate("!window.__ayo.carry.sure && window.__ayo.carry.open")
+        pf.fill("#carryPaste", "https://ayo-ncho.onrender.com/#carry=zAAAA"); pf.wait_for_timeout(300)
+        w = pf.evaluate("window.__ayo.carry"); assert not w["yes"] and "incomplet" in w["what"], w["what"]
+        pf.fill("#carryPaste", "Ma progression " + link); pf.wait_for_function("window.__ayo.carry.sure", timeout=5000); pf.wait_for_timeout(1000)
+        w = pf.evaluate("window.__ayo.carry"); print("carry: French", repr(w["what"])); assert w["what"].startswith("9 jours de jeu · 31 parties · classement 1240"), w["what"]
+        row = pf.evaluate("document.querySelector('#carryGroup').innerText"); assert "Passer à un nouveau téléphone" in row and "Récupérer" in row, row
+        pf.click("#carryNo"); pf.wait_for_timeout(200); assert not pf.evaluate("window.__ayo.carry.open")
+        fr.close(); b.close()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    print("carry ok · Send copies the link, the new phone asks with the counts, brings it in (no purchases, days put together), paste and French · wrote", out); sys.exit(0)
 if fullc:  # full screen (idea 7 Nov): Settings → Feel → Full screen and F; kept, back after a reload on the first tap; Esc turns it off
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []

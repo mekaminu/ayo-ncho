@@ -104,6 +104,7 @@ function privacy(c) {
 <li>your phone's tag (below) and the list of people you have blocked, with the names they used.</li>
 </ul>
 <p>None of this is sent to us, apart from your name and moves while you play a friend online (below). Clearing the site's data in your browser, or deleting the app, removes it all.</p>
+<p>Settings → New phone → Send puts these (never your purchases) into one link that you send yourself, to open on a new phone. The progress sits after the # in the link, a part a browser never sends to any server, so it does not reach us; it goes only where you send it, and anyone who opens that link can bring it in, so keep it to yourself.</p>
 
 <h2>Playing with a friend online</h2>
 <p>When you open a room or knock on a friend's, our server receives the name you typed, your moves, any of the fixed shouts you send ("Oya, your move!" and the like) a random code for your seat, and your phone's tag: a random string made on your phone the first time you play a friend, linked to nothing else (no account, no name, no device ID). Your friend's phone sees your name and your tag, so that if they block you their phone can turn your knocks away later. This is needed to run the game between you, and it is all it is used for.</p>
