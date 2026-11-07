@@ -716,6 +716,7 @@ const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
 const spanFr = (w) => w === 'under a minute' ? 'moins d’une minute' : w; // "5 h 12 min" reads the same in French
 export const PATTERNS = [
+  [/^This week ([●◐○–·]{7}) \((\d) of 7\)$/, (m) => `Cette semaine ${m[1]} (${m[2]} sur 7)`], // the puzzle's share line (web/week.js weekShare)
   [/^This week · (?:none yet|(\d+) of 7)(?: · (Sunday's|today's) the hard one)?$/, (m) => `Cette semaine · ${m[1] ? `${m[1]} sur 7` : 'aucune pour l’instant'}${m[2] ? (m[2] === "Sunday's" ? ' · dimanche, la plus corsée' : ' · aujourd’hui, la plus corsée') : ''}`],
   // the next puzzle (web/nextday.js): "5 h 12 min", "42 min", "under a minute" keep their numbers
   [/^Next puzzle in (\d+ h(?: \d+ min)?|\d+ min|under a minute)$/, (m) => `Prochaine énigme dans ${spanFr(m[1])}`],

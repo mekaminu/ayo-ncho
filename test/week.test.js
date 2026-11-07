@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { weekKeys, weekStrip, weekLine, weekLabel, letterOf, solvedIn } from "../web/week.js";
+import { weekKeys, weekStrip, weekLine, weekLabel, letterOf, solvedIn, weekShare } from "../web/week.js";
 import { parse, record, markShown } from "../web/daily.js";
 import { translate } from "../web/i18n.js";
 
@@ -67,4 +67,25 @@ test("the card carries the strip, painted from game.js, and it keeps still for r
   assert.match(html, /id="pzWeek"[^>]*role="img"/); assert.match(html, /id="pzWeekPits"/); assert.match(html, /id="pzWeekLine"/);
   assert.match(html, /prefers-reduced-motion:reduce\)\{[^}]*\.pzWeekPits \.drop \.p i/);
   assert.match(game, /from '\.\/week\.js'/); assert.match(game, /paintWeek\(firstSolve\)/);
+});
+
+test("share your week: the share's last line marks Mon … Sun and the count, the same in French", () => {
+  let d = parse(null);
+  d = record(d, "2026-11-09", "ncho", 8, 8).data;          // Mon solved
+  d = record(d, "2026-11-10", "ncho", 3, 8).data; d = markShown(d, "2026-11-10", "ncho"); // Tue shown
+  d = record(d, "2026-11-12", "ncho", 2, 9).data;          // Thu tried; Wed missed
+  d = record(d, "2026-11-13", "ncho", 9, 9).data;          // Fri (today) solved
+  const s = weekStrip(d, "2026-11-13", "ncho");
+  assert.equal(weekShare(s), "This week ●◐–○●·· (2 of 7)");
+  assert.equal(translate(weekShare(s), "fr"), "Cette semaine ●◐–○●·· (2 sur 7)");
+  assert.equal(weekShare(weekStrip(parse(null), "2026-11-09", "ncho")), "This week ······· (0 of 7)");
+  let all = parse(null); for (const k of weekKeys("2026-11-15")) all = record(all, k, "ayo", 9, 9).data;
+  assert.equal(weekShare(weekStrip(all, "2026-11-15", "ayo")), "This week ●●●●●●● (7 of 7)");
+  assert.equal(translate(weekShare(weekStrip(all, "2026-11-15", "ayo")), "fr"), "Cette semaine ●●●●●●● (7 sur 7)");
+  for (const st of ["solved", "shown", "tried", "missed", "open", "ahead"]) assert.equal(weekShare(Array.from({ length: 7 }, (_, i) => ({ i, state: st }))).length, "This week ••••••• (0 of 7)".length);
+});
+
+test("the puzzle's Share sends today's result, then the week", () => {
+  const src = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  assert.match(src, /shareText\(p, puzzle\.got\) \+ '\\n' \+ weekShare\(weekStrip\(daily, p\.key, p\.variant\)\)/);
 });

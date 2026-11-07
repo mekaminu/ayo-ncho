@@ -125,6 +125,6 @@ test("game.js sends the shared words through the page's language", () => {
   const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
   assert.match(game, /let text = tLines\(local \? localShare/);
   assert.match(game, /text \+= .\\n. \+ tLines\(watchLink\(\)\)/); // the watch link's words too (web/watch.js)
-  assert.match(game, /const text = tLines\(shareText\(p, puzzle\.got\)\)/);
+  assert.match(game, /const text = tLines\(shareText\(p, puzzle\.got\) \+ .\\n. \+ weekShare\(/); // the week line (web/week.js) rides in the same tLines
   assert.match(game, /const caption = tLines\(clipCaption\(/);
 });

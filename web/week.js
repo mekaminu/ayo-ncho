@@ -60,3 +60,13 @@ export function weekLabel(strip, lang = 'en') {
 
 // The letter under each pit, in the page's language.
 export const letterOf = (i, lang = 'en') => (LETTERS[lang] || LETTERS.en)[i];
+
+// Share your week (idea 7 Nov): the puzzle's Share sent today's result only, so a friend never saw the week behind it. Now the
+// share carries one more line, the week as seven marks Monday to Sunday — ● solved · ◐ shown the move · ○ tried · – a day gone
+// by unplayed · · today unplayed or a day to come — and the count: "This week ●●◐–●·· (3 of 7)". Before Monday 9 Nov's weekly
+// puzzles the line is the same, it just has fewer days behind it. Plain characters that read the same on WhatsApp, iMessage
+// and a text, in the order of the days, so a run of solved days shows as a run.
+export const SHARE_MARKS = { solved: '●', shown: '◐', tried: '○', missed: '–', open: '·', ahead: '·' };
+export function weekShare(strip) {
+  return `This week ${strip.map((d) => SHARE_MARKS[d.state] || '·').join('')} (${solvedIn(strip)} of 7)`;
+}

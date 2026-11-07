@@ -12,7 +12,7 @@ import { greetMoment } from './greet.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey, levelWord } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, dayLine, levelSeeds, canShow, markShown } from './daily.js';
-import { weekStrip, weekLine, weekLabel, letterOf, solvedIn } from './week.js';
+import { weekStrip, weekLine, weekLabel, letterOf, solvedIn, weekShare } from './week.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { qrMatrix, qrBands, scanWords, QUIET } from './qr.js';
 import { makeBackNav, webStep, ROOM_WORDS } from './backnav.js';
@@ -1722,7 +1722,7 @@ function closePuzzle() { // Back to home: the board goes back to your game (or a
   if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
 }
 async function sharePuzzle() {
-  const p = puzzle.p; const text = tLines(shareText(p, puzzle.got)) + (linkable() ? `\n${publicBase()}?puzzle=1` : '');
+  const p = puzzle.p; const text = tLines(shareText(p, puzzle.got) + '\n' + weekShare(weekStrip(daily, p.key, p.variant))) + (linkable() ? `\n${publicBase()}?puzzle=1` : '');
   try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast('Result copied'); } } catch {}
 }
 $('#puzzleCard').addEventListener('click', () => { openPuzzle(); click(1.3, 0.08); });
