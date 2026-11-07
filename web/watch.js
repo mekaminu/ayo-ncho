@@ -64,3 +64,44 @@ export function endWords(w) {
 }
 // the words that go with the link when a game is shared
 export function linkWords() { return 'Watch the whole game:'; }
+
+// ---------- Play on from here (idea 7 Nov): a friend watching a shared game sees the moment it turned and wants to try it
+// themselves — "what if I'd played pit 3 there?" Lichess's "continue from here" on a shared game. While it plays back, a chip
+// under the board offers it; one tap stops after the turn in hand and the watcher plays on from exactly that position, as the
+// side to move, against the opponent they chose on Home. The side to move always becomes the near seat (0): when it is the
+// far side's move the game is mirrored — every move turned to the pit opposite, the other seat first — which the rules
+// cannot tell apart (they are the same for both seats), and the board turns half round to face them as it happens.
+// Practice, like a play-out from the daily puzzle (web/playout.js reads `from` / `prefix`): never saved or counted.
+export const mirrorPit = (pit) => (pit + 6) % 12;
+
+// May the chip offer it for the position after `k` moves? Only while the game plays back, after a move, with the game going.
+export function canTakeOver({ watching = false, done = false, k = 0, state = null } = {}) {
+  return !!(watching && !done && k >= 1 && state && !state.over);
+}
+
+// The game after `k` moves of the watched game `w`, ready to be played on by the side to move from the near seat:
+// { state, flip, side, other, n, po } or null. `po` is the play-out the board keeps while it is played.
+export function takeoverOf(w, k) {
+  const s = w && w.states ? w.states[k] : null;
+  if (!canTakeOver({ watching: true, k, state: s })) return null;
+  const flip = s.turn === 1; const kept = w.moves.slice(0, k).map((m) => (flip ? mirrorPit(m) : m));
+  let t = newGame(w.variant, w.rules, flip ? 1 - w.first : w.first);
+  for (const pit of kept) { if (t.over || !legalMoves(t).includes(pit)) return null; t = applyMove(t, pit).state; }
+  if (t.turn !== 0 || t.over) return null;
+  const side = w.names[flip ? 1 : 0], other = w.names[flip ? 0 : 1];
+  return { state: t, flip, side, other, n: k, po: { kind: 'watch', from: kept.length, prefix: kept.join(','), n: k, side, other } };
+}
+export const isTakeover = (po) => !!po && po.kind === 'watch';
+
+// The words.
+export const TAKE_TITLE = 'Play on from here';
+export const takeoverChip = (side, opp) => `you take ${side}'s side · vs ${opp}`;
+export const takeoverLabel = (side, opp) => `Play on from here: you take ${side}'s side against ${opp}`;
+export const takeoverToast = (n, side) => `From move ${n}, you play on as ${side} — your move`;
+export const takeoverTag = (n) => `from move ${n} of a shared game`;
+export const takeoverEyebrow = (variant, n, played) => `${gameName(variant)} · ${takeoverTag(n)} · ${played} move${played === 1 ? '' : 's'}`;
+export function takeoverShare(state, you, name, po) {
+  const a = state.stores[you], b = state.stores[1 - you];
+  const how = state.winner === 'draw' ? 'drew with' : state.winner === you ? 'beat' : 'lost to';
+  return `Ayo & Nchò — I played on as ${po.side} from move ${po.n} of a shared game and ${how} ${name} ${a}–${b}.`;
+}

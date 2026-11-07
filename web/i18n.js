@@ -45,6 +45,9 @@ export const FR = {
   // Back goes back (web/backnav.js): a back gesture in a room stays in it
   'Back keeps you in the room — Home leaves it': 'Retour vous garde dans la salle — Accueil la quitte',
   'Watch the whole game:': 'Regarder toute la partie\u00a0:',
+  'Play on from here': 'Continuer d’ici', // play on from here (web/watch.js takeover)
+  'Stop here and play on from this position': 'S’arrêter ici et continuer depuis cette position',
+  play: 'jouer',
   'That game link could not be read': 'Impossible de lire le lien de cette partie',
   // the board's toolbar and cards
   'Ayo board': 'Plateau d’Ayo',
@@ -853,6 +856,12 @@ export const PATTERNS = [
   [/^Move (\d+) of (\d+) · (.+) plays$/, (m) => `Coup ${m[1]} sur ${m[2]} · ${who(m[3])} joue`],
   [/^Move (\d+) of (\d+)$/, (m) => `Coup ${m[1]} sur ${m[2]}`], // …and its parts, when the hurry words join on with a ·
   [/^([^·—:]{1,20}) plays$/, (m) => `${who(m[1])} joue`],
+  // play on from here (web/watch.js takeover): a shared game taken over at a move
+  [/^you take (.+)'s side · vs (.+)$/, (m) => `vous prenez la place de ${who(m[1])} · contre ${who(m[2])}`],
+  [/^Play on from here: you take (.+)'s side against (.+)$/, (m) => `Continuer d’ici\u00a0: vous prenez la place de ${who(m[1])} contre ${who(m[2])}`],
+  [/^From move (\d+), you play on as (.+) — your move$/, (m) => `Depuis le coup ${m[1]}, vous continuez à la place de ${who(m[2])} — à vous de jouer`],
+  [/^from move (\d+) of a shared game$/, (m) => `depuis le coup ${m[1]} d’une partie partagée`],
+  [/^Ayo & Nchò — I played on as (.+?) from move (\d+) of a shared game and (beat|drew with|lost to) (.+?) (\d+)–(\d+)\.$/, (m) => `Ayo & Nchò — j’ai continué à la place de ${who(m[1])} depuis le coup ${m[2]} d’une partie partagée et ${{ beat: 'j’ai battu', 'drew with': 'j’ai fait match nul avec', 'lost to': 'j’ai perdu contre' }[m[3]]} ${who(m[4])} ${m[5]}–${m[6]}.`],
   [/^(.+?) and (.+?) stopped at (\d+)–(\d+) after (\d+) moves$/, (m) => `${who(m[1])} et ${who(m[2])} se sont arrêtés à ${m[3]}–${m[4]} après ${pl(m[5], 'coup', 'coups')}`],
   [/^(.+?) and (.+?) drew (\d+)–(\d+)$/, (m) => `${who(m[1])} et ${who(m[2])} ont fait match nul ${m[3]}–${m[4]}`],
   [/^(.+?) beat (.+?) (\d+)–(\d+)$/, (m) => `${who(m[1])} a battu ${who(m[2])} ${m[3]}–${m[4]}`],

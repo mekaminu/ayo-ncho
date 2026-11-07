@@ -194,6 +194,10 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  faint light still sits on the pit they played (<out>), the pit's label says "played last", it stays while you pick a pit
 #                  of yours, steps aside while their move is watched again, goes with your move and comes back on their next one
 #        --watch: watch the whole game (web/watch.js) — a game Meka won, sent as a link, plays back on the board (picture <out>, the end <out>-end.png), every turn hurried, the board and scores at the end checked against the engine, then Home with this phone's game untouched; in French; Home stops it; a broken link is refused
+#        --takeover: play on from here (web/watch.js takeoverOf) — a shared game plays back; at a move where the far side is to move, the chip is tapped
+#                  mid-turn: the turn is hurried and stops, the board turns round, the position is the engine's take-over (mirrored), it is your move
+#                  against Nnamdi (<out>, and the chip mid-watch <out>-chip.png); a move and his reply, Undo stops at the take-over, the Game over
+#                  eyebrow is checked by playing on, and Home brings this phone's own game back untouched; the chip in French
 #        --greet: good morning at the right time (web/greet.js) — Mama Ngozi greets a phone back after 5 days away (?away=5&hour=8),
 #          then the next game the usual line, an afternoon game her afternoon word, a night game in French her night word
 #        --glloss: the board comes back (web/glloss.js) — WEBGL_lose_context takes the board away: nothing said for a blink, the canvas
@@ -207,7 +211,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -380,6 +384,54 @@ if watchc:  # watch the whole game (idea 6 Nov): a game sent as a link plays bac
         pg.wait_for_function("[...document.querySelectorAll('.toast')].some(x => x.textContent.includes('That game link could not be read'))", timeout=120000)
         t = pg.evaluate("[...document.querySelectorAll('.toast')].map(x => x.textContent).join(' | ')"); assert not pg.evaluate("document.querySelector('#home').hidden") and "That game link could not be read" in t and not pg.evaluate("window.__watch.on"), t
         print("watch: a broken link is refused —", t)
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
+if takec:  # play on from here (idea 7 Nov): stop a shared game at a move and play on from it
+    js = """import('./web/watch.js').then(async (W) => { const E = await import('./engine/ayo.js');
+      let seed = 9; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+      let s = E.newGame('ncho'); const moves = [];
+      while (!s.over) { const ms = E.legalMoves(s); const m = ms[Math.floor(rnd() * ms.length)]; moves.push(m); s = E.applyMove(s, m).state; }
+      const own = []; let o = E.newGame('ncho'); for (let i = 0; i < 4; i++) { const m = E.legalMoves(o)[0]; own.push(m); o = E.applyMove(o, m).state; }
+      console.log(JSON.stringify({ q: W.watchQuery({ variant: 'ncho', rules: E.RULES.ncho, first: 0, moves }, ['Meka', 'Tete']), n: moves.length, own })); });"""
+    G = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", js], cwd=root).decode()); OWN = json.dumps(G["own"]).replace(" ", "")
+    print("takeover: a %d-move shared game" % G["n"])
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "takeover: ")
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.speed', 'fast'); localStorage.setItem('ayo.level', 'medium'); localStorage.setItem('ayo.game', JSON.stringify({ moves: %s, variant: 'ncho', rules: { capture: 4, relay: true, last8: true }, level: 'medium', stats: { biggest: 0, captures: 0 }, local: false })); }" % OWN)
+        url = "http://127.0.0.1:8766/web/index.html" + G["q"] + "&capture=1&lite=1"
+        pg.goto(url, wait_until="load"); pg.wait_for_function("window.__done===true", timeout=120000)
+        pg.evaluate("import('./watch.js').then((W) => { const p = new URLSearchParams(%s); window.__W = W.decodeGame(p.get('watch'), p.get('a'), p.get('b')); window.__WM = W; })" % json.dumps(G["q"][1:]))
+        pg.wait_for_function("window.__W && window.__watch.on && window.__watch.k >= 4 && window.__W.states[window.__watch.k].turn === 1 && window.__ayo.tweens > 0", timeout=240000)
+        chip = pg.evaluate("({ hidden: document.querySelector('#watchOn').hidden, words: document.querySelector('#watchOnWords').textContent, label: document.querySelector('#watchOn').getAttribute('aria-label'), k: window.__watch.k })")
+        assert not chip["hidden"] and chip["words"] == "you take Tete's side · vs Nnamdi", chip
+        pg.screenshot(path=out.replace(".png", "-chip.png"), timeout=120000); print("takeover: the chip mid-watch —", chip["words"], "(after move %d)" % chip["k"])
+        pg.click("#watchOn")
+        pg.wait_for_function("!window.__watch.on && window.__ayo.playout.on && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(300)
+        T = pg.evaluate("""(() => { const k = %d; const t = window.__WM.takeoverOf(window.__W, k); const s = window.__ayo.state;
+          return { k, flip: t.flip, same: JSON.stringify(s.pits) === JSON.stringify(t.state.pits) && JSON.stringify(s.stores) === JSON.stringify(t.state.stores), turn: s.turn,
+            watched: JSON.stringify(window.__W.states[k].pits), now: JSON.stringify(s.pits), theta: window.__ayo.theta, me: document.querySelector('#meName').textContent,
+            opp: document.querySelector('#oppName').textContent, toast: [...document.querySelectorAll('.toast')].map(x => x.textContent).join(' | '), chip: document.querySelector('#watchOn').hidden,
+            badges: [...document.querySelectorAll('#badges .badge')].map(e => e.textContent) }; })()""" % chip["k"])
+        assert T["flip"] and T["same"] and T["turn"] == 0 and T["chip"], T
+        assert abs(math.cos(T["theta"]) - 1) < 1e-6, T
+        assert "From move %d, you play on as Tete — your move" % chip["k"] in T["toast"], T
+        pg.screenshot(path=out, timeout=120000); print("takeover: from move", T["k"], "mirrored to the near seat, the board turned round —", T["toast"])
+        before = pg.evaluate("window.__ayo.state.moves.length")
+        mv = pg.evaluate("window.__ayo.legal[0]"); x, y = pg.evaluate("window.__ayo.pitAt(%d)" % mv)
+        pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+        pg.wait_for_function("window.__ayo.state.moves.length >= %d + 2 && !window.__ayo.busy || window.__ayo.state.over" % before, timeout=60000); pg.wait_for_timeout(400)
+        print("takeover: a move and Nnamdi's reply played on")
+        if not pg.evaluate("window.__ayo.state.over"):
+            pg.click("#undo"); pg.wait_for_function("window.__ayo.state.moves.length === %d && !window.__ayo.busy" % before, timeout=30000); pg.wait_for_timeout(300)
+            assert pg.evaluate("document.querySelector('#undo').disabled"), "undo goes no further back than the take-over"
+            print("takeover: Undo takes it back to the take-over and stops there")
+        saved = pg.evaluate("localStorage.getItem('ayo.game')"); assert '"moves":' + OWN in saved, saved
+        pg.click("#homeBtn"); pg.wait_for_function("!document.querySelector('#home').hidden", timeout=20000); pg.wait_for_timeout(300)
+        own = pg.evaluate("window.__ayo.state.moves.join(',')"); assert own == ",".join(map(str, G["own"])), own; print("takeover: Home brings this phone's own game back untouched")
+        pg.goto(url + "&lang=fr", wait_until="load"); pg.wait_for_function("window.__watch.on && !document.querySelector('#watchOn').hidden", timeout=120000); pg.wait_for_timeout(200)
+        fr = pg.evaluate("document.querySelector('#watchOn').textContent"); assert "Continuer d’ici" in fr and "vous prenez la place de" in fr, fr; print("takeover: in French —", fr)
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)

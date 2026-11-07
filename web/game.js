@@ -48,7 +48,7 @@ import { inLast8, crossed as crossedLast8, last8Words, crossedWords } from './la
 import { gameStory, storyWords, storyPath } from './story.js';
 import { handSteps, handText, handShown, haulKind } from './handcount.js';
 import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
-import { decodeGame, watchQuery, titleWords as watchTitle, moveWords as watchMove, endWords as watchEnd, linkWords as watchLink } from './watch.js';
+import { decodeGame, watchQuery, titleWords as watchTitle, moveWords as watchMove, endWords as watchEnd, linkWords as watchLink, canTakeOver, takeoverOf, isTakeover, takeoverChip, takeoverLabel, takeoverToast, takeoverEyebrow, takeoverShare } from './watch.js';
 import { parse as parseTally, record as recordTally, roomKey, entryOf as tallyOf, cardLine as tallyLine, startLine as tallyStart, standingParts, wentUp, played as tallyPlayed } from './tally.js';
 import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
@@ -259,7 +259,7 @@ const easeOut = (t) => 1 - (1 - t) ** 3, easeIn = (t) => t * t, easeInOut = (t) 
 const wait = (ms) => new Promise((r) => setTimeout(r, reduceMotion ? 0 : hurried(ms, hurry.on)));
 // tap to hurry (web/hurry.js): while a turn plays, a tap on the board or Space plays the rest of it faster; the next turn is back at your speed
 const hurry = { on: false, depth: 0, words: false, base: '' };
-const watch = { on: false, stop: false, text: '', done: false, i: 0, n: 0 }; window.__watch = watch; // watching a game sent as a link (web/watch.js)
+const watch = { on: false, stop: false, text: '', done: false, i: 0, n: 0, take: false, k: 0, taken: null }; window.__watch = watch; // watching a game sent as a link (web/watch.js)
 function hurryNow() {
   if (!canHurry({ animating: hurry.depth > 0, clipping, screen: body.classList.contains('screen'), already: hurry.on })) return false;
   hurry.on = true; const now = performance.now(); for (const tw of tweens) tw.ms = squeeze(tw, now); // what is already moving speeds up too
@@ -2081,7 +2081,7 @@ function gameOver() {
   const a = state.stores[you], b = state.stores[them]; const win = state.winner === you; const draw = state.winner === 'draw';
   const gave = online && state.resigned != null ? gaveUpWords(state.resigned, you, oppLabel()) : online && state.agreed ? { ...drawWords(oppLabel()), title: 'A draw' } : null; // a game someone gave up (or both agreed level): the result is theirs to give, whatever the seeds say
   const out = playingOut(); // a play-out: no record, rating, review, story, replay or clip (the moves before the puzzle were nobody's)
-  $('#goEyebrow').textContent = out ? (isRetry(playout) ? retryEyebrow(state.variant, playout.n, playedOut(playout, state)) : playoutEyebrow(state.variant, playedOut(playout, state))) + (endedCircling(state) ? ' · ' + circlingEnded() : '') : `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves${gave ? ' · ' + gave.who : endedCircling(state) ? ' · ' + circlingEnded() : ''}`; // a called game says why it ended
+  $('#goEyebrow').textContent = out ? (isRetry(playout) ? retryEyebrow(state.variant, playout.n, playedOut(playout, state)) : isTakeover(playout) ? takeoverEyebrow(state.variant, playout.n, playedOut(playout, state)) : playoutEyebrow(state.variant, playedOut(playout, state))) + (endedCircling(state) ? ' · ' + circlingEnded() : '') : `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves${gave ? ' · ' + gave.who : endedCircling(state) ? ' · ' + circlingEnded() : ''}`; // a called game says why it ended
   $('#goTitle').textContent = gave ? gave.title : local ? localTitle(state) : draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
   $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = oppLabel();
   $('#rematch').textContent = online ? (friend && friend.wantsRematch ? `Play again — ${friend.name} is ready` : 'Play again') : 'Play again'; $('#rematch').disabled = false;
@@ -2203,7 +2203,7 @@ $('#replayBtn').addEventListener('click', async () => {
 });
 function refreshStaticFrom(s) { s.pits.forEach((n, i) => setBadge(i, n)); const n = local ? nearCard() : you; $('#myScore').textContent = s.stores[n]; $('#oppScore').textContent = s.stores[1 - n]; }
 $('#shareBtn').addEventListener('click', async () => {
-  const a = state.stores[you], b = state.stores[them]; let text = tLines(local ? localShare(state) : playingOut() ? (isRetry(playout) ? retryShare(state, you, names[level], playout) : playoutShare(state, you, names[level])) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`);
+  const a = state.stores[you], b = state.stores[them]; let text = tLines(local ? localShare(state) : playingOut() ? (isRetry(playout) ? retryShare(state, you, names[level], playout) : isTakeover(playout) ? takeoverShare(state, you, names[level], playout) : playoutShare(state, you, names[level])) : `Ayo & Nchò — ${state.winner === 'draw' ? 'I drew with' : state.winner === you ? 'I beat' : 'I lost to'} ${online ? oppLabel() : names[level]} ${a}–${b} in ${state.moves.length} moves.`);
   const seats = []; if (local) { seats[0] = LNAMES[0]; seats[1] = LNAMES[1]; } else { seats[you] = myName(); seats[them] = online ? oppLabel() : names[level]; }
   const watchQ = !playingOut() && !puzzle.on && linkable() ? watchQuery({ variant: state.variant, rules: state.rules, first: firstMover(state.moves, state.first || 0), moves: state.moves }, seats) : null; // watch the whole game (web/watch.js): the moves ride in the link
   if (watchQ) text += '\n' + tLines(watchLink()) + ' ' + publicBase() + watchQ;
@@ -2609,12 +2609,17 @@ async function watchGame(w) {
   const paintNames = () => { $('#meName').textContent = w.names[0]; $('#goMe span').textContent = w.names[0]; $('#oppName').textContent = w.names[1]; $('#oppFace').innerHTML = initialFace(w.names[1]); };
   let s = w.states[0]; layoutFromState(s); refreshStaticFrom(s); paintNames(); paintWatch(); toast(watch.text, 2600); buzz(10);
   await wait(1400);
+  let k = 0; // moves played back so far
   for (let i = 0; i < w.moves.length && !watch.stop; i++) {
     const m = w.moves[i]; watch.i = i + 1; watch.text = watchMove(w, i);
+    paintWatchOn(w, i + 1); // a tap from now on plays on from the position this move leaves
     select(m, false); await wait(420); deselect();
-    const r = applyMove(s, m); await animate(r.events, s.stores, Math.round(PACE * 0.85)); s = r.state; refreshStaticFrom(s); paintNames();
+    const r = applyMove(s, m); await animate(r.events, s.stores, Math.round(PACE * 0.85)); s = r.state; k = i + 1; refreshStaticFrom(s); paintNames();
     await wait(260);
   }
+  watchOnBtn.hidden = true; watchOnBtn.classList.remove('live');
+  const t = watch.take ? takeoverOf(w, k) : null; watch.take = false;
+  if (t) return takeOver(t);
   if (!watch.stop) {
     watch.done = true; watch.text = watchEnd(w); paintWatch(); toast(watch.text, 3200);
     click(1.5, 0.12); setTimeout(() => click(2, 0.12), 120); buzz([15, 40, 15]);
@@ -2622,6 +2627,34 @@ async function watchGame(w) {
   }
   watch.on = false; watch.done = false; busy = false; hurry.on = false;
   layoutFromState(state); refreshStatic(); deselect(); showScreen('home');
+}
+// Play on from here (idea 7 Nov; web/watch.js takeoverOf): while a shared game plays back, the chip under the board offers to
+// stop and play on from the position on the board, as the side to move, against the opponent chosen on Home. A tap mid-turn
+// hurries the rest of that turn and stops after it. When it is the far side's move the game is mirrored to the near seat
+// and the board turns half round to face the watcher, as a real board is turned to the person taking over. Practice, like a
+// play-out: not saved, no record, rating or who-starts; undo goes back as far as the take-over and no further.
+const watchOnBtn = $('#watchOn');
+function paintWatchOn(w, k) {
+  const ok = canTakeOver({ watching: watch.on, done: watch.done, k, state: w.states[k] }); watch.k = ok ? k : 0;
+  if (!ok) { watchOnBtn.hidden = true; return; }
+  const side = w.names[w.states[k].turn];
+  $('#watchOnWords').textContent = takeoverChip(side, names[level]); watchOnBtn.setAttribute('aria-label', takeoverLabel(side, names[level]));
+  $('#watchOnFace').innerHTML = faceFor(level, 'calm'); watchOnBtn.hidden = false;
+}
+watchOnBtn.addEventListener('click', () => {
+  if (!watch.on || watch.done || watch.take || !watch.k) return;
+  watch.take = true; watch.stop = true; watchOnBtn.classList.add('live'); click(1.3, 0.08); buzz(10); hurryNow(); // the turn in hand finishes quickly, then it stops
+});
+async function takeOver(t) {
+  watch.on = false; watch.done = false; hurry.on = false; watch.taken = { n: t.n, side: t.side, flip: t.flip };
+  stopReview(); hideExplain(); hideTake(); takeSaid = false; local = false; seat(0); hintedAt = -1; mood = 'calm';
+  playout = t.po; state = t.state; stats = { biggest: 0, captures: 0, started: Date.now() };
+  sim.finish(); layoutFromState(state); refreshStatic(); deselect(); paintRules();
+  if (t.flip) { // the mirrored seeds seen from the far end look exactly as they lay; then the board turns round to face you
+    theta += Math.PI; const from = theta, to = baseTheta + Math.round((theta - baseTheta) / (2 * Math.PI)) * 2 * Math.PI;
+    click(1.1, 0.04); await tween(reduceMotion ? 1 : 700, (x) => { theta = from + (to - from) * x; }, easeInOut);
+  }
+  busy = false; refreshStatic(); deselect(); toast(takeoverToast(t.n, t.side)); buzz([15, 30, 15]); kickAi();
 }
 
 // ---------- start ----------
