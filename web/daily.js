@@ -3,7 +3,7 @@
 //   { days: { "2026-10-29:ncho": { got, target, tries, solved } }, solved: ["2026-10-29", ...] }
 //   days   — every day you tried, by date and game, with your best capture and how many goes it took
 //   solved — every date solved (whichever game), oldest first, for the run on the result card
-import { todayKey } from '../engine/puzzle.js';
+import { todayKey, levelWord } from '../engine/puzzle.js';
 
 export function parse(raw) {
   try {
@@ -61,6 +61,12 @@ export function resultLabel(got, target) {
 
 // The run, in plain words: "5 in a row", "1 day", "none yet".
 export function runLine(n) { return n === 0 ? 'none yet' : n === 1 ? '1 day' : `${n} in a row`; }
+
+// The puzzle's top line: "Daily puzzle · Mon 9 Nov · gentle" — from 9 Nov 2026 the week gets harder (engine/puzzle.js) and
+// the line says how hard today's is; days before say only the day.
+export function dayLine(p) { return `Daily puzzle · ${dayLabel(p.key)}${p.weekly ? ' · ' + levelWord(p.level) : ''}`; }
+// The four seeds beside it: how many are lit (0 before the weekly puzzles) and what a screen reader hears.
+export function levelSeeds(p) { return p.weekly ? { lit: p.level, of: 4, label: `${levelWord(p.level)} · ${p.level} of 4` } : { lit: 0, of: 4, label: '' }; }
 
 // "Thu 29 Oct" for a key.
 export function dayLabel(key) { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }); }

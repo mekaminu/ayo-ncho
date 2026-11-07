@@ -168,6 +168,13 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 #puzzle.open::before{opacity:.6}
 .puzzleTop{position:absolute;left:max(20px,env(safe-area-inset-left,0px));right:max(20px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 54px);display:flex;flex-direction:column;gap:6px}
 .puzzleHead{display:flex;justify-content:space-between;align-items:center}
+.eyeRow{display:flex;align-items:center;gap:7px;min-width:0;flex-wrap:wrap}
+.pzLevel{display:inline-flex;gap:3px;align-items:center}.pzLevel[hidden]{display:none}
+.pzLevel i{width:7px;height:5px;border-radius:50%;background:rgba(230,183,111,.18);box-shadow:inset 0 0 0 1px rgba(230,183,111,.35)}
+.pzLevel i.on{background:radial-gradient(circle at 35% 30%,#f3d9a4,var(--brass) 55%,#8a6332);box-shadow:0 0 4px rgba(230,183,111,.45)}
+.pzLevel em{font-style:normal;font-size:calc(11px*var(--ts));letter-spacing:.06em;color:var(--brass);margin-left:4px}
+.pzLevel.land i.on{animation:seedIn .32s cubic-bezier(.3,1.6,.5,1) backwards}
+@keyframes seedIn{from{opacity:0;transform:translateY(-6px) scale(.4)}to{opacity:1;transform:none}}
 .puzzleTop h2{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:700;line-height:1.05;margin:0}
 .puzzleTop .sub{font-size:calc(13px*var(--ts))}
 .puzzleBottom{position:absolute;left:max(20px,env(safe-area-inset-left,0px));right:max(20px,env(safe-area-inset-right,0px));bottom:calc(env(safe-area-inset-bottom,0px) + 34px);display:flex;flex-direction:column;gap:12px;align-items:stretch}
@@ -596,7 +603,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
     <span class="homeChips"><button class="chip" id="homeStore" aria-label="Store" title="Store · boards, seed sets and Gold"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 8h14l-1.2 11a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/></svg></button><button class="chip" id="homeSettings" aria-label="Settings"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button></span>
   </div>
   <div class="homeBottom">
-    <button class="dailyCard" id="puzzleCard" type="button"><span class="col"><span class="eyebrow brass" id="puzzleDay">Daily puzzle</span><b id="puzzleAsk">Capture 8 in one turn</b></span><span class="dailyRight"><span id="puzzleState">not yet played</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></button>
+    <button class="dailyCard" id="puzzleCard" type="button"><span class="col"><span class="eyebrow brass" id="puzzleDay">Daily puzzle</span><b id="puzzleAsk">Capture 8 in one turn</b><span class="pzLevel" id="puzzleLevel" role="img" hidden></span></span><span class="dailyRight"><span id="puzzleState">not yet played</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></span></button>
     <div class="gamePick" role="group" aria-label="Which game">
       <button class="segbtn" data-game="ncho" aria-pressed="true">Nchò<small>capture on 4</small></button>
       <button class="segbtn" data-game="ayo" aria-pressed="false">Ayo<small>capture on 2 or 3</small></button>
@@ -651,7 +658,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 <!-- Daily puzzle, as approved: today's position on the live board, one move to capture the target; the result card once it is played -->
 <section id="puzzle" hidden aria-label="Daily puzzle">
   <div class="puzzleTop">
-    <div class="puzzleHead"><span class="eyebrow" id="pzDay">Daily puzzle · Thu 29 Oct</span><span class="sub" id="pzRules">Nchò rules</span></div>
+    <div class="puzzleHead"><span class="eyeRow"><span class="eyebrow" id="pzDay">Daily puzzle · Thu 29 Oct</span><span class="pzLevel" id="pzLevel" role="img" hidden></span></span><span class="sub" id="pzRules">Nchò rules</span></div>
     <h2 id="pzAsk">Capture 8 in one turn</h2>
     <span class="sub" id="pzHow">One move. Your pits are on the right. Relay sowing counts.</span>
   </div>

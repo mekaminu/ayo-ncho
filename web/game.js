@@ -10,8 +10,8 @@ import { decideSaver, saverPlan, drawDue, toastFor, noteFor, watchBattery } from
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES, dayKey } from './streak.js';
 import { greetMoment } from './greet.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
-import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
-import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
+import { dailyPuzzle, attempt, shareText, todayKey, levelWord } from '../engine/puzzle.js';
+import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, dayLine, levelSeeds, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { qrMatrix, qrBands, scanWords, QUIET } from './qr.js';
 import { makeBackNav, webStep, ROOM_WORDS } from './backnav.js';
@@ -1577,16 +1577,25 @@ let daily = parseDaily(prefs.get('daily', null));
 const puzzle = { on: false, p: null, played: false, got: 0, mine: false };
 function todaysPuzzle() { const v = settings.game; if (!puzzle.p || puzzle.p.key !== todayKey() || puzzle.p.variant !== v) puzzle.p = dailyPuzzle(todayKey(), v); return puzzle.p; }
 let puzzleCardKey = null; // the day the Home card was painted for: at midnight it paints itself afresh (web/nextday.js)
+// How hard today's puzzle is (the week gets harder, Mon gentle … Sun hard): four little seeds beside the day, as many lit as
+// the level, landing one after another with a soft tick each when `land` (the puzzle opening); quiet on Home.
+// On Home the word sits beside the seeds under the ask (the card's top line stays one line on the Fold folded).
+function paintLevel(el, p, land = false, word = false) {
+  const L = levelSeeds(p); el.hidden = !L.lit; el.setAttribute('aria-label', L.label); el.dataset.level = String(L.lit);
+  el.replaceChildren(...Array.from({ length: L.of }, (_, i) => { const s = document.createElement('i'); if (i < L.lit) s.className = 'on'; if (land && !reduceMotion) s.style.animationDelay = `${120 + i * 110}ms`; return s; }));
+  if (word && L.lit) { const w = document.createElement('em'); w.textContent = levelWord(p.level); el.append(w); }
+  el.classList.remove('land'); if (land && L.lit && !reduceMotion) { void el.offsetWidth; el.classList.add('land'); for (let i = 0; i < L.lit; i++) setTimeout(() => click(1.7 + i * 0.15, 0.04), 120 + i * 110); }
+}
 function paintPuzzleCard() { // the Home card: today's ask and where you stand
   const p = todaysPuzzle(); const e = dailyEntry(daily, p.key, p.variant); puzzleCardKey = p.key;
-  $('#puzzleDay').textContent = `Daily puzzle · ${dayLabel(p.key)}`; $('#puzzleAsk').textContent = `Capture ${p.target} in one turn`;
+  $('#puzzleDay').textContent = `Daily puzzle · ${dayLabel(p.key)}`; paintLevel($('#puzzleLevel'), p, false, true); $('#puzzleAsk').textContent = `Capture ${p.target} in one turn`;
   $('#puzzleState').textContent = cardLine(e); $('#puzzleCard').classList.toggle('solved', !!(e && e.solved));
 }
 function openPuzzle() { // Home → the card: the board shows today's position, your pits nearest you, and waits for one move
   if (online) return; // your game is already saved move by move; Back to home brings it back
   const p = todaysPuzzle(); puzzle.on = true; puzzle.played = false; puzzle.got = 0; seat(0);
   state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); hintedAt = -1;
-  $('#pzDay').textContent = `Daily puzzle · ${dayLabel(p.key)}`; $('#pzRules').textContent = `${p.variant === 'ncho' ? 'Nchò' : 'Ayo'} rules`; $('#pzAsk').textContent = `Capture ${p.target} in one turn`;
+  $('#pzDay').textContent = dayLine(p); paintLevel($('#pzLevel'), p, true); $('#pzRules').textContent = `${p.variant === 'ncho' ? 'Nchò' : 'Ayo'} rules`; $('#pzAsk').textContent = `Capture ${p.target} in one turn`;
   $('#pzHow').textContent = p.variant === 'ncho' ? 'One move. Your pits are on the right. Relay sowing counts.' : 'One move. Your pits are on the right. 2s and 3s behind your last seed count too.';
   $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); showScreen('puzzle');
 }
