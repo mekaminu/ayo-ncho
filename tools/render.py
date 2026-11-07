@@ -235,6 +235,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
 out = sys.argv[1]; talkc = "--talk" in sys.argv; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; tablec = "--table" in sys.argv; leftyc = "--lefty" in sys.argv; warmc = "--warm" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; ratedc = "--rated" in sys.argv; fullc = "--fullscreen" in sys.argv; record = record or story or bestsc
+keyhelpc = "--keyhelp" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -642,6 +643,42 @@ if tsc:  # bigger words (idea 6 Nov): Settings → Language → Word size; at La
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     print("textsize ok"); sys.exit(0)
+if keyhelpc:  # the keys, on How to play (idea 7 Nov): on the Mac ? opens the card at its list of keys, a key's line glints as it works; never on a phone
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        seed = "if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); }"
+        ctx = b.new_context(viewport={"width": 1280, "height": 800}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "mac: ")
+        pg.add_init_script(seed)
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); pg.wait_for_timeout(600)
+        pg.keyboard.press("?"); pg.wait_for_function("window.__ayo.keyHelp.open", timeout=5000); pg.wait_for_timeout(900)
+        k = pg.evaluate("window.__ayo.keyHelp"); print("keyhelp: rows", k["rows"])
+        assert k["box"] and k["rows"][0] == "pit" and k["rows"][-1] == "help" and "hint" in k["rows"] and "full" in k["rows"], k
+        assert "Press ? on the board" in k["text"], k["text"]
+        assert pg.evaluate("(() => { const r = document.querySelector('#rulesKeys').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight + 1; })()"), "the list is in view"
+        pg.wait_for_timeout(1500)  # the marks of nothing picked yet; then 3, and the board stops drawing so the glint is caught while it is on
+        hit = pg.evaluate("(() => { dispatchEvent(new KeyboardEvent('keydown', { key: '3', bubbles: true })); return window.__ayo.keyHelp.hit; })()")
+        assert hit == ["pit"], hit
+        pg.wait_for_timeout(900); assert pg.evaluate("window.__ayo.selected") == 2, "the key still picks the pit under the card"
+        pg.evaluate("window.__freeze=true; const r = document.querySelector('#keyRows [data-id=pit]'); r.classList.add('hit'); clearTimeout(r._t)"); pg.wait_for_timeout(200)
+        pg.screenshot(path=out, animations="disabled"); pg.evaluate("window.__freeze=false; document.querySelector('#keyRows [data-id=pit]').classList.remove('hit'); document.dispatchEvent(new Event('visibilitychange'))")
+        pg.keyboard.press("ArrowLeft"); pg.wait_for_timeout(120); assert pg.evaluate("window.__ayo.keyHelp.last") == "turn"
+        pg.keyboard.press("Escape"); pg.wait_for_timeout(200)
+        k = pg.evaluate("window.__ayo.keyHelp"); assert not k["open"] and k["last"] == "deselect", ("Esc closes the card first", k)
+        pg.keyboard.press("?"); pg.wait_for_function("window.__ayo.keyHelp.open", timeout=5000); pg.keyboard.press("?"); pg.wait_for_timeout(200)
+        assert not pg.evaluate("window.__ayo.keyHelp.open"), "? again closes it"
+        pg.evaluate("localStorage.setItem('ayo.lang','fr')"); pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); pg.wait_for_timeout(500)
+        pg.keyboard.press("?"); pg.wait_for_function("window.__ayo.keyHelp.open", timeout=5000); pg.wait_for_timeout(700)
+        fr = pg.evaluate("window.__ayo.keyHelp.text"); assert "Touches" in fr and "tourner le plateau" in fr, fr
+        print("keyhelp: French", fr.replace("\n", " / ")[:120])
+        ctx.close()
+        ph = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1, has_touch=True, is_mobile=True).new_page(); watch(ph, errors, "phone: ")
+        ph.add_init_script(seed)
+        ph.goto("http://127.0.0.1:8766/web/index.html?capture=1", wait_until="load"); ph.wait_for_function("window.__done===true", timeout=180000); ph.wait_for_timeout(400)
+        ph.evaluate("window.__ayo.openRules()"); ph.wait_for_timeout(300)
+        k = ph.evaluate("window.__ayo.keyHelp"); assert k["open"] and not k["box"], ("no keys on a phone in the hand", k)
+        b.close()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    print("keyhelp ok · ? opens the list, a key glints its line and still works, Esc and ? close it, French, none on the phone · wrote", out); sys.exit(0)
 if fullc:  # full screen (idea 7 Nov): Settings → Feel → Full screen and F; kept, back after a reload on the first tap; Esc turns it off
     with sync_playwright() as p:
         b = p.chromium.launch(args=ARGS); errors = []

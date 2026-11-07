@@ -101,6 +101,17 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 .card h2{font-family:Fraunces,Georgia,serif;font-size:30px;margin:0;font-weight:700;line-height:1.05}
 .card p{margin:0;color:var(--muted);font-size:calc(14px*var(--ts));line-height:1.5}
 .card ul{margin:0;padding-left:18px;color:var(--fg);font-size:calc(14px*var(--ts));line-height:1.55;display:grid;gap:6px}
+/* the keys, on How to play (web/keyhelp.js): each key a small brass cap, the line glints when its key is pressed */
+#rulesKeys{display:grid;gap:8px;border-top:1px solid rgba(230,183,111,.2);padding-top:12px}#rulesKeys[hidden]{display:none}
+#rulesKeys h3{margin:0;font:600 calc(15px*var(--ts)) Fraunces,Georgia,serif;color:var(--brass,#e6b76f)}
+#keyRows{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;align-items:center;margin:0}
+#keyRows .kr{display:contents}#keyRows dt{display:flex;gap:4px;align-items:center;white-space:nowrap;margin:0}#keyRows dd{margin:0;color:var(--fg);font-size:calc(13.5px*var(--ts));line-height:1.4;border-radius:6px;padding:1px 4px;transition:background .5s,color .5s}
+#keyRows kbd{font:600 calc(12px*var(--ts))/1 Inter,system-ui,sans-serif;min-width:12px;text-align:center;padding:4px 6px 3px;border:1px solid rgba(230,183,111,.45);border-bottom-width:2px;border-radius:6px;background:rgba(230,183,111,.08);color:var(--fg);transition:transform .12s,background .3s,border-color .3s}
+#keyRows .dash{color:var(--muted);font-size:calc(12px*var(--ts))}
+#keyRows .kr.in dt,#keyRows .kr.in dd{animation:keyIn .36s ease-out both;animation-delay:calc(var(--i)*32ms)}
+@keyframes keyIn{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:none}}
+#keyRows .kr.hit kbd{background:rgba(230,183,111,.38);border-color:#e6b76f;transform:translateY(1px)}#keyRows .kr.hit dd{background:rgba(230,183,111,.16);color:#f6dfb2;transition:none}
+@media (prefers-reduced-motion:reduce){#keyRows .kr.in dt,#keyRows .kr.in dd{animation:none}#keyRows kbd{transition:none}#keyRows .kr.hit kbd{transform:none}}
 .eyebrow{font-size:calc(11px*var(--ts));letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .btn{background:var(--brass);color:#1a0f07;border:0;border-radius:999px;padding:13px 18px;font:600 calc(15px*var(--ts)) Inter,system-ui,sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
 .btn.ghost{background:none;color:var(--brass);border:1px solid rgba(230,183,111,.5)}
@@ -900,6 +911,7 @@ html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
     <li>If the other side is empty, you must give them seeds when you can.</li>
     <li>First to 25 seeds wins.</li>
   </ul>
+  <section id="rulesKeys" hidden aria-labelledby="keysTitle"><h3 id="keysTitle">Keys</h3><dl id="keyRows"></dl><p id="keysNote">Press ? on the board any time for this list.</p></section>
   <p>Board, seeds and sounds are made on your device: no downloads, no ads. Fonts: Fraunces and Inter (Open Font Licence).</p>
   <button class="btn ghost" id="rulesClose">Got it</button>
 </div>
