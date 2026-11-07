@@ -291,6 +291,17 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 #waBtn{padding:14px 18px}
 .btn.off{opacity:.45;pointer-events:none}
 .roomCard .two .btn{flex:1;flex-direction:row;padding:11px 10px;font-size:calc(13px*var(--ts));text-align:center}
+.roomCard .two .qrBtn{flex:0 0 auto;gap:6px;align-items:center;justify-content:center;padding:11px 12px}.roomCard .two .qrBtn[aria-expanded=true]{background:rgba(230,183,111,.16);border-color:var(--brass)}
+/* Scan to join (idea 7 Nov): the invite link as a QR code on a bone inlay, drawn in from the middle like ripples */
+.qrPanel{display:flex;flex-direction:column;align-items:center;gap:10px}
+.qrPanel[hidden]{display:none}
+.qrTile{width:min(208px,58vw);aspect-ratio:1;border-radius:12px;background:#f1e6cf;border:2px solid rgba(230,183,111,.75);box-shadow:inset 0 0 0 1px rgba(120,80,40,.25),0 8px 24px rgba(0,0,0,.45);animation:qrTile .38s cubic-bezier(.3,1.35,.5,1) backwards}
+.qrTile svg{display:block;width:100%;height:100%}
+.qrTile path{fill:#24160b;opacity:0;transform-origin:50% 50%;transform-box:view-box;animation:qrBand .32s ease-out forwards}
+.qrWords{font-size:calc(13px*var(--ts));color:var(--muted);text-align:center;line-height:1.4}
+@keyframes qrTile{from{transform:scale(.86) rotate(-2deg);opacity:0}}
+@keyframes qrBand{from{opacity:0;transform:scale(.94)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.qrTile,.qrTile path{animation:none;opacity:1}}
 .btn.plain{color:var(--fg);border-color:var(--line)}
 .btn:disabled{opacity:.45;cursor:default}
 .joinCard{background:var(--soft);border:1px solid var(--line);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;margin:0}
@@ -621,7 +632,11 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
       <div class="code empty" id="roomCode" role="status" aria-label="Room code"><span>·</span><span>·</span><span>·</span><span>·</span></div>
       <p class="roomNote">Tell them the code, or send the link. The seat is theirs for 10 minutes.</p>
       <a class="btn off" id="waBtn" target="_blank" rel="noopener"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm0 18.2a8.2 8.2 0 0 1-4.2-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8s-.4-.1-.6.1-.6.8-.8 1-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.3-.4.7-1.3.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5a1 1 0 0 0-.7.3 3 3 0 0 0-.9 2.2 5.2 5.2 0 0 0 1.1 2.8 12 12 0 0 0 4.6 4c1.7.7 2.3.8 3.2.6a2.7 2.7 0 0 0 1.8-1.3 2.2 2.2 0 0 0 .2-1.3c-.1-.1-.3-.2-.5-.3z"/></svg>Invite on WhatsApp</a>
-      <div class="two"><button class="btn ghost" id="copyBtn" type="button" disabled>Copy link</button><button class="btn ghost plain" id="shareLinkBtn" type="button" disabled>Share…</button></div>
+      <div class="two"><button class="btn ghost" id="copyBtn" type="button" disabled>Copy link</button><button class="btn ghost plain" id="shareLinkBtn" type="button" disabled>Share…</button><button class="btn ghost plain qrBtn" id="qrBtn" type="button" disabled aria-expanded="false" aria-controls="qrPanel"><svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1 1h6v6H1zm1.5 1.5v3h3v-3zM9 1h6v6H9zm1.5 1.5v3h3v-3zM1 9h6v6H1zm1.5 1.5v3h3v-3zM9 9h2v2H9zm2 2h2v2h-2zm2-2h2v2h-2zm-4 4h2v2H9zm4 0h2v2h-2z"/></svg><span id="qrBtnWords">Scan</span></button></div>
+      <div class="qrPanel" id="qrPanel" hidden>
+        <div class="qrTile"><svg id="qrSvg" viewBox="0 0 37 37" shape-rendering="crispEdges" role="img" aria-label="QR code of the invite link"></svg></div>
+        <span class="qrWords" id="qrWords">Point their phone's camera here to join the room</span>
+      </div>
     </div>
     <form class="joinCard" id="joinCard" autocomplete="off">
       <b>Got a code? Join their room</b>

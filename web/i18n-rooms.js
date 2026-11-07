@@ -19,6 +19,10 @@ export const FR_ROOMS = nb({
   'One minute…': 'Une minute…',
 
   // the Rooms screen, the name card, the door
+  'Scan': 'Scanner', // Scan to join (web/qr.js)
+  'Hide': 'Masquer',
+  "Point their phone's camera here to join the room": 'Avec l’appareil photo d’un téléphone, ce code ouvre la salle',
+  'QR code of the invite link': 'Code QR du lien d’invitation',
   'Your friends see this name at the board. Asked once, kept on this phone.': 'Vos amis voient ce nom au plateau. Demandé une fois, gardé sur ce téléphone.',
   'Your friend sees this name when they knock on your board.': 'Votre ami voit ce nom en frappant à votre plateau.',
   'tap to open a room': 'touchez pour ouvrir une salle',
@@ -214,6 +218,9 @@ export function roomPatterns({ who, item, need }) {
     [R(`${N} wants to play again`), (m) => `${who(m[1])} veut rejouer`],
     [R(`Let them in and they take the far seat\\. (\\d+) more (?:is|are) waiting behind them\\.`), (m) => `Faites entrer cette personne et elle prend la place d’en face. ${m[1] === '1' ? 'Une autre attend' : `${m[1]} autres attendent`} derrière.`],
     [R(`${N} is at the door`), (m) => `${who(m[1])} est à la porte`],
+    [R(`Point their phone's camera here to join room ([A-Z]{4})`), (m) => `Avec l’appareil photo d’un téléphone, ce code ouvre la salle ${m[1]}`], // Scan to join (web/qr.js)
+    [R(`Scan with a phone's camera to join room ([A-Z]{4})`), (m) => `Scannez avec l’appareil photo d’un téléphone pour rejoindre la salle ${m[1]}`],
+    [R(`QR code of the invite link to room ([A-Z]{4})`), (m) => `Code QR du lien d’invitation de la salle ${m[1]}`],
     [R(`Knocked — waiting for ${N} to let you in`), (m) => `Vous avez frappé — on attend que ${who(m[1])} vous fasse entrer`],
     [R(`(Room|room) ([A-Z]{4})`), (m) => `${m[1] === 'Room' ? 'Salle' : 'salle'} ${m[2]}`],
     [R(`${N} let you in`), (m) => `${who(m[1])} vous a fait entrer`],

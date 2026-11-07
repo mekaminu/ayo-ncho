@@ -16,7 +16,7 @@ const ONE_OF = {
   vs: [...LEVELS, 'local', 'friend'],
   result: ['win', 'loss', 'draw'],
   ended: ['played', 'gave_up', 'draw_agreed', 'circling'],
-  how: ['done', 'skipped', 'whatsapp', 'copy', 'share'],
+  how: ['done', 'skipped', 'whatsapp', 'copy', 'share', 'qr'],
   as: ['host', 'friend'],
   from: ['home', 'settings'],
   product: ['gold', 'board_benin_bronze', 'board_grandpa', 'seeds_cowries', 'seeds_palm_kernels', 'bundle_all'],

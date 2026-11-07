@@ -13,6 +13,7 @@ import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, canShow, markShown } from './daily.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
+import { qrMatrix, qrBands, scanWords, QUIET } from './qr.js';
 import { makeBackNav, webStep, ROOM_WORDS } from './backnav.js';
 import { startApp, backStep, haptic, wsUrl, publicBase, linkable, legalLink, inApp, plugin, platform } from './app.js';
 import { makeShop, makeTestStore } from './purchase.js';
@@ -627,7 +628,35 @@ function setRoomStatus(s, text) {
   const ready = (s === 'open' || s === 'door') && net && net.code;
   $('#waBtn').classList.toggle('off', !ready); $('#copyBtn').disabled = !ready; $('#shareLinkBtn').disabled = !ready;
   if (ready) $('#waBtn').href = whatsappLink(net.code, inviteLink(net.code, publicBase()), i18n.t); else $('#waBtn').removeAttribute('href');
+  $('#qrBtn').disabled = !ready;
+  if (!ready) closeQr(); else if (qrShown.open && qrShown.link !== inviteLink(net.code, publicBase())) openQr(false); else if (!qrShown.open && mouseLikely && !qrShown.closedByHand) openQr(false); // on the Mac it is out at once: the phone beside it scans
 }
+// Scan to join (idea 7 Nov): the invite link as a QR code on the room card; a friend beside you points their camera at it
+const qrShown = { open: false, link: null, code: null, version: 0, closedByHand: false, bands: 0 };
+function openQr(byHand) {
+  if (!net || !net.code) return;
+  const link = inviteLink(net.code, publicBase()); const q = qrMatrix(link); const n = q.size + 2 * QUIET; const bands = qrBands(q, 6);
+  const svg = $('#qrSvg'); svg.setAttribute('viewBox', `0 0 ${n} ${n}`); svg.setAttribute('aria-label', `QR code of the invite link to room ${net.code}`);
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  svg.innerHTML = bands.map((d, i) => `<path d="${d}" style="animation-delay:${still ? 0 : 140 + i * 70}ms"></path>`).join('');
+  const panel = $('#qrPanel'), was = qrShown.open; panel.hidden = false; const tile = panel.querySelector('.qrTile'); tile.style.animation = 'none'; void tile.offsetWidth; tile.style.animation = '';
+  $('#qrWords').textContent = scanWords(net.code, mouseLikely);
+  Object.assign(qrShown, { open: true, link, code: net.code, version: q.version, bands: bands.length });
+  $('#qrBtn').setAttribute('aria-expanded', 'true'); $('#qrBtnWords').textContent = 'Hide';
+  if (byHand) {
+    tele.track('invite_sent', { how: 'qr' }); buzz(12);
+    if (!still) for (let i = 0; i < bands.length; i++) setTimeout(() => { if (qrShown.open) click(1.5 + i * 0.08, 0.03); }, 140 + i * 70); // a soft tick as each ring lands
+    if (!was) setTimeout(() => { try { panel.scrollIntoView({ block: 'nearest', behavior: still ? 'auto' : 'smooth' }); } catch {} }, 60);
+  }
+}
+function closeQr(byHand) {
+  if (byHand) qrShown.closedByHand = true;
+  if (!qrShown.open && $('#qrPanel').hidden) return;
+  qrShown.open = false; $('#qrPanel').hidden = true; $('#qrSvg').innerHTML = ''; $('#qrBtn').setAttribute('aria-expanded', 'false'); $('#qrBtnWords').textContent = 'Scan';
+  if (byHand) click(1, 0.05);
+}
+$('#qrBtn').addEventListener('click', () => { if (qrShown.open) closeQr(true); else { qrShown.closedByHand = false; openQr(true); } });
+
 function paintRoomStatus() { // what the room card says, from the connection and the door
   if (!roomsShowing()) return;
   if (!net) return setRoomStatus(rooms.state === 'error' ? 'error' : 'idle');

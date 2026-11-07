@@ -1,5 +1,9 @@
 # Render the game with headless Chromium (software WebGL) and optionally play a move.
 # Usage: python3 tools/render.py out.png            -> still frame (mid-game position, pit 4 lit)
+#        add --qr to check Scan to join (idea 7 Nov): a phone (touch) opens With friends, the room opens, Scan shows the invite link as a
+#                  QR code (screenshot <out>); OpenCV reads the code off the screenshot and it must be the invite link; a second phone opens
+#                  what was read and knocks, and the host's door card says so; Hide puts it away; on the Mac (<out>-wide.png) the code is out
+#                  as soon as the room opens and reads back too; the French words
 #        add --sideways to check a phone held on its side (844x390, touch): the board lies across the screen, your row nearest you,
 #                  each pit where a tap lands on it, bigger than the upright board on the same screen (?sideways=0); a real move and the
 #                  reply played sideways (<out>); turned upright (390x844) and onto the Mac (1180x820) it stands up as before, and back
@@ -200,7 +204,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -209,7 +213,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8766), functools.partial(Quiet, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 node = None
-if online or legal or freshc or cdnc:  # the real server on its own port, so two pages can meet at one board
+if online or legal or freshc or cdnc or qrc:  # the real server on its own port, so two pages can meet at one board
     def start_node():  # with a fixed ROOM_SECRET, so a restart mid-game can be checked (the rooms come back from the boards' tickets)
         n = subprocess.Popen(["node", os.path.join(root, "server", "index.js")], env={**os.environ, "PORT": "8767", "ROOM_SECRET": "render-check-secret"}, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         for _ in range(100):
@@ -239,6 +243,55 @@ def open_call(pg):  # opens the camera button's menu; a busy container can paint
 def tap(pg, pit):  # tap a pit twice (select, then sow) where the board draws it on this page
     x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
     pg.mouse.click(x, y); pg.wait_for_timeout(300); pg.mouse.click(x, y)
+if qrc:  # Scan to join (idea 7 Nov): the QR code on the room card is read by a real QR reader (OpenCV) off the screenshot
+    import cv2, numpy as np, atexit; atexit.register(lambda: node.terminate())
+    def decode(png):
+        img = cv2.imdecode(np.frombuffer(png, np.uint8), cv2.IMREAD_COLOR); data, pts, _ = cv2.QRCodeDetector().detectAndDecode(img); return data
+    def rooms(pg, name):
+        pg.goto("http://127.0.0.1:8767/?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        pg.click("#friendsBtn"); pg.wait_for_selector("#nameCard:not([hidden])", timeout=10000); pg.fill("#nameField", name); pg.click("#nameGo")
+        pg.wait_for_function("window.__ayo.room && window.__ayo.room.code && document.querySelector('#roomStatus').dataset.state==='open'", timeout=20000)
+        return pg.evaluate("window.__ayo.room.code")
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        host = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True, is_mobile=True).new_page(); watch(host, errors, "host: ")
+        code = rooms(host, "Meka"); link = "http://127.0.0.1:8767/?room=" + code
+        assert host.evaluate("document.querySelector('#qrPanel').hidden"), "on a phone the code waits for Scan"
+        assert not host.evaluate("document.querySelector('#qrBtn').disabled") and host.evaluate("document.querySelector('#qrBtnWords').textContent") == "Scan"
+        host.click("#qrBtn"); host.wait_for_selector("#qrPanel:not([hidden])", timeout=5000); host.wait_for_timeout(1100)
+        assert host.evaluate("document.querySelector('#qrBtn').getAttribute('aria-expanded')") == "true" and host.evaluate("document.querySelector('#qrBtnWords').textContent") == "Hide"
+        words = host.evaluate("document.querySelector('#qrWords').textContent"); assert words == "Point their phone's camera here to join room " + code, words
+        assert host.evaluate("document.querySelectorAll('#qrSvg path').length") == 6, "drawn in six rings"
+        assert host.evaluate("getComputedStyle(document.querySelector('#qrSvg path:last-child')).opacity") == "1", "every ring has landed"
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); png = host.screenshot(path=out, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        got = decode(png); print("qr: the phone's screen reads", repr(got)); assert got == link, (got, link)
+        tile = decode(host.locator(".qrTile").screenshot(timeout=60000)); assert tile == link, tile
+        # a friend's phone opens what the camera read and knocks
+        friend = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1).new_page(); watch(friend, errors, "friend: ")
+        friend.add_init_script("localStorage.setItem('ayo.name', 'Tete')")
+        friend.goto(got.replace("?room=", "?capture=1&room="), wait_until="load"); friend.wait_for_function("window.__done===true", timeout=180000)
+        if friend.evaluate("!document.querySelector('#nameCard').hidden"): friend.fill("#nameField", "Tete"); friend.click("#nameGo")
+        host.wait_for_selector("#knockCard:not([hidden])", timeout=20000)
+        t = host.evaluate("document.querySelector('#knockTitle').textContent"); print("qr: the door says", t); assert t == "Tete wants to play", t
+        host.click("#knockNo"); host.wait_for_timeout(400)
+        host.click("#qrBtn"); host.wait_for_timeout(200)
+        assert host.evaluate("document.querySelector('#qrPanel').hidden") and host.evaluate("document.querySelector('#qrBtnWords').textContent") == "Scan", "Hide puts it away"
+        # French
+        host.evaluate("localStorage.setItem('ayo.lang', 'fr')"); host.close(); fr = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1, has_touch=True, is_mobile=True).new_page(); watch(fr, errors, "fr: ")
+        fr.add_init_script("localStorage.setItem('ayo.lang', 'fr'); localStorage.setItem('ayo.name', 'Meka')")
+        fr.goto("http://127.0.0.1:8767/?capture=1&stay=home", wait_until="load"); fr.wait_for_function("window.__done===true", timeout=180000)
+        fr.click("#friendsBtn"); fr.wait_for_function("document.querySelector('#roomStatus').dataset.state==='open'", timeout=20000); fr.click("#qrBtn"); fr.wait_for_timeout(500)
+        fw = fr.evaluate("document.querySelector('#qrWords').textContent + ' | ' + document.querySelector('#qrBtnWords').textContent"); print("qr: in French", fw)
+        assert fw.startswith("Avec l’appareil photo d’un téléphone, ce code ouvre la salle ") and fw.endswith("| Masquer"), fw
+        # the Mac: the code is out as soon as the room opens
+        mac = b.new_context(viewport={"width": 1180, "height": 820}, device_scale_factor=1).new_page(); watch(mac, errors, "mac: ")
+        mcode = rooms(mac, "Meka"); mac.wait_for_selector("#qrPanel:not([hidden])", timeout=5000); mac.wait_for_timeout(1100)
+        mw = mac.evaluate("document.querySelector('#qrWords').textContent"); assert mw == "Scan with a phone's camera to join room " + mcode, mw
+        out2 = out[:-4] + "-wide.png"; mac.evaluate("window.__freeze=true"); mac.wait_for_timeout(300); png2 = mac.screenshot(path=out2, timeout=120000, animations="disabled")
+        g2 = decode(png2); print("qr: the Mac's screen reads", repr(g2)); assert g2 == "http://127.0.0.1:8767/?room=" + mcode, g2
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out, out2); sys.exit(0)
 if glc:  # the board comes back (idea 6 Nov): WEBGL_lose_context takes the board away as a phone does, then gives it back; then never
     from PIL import Image; import io
     def lit(pg):  # how much of the middle of the screen is board rather than the page's dark wood colour
