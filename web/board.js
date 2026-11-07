@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { woodTextures, bronzeTextures, grandpaTextures, roomTexture, seedTexture, stoneTexture, cowrieTexture, kernelTexture, clothTexture } from './textures.js';
 import { bowl } from './slots.js'; // the bowl's curve lives with the seeds that lie in it
+import { WARM } from './clearmarks.js';
 export { bowl };
 
 // Board sizes (metres). Length runs along Z towards the player, width along X.
@@ -128,9 +129,19 @@ export function buildBoard(scene, finish = 'mahogany', q = {}) {
   const may = pitCenters.map(([x, z]) => { const m = new THREE.Mesh(mayG, new THREE.MeshBasicMaterial({ color: 0xf0c27a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; m.position.set(x, BT + 0.0022, z); m.visible = false; m.renderOrder = 2; group.add(m); return m; });
 
+  // clear marks (web/clearmarks.js): the marks' colours in place, and the capture ring's second ring inside it on or off
+  const tint = { pal: WARM, double: false };
+  function setMarks(pal = WARM, double = false) {
+    const paint = (list, hex) => list.forEach((m) => m.material.color.setHex(hex));
+    paint(marks.steps, pal.steps); paint(marks.dots, pal.dots); paint(marks.caps, pal.caps); paint(marks.gifts, pal.gifts);
+    paint(marks.slams, pal.slams); paint(marks.risk, pal.risk); paint(may, pal.may);
+    hover.material.color.setHex(pal.hover); ring.material.color.setHex(pal.ring);
+    marks.caps.forEach((m) => { m.userData.inner.visible = !!double; });
+    tint.pal = pal; tint.double = !!double;
+  }
   setFinish(finish);
   scene.add(group);
-  return { group, targets, ring, glow, hover, woodMat, marks, may, setFinish, get finish() { return look.finish; } };
+  return { group, targets, ring, glow, hover, woodMat, marks, may, setFinish, setMarks, get tint() { return { ...tint }; }, get finish() { return look.finish; } };
 }
 
 // Where the seeds will go (shown on the first tap, from the engine's own events): a faint brass ring just inside the rim of
@@ -155,13 +166,17 @@ function buildPathMarks(group) {
   // every seed they have (an Ayo grand slam): the capture that is not — an ash-grey ring at the capture ring's place with one
   // stroke across the pit, the way a sum is struck out; the bar is the ring's child, so it fades and scales with it
   const slamG = new THREE.RingGeometry(PIT_R * 0.98, PIT_R * 1.04, 72), barG = new THREE.PlaneGeometry(PIT_R * 2.0, PIT_R * 0.055);
+  // clear marks: a second, thinner ring inside the capture ring (the ring's child, so it lands, fades and scales with it), so a pit
+  // you take differs from the brass path ring by its shape as well as its colour; hidden unless Settings → Board → Clear marks
+  const innerG = new THREE.RingGeometry(PIT_R * 0.925, PIT_R * 0.955, 72);
   const steps = [], dots = [], caps = [], risk = [], gifts = [], slams = [];
   for (const [x, z] of pitCenters) {
     steps.push(mk(ringG, new THREE.MeshBasicMaterial({ color: 0xe6b76f, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0025, z));
     // the mark itself: a brass dot on the bowl's inner slope, at the edge nearest the board's centre line, where seeds seldom sit
     const dx = x - Math.sign(x) * PIT_R * 0.74, dz = z + PIT_R * 0.42;
     dots.push(mk(dotG, new THREE.MeshBasicMaterial({ color: 0xf2c57c, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), dx, surfaceY(dx, dz) + 0.0015, dz));
-    caps.push(mk(capG, new THREE.MeshBasicMaterial({ color: 0xff6e3a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z));
+    const cp = mk(capG, new THREE.MeshBasicMaterial({ color: 0xff6e3a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z);
+    const inner = new THREE.Mesh(innerG, cp.material); inner.renderOrder = 2; inner.visible = false; cp.add(inner); cp.userData.inner = inner; caps.push(cp);
     gifts.push(mk(giftG, new THREE.MeshBasicMaterial({ color: 0xf3e6c8, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.003, z));
     const sm = mk(slamG, new THREE.MeshBasicMaterial({ color: 0xc9bfae, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }), x, BT + 0.0032, z);
     const bar = new THREE.Mesh(barG, sm.material); bar.rotation.z = Math.PI / 4; bar.renderOrder = 2; sm.add(bar); sm.userData.bar = bar; slams.push(sm);
