@@ -247,6 +247,7 @@ carryc = "--carry" in sys.argv
 sbackc = "--settingsback" in sys.argv
 stepc = "--stepdown" in sys.argv
 ratec = "--askrate" in sys.argv
+lookc = "--look" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1202,6 +1203,47 @@ if sbackc:  # Back from Settings goes back where you were (fix 7 Nov): one touch
         assert pg.evaluate("window.__ayo.settingsBack()")["log"][-1] == "home" and not pg.evaluate("document.querySelector('#home').hidden"), "opened from Home: back to Home"
         print("settingsback: mid-game back to the board; a rule changed mid-game goes Home; opened from Home goes Home")
         ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
+if lookc:  # Look from above (idea 7 Nov): Settings → Board → Look → From above stands the camera nearly straight over the board
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        def spans(pg):  # the board's width at its far end against its near end: under 1 when tilted away, near 1 from above
+            P = [pg.evaluate("window.__ayo.pitAt(%d)" % i) for i in range(12)]
+            w = [((P[i][0] - P[11 - i][0]) ** 2 + (P[i][1] - P[11 - i][1]) ** 2) ** 0.5 for i in range(6)]; near, far = max(w), min(w)  # across the board, pit by pit along it
+            for i, (x, y) in enumerate(P): assert pg.evaluate("window.__ayo.hitTest(%f, %f)" % (x, y))[:1] == [i], "a tap on pit %d should land on it" % i
+            return P, far / near
+        W, H = 390, 844
+        ctx = b.new_context(viewport={"width": W, "height": H}, device_scale_factor=2, has_touch=True); pg = ctx.new_page(); watch(pg, errors, "look: ")
+        pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(800)
+        P0, r0 = spans(pg); L0 = pg.evaluate("window.__ayo.look"); assert L0["look"] == "table" and L0["phi"] > 0.6, L0
+        pit = pg.evaluate("window.__ayo.legal")[0]; tap(pg, pit)
+        pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy", timeout=240000); pg.wait_for_timeout(800)
+        pg.screenshot(path=out.replace(".png", "-table.png"))
+        pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000); pg.wait_for_timeout(300)
+        assert pg.evaluate("document.querySelector('#lookNow').textContent") == "as at a table, tilted away from you"
+        pg.click("[data-set=look] [data-v=above]"); pg.wait_for_timeout(150)
+        mid = pg.evaluate("window.__ayo.look")["phi"]; assert 0.16 < mid < L0["phi"], ("the board glides, it does not jump", mid)
+        assert pg.evaluate("localStorage.getItem('ayo.look')") == "above" and pg.evaluate("document.querySelector('[data-set=look] [data-v=above]').getAttribute('aria-pressed')") == "true"
+        pg.wait_for_timeout(900); L1 = pg.evaluate("window.__ayo.look"); assert abs(L1["phi"] - 0.16) < 1e-6 and L1["log"][-1]["look"] == "above", L1
+        pg.click("#settingsBack"); pg.wait_for_timeout(900)
+        P1, r1 = spans(pg); assert r1 > r0 + 0.08 and r1 > 0.85, ("from above, the far end is as wide as the near one", r0, r1)
+        print("look: far end / near end %.2f at the table, %.2f from above; every tap lands" % (r0, r1))
+        pit = pg.evaluate("window.__ayo.legal")[-1]; tap(pg, pit)
+        pg.wait_for_function("window.__ayo.state.moves.length >= 4 && !window.__ayo.busy", timeout=240000); pg.wait_for_timeout(1200)
+        pg.screenshot(path=out); print("look: played pit %d from above and the reply came" % pit)
+        pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); pg.wait_for_timeout(600)
+        assert pg.evaluate("window.__ayo.look")["look"] == "above", "kept after a reload"
+        ctx.close()
+        W, H = 832, 690
+        c2 = b.new_context(viewport={"width": W, "height": H}, device_scale_factor=2, has_touch=True); q = c2.new_page(); watch(q, errors, "look fold: ")
+        q.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.look', 'above')")
+        q.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); q.wait_for_function("window.__done===true", timeout=180000)
+        play_btn(q); q.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); q.wait_for_timeout(900)
+        _, r2 = spans(q); assert r2 > 0.85, r2; q.screenshot(path=out.replace(".png", "-fold.png")); print("look: the Fold open from above, far/near %.2f" % r2)
+        c2.close(); b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)
 if leftyc:  # Left hand (idea 7 Nov): the side layout mirrored for a left thumb

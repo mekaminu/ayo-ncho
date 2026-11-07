@@ -58,7 +58,7 @@ export function nudgeView(v, fit, kind, dir) {
   if (kind === 'turn') out.theta = v.theta + d * NUDGE.turn;
   else if (kind === 'tilt') out.phi = v.phi - d * NUDGE.tilt;
   else if (kind === 'zoom') out.dist = v.dist / Math.pow(NUDGE.zoom, d);
-  out.phi = Math.min(LIMITS.phiMax, Math.max(LIMITS.phiMin, out.phi));
+  out.phi = Math.min(LIMITS.phiMax, Math.max(Math.min(LIMITS.phiMin, fit.phi ?? LIMITS.phiMin), out.phi)); // the board's rest may lie lower (from above, web/look.js; the Fold half folded)
   out.dist = Math.min(fit.dist * LIMITS.far, Math.max(fit.dist * LIMITS.near, out.dist));
   return out;
 }
