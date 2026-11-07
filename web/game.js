@@ -1310,7 +1310,7 @@ const worker = new Worker('./ai-worker.js', { type: 'module' });
 const asks = new Map(); let askId = 0; // every question to the worker carries an id, so a hint, the opponent's move and Mama Ngozi's take never take each other's answer
 worker.onmessage = (e) => { const r = asks.get(e.data.id); if (r) { asks.delete(e.data.id); r(e.data.result); } };
 function ask(msg) { return new Promise((res) => { const id = ++askId; asks.set(id, res); worker.postMessage({ id, ...msg }); }); }
-function aiMove(s, lvl = level) { return ask({ state: s, level: lvl }); }
+function aiMove(s, lvl = level, play = false) { return ask({ state: s, level: lvl, play }); } // play: the opponent's own move in a game (Mama Ngozi may take any of her near-equal best, engine/ai.js playMove); a hint asks for her one best
 function aiRate(s, lvl = 'hard') { return ask({ state: s, level: lvl, rate: true }); }
 let hintedAt = -1, hinted = null; // hinted: the pit Hint picked for you, and on which move
 async function hint() {
@@ -2508,7 +2508,7 @@ const ponder = { mesh: null, plan: [], t0: 0, pick: -1, on: false, s: null, log:
 { const m = new THREE.Mesh(board.hover.geometry, board.hover.material.clone()); m.rotation.x = -Math.PI / 2; m.position.y = board.hover.position.y + 0.0004; m.material.opacity = 0; m.visible = false; board.group.add(m); ponder.mesh = m; }
 function ponderOff() { ponder.on = false; ponder.s = null; }
 async function theirPick(s) {
-  const think = aiMove(s);
+  const think = aiMove(s, level, true);
   if (!ponderOn({ computer: !online && !local, puzzle: puzzle.on && !playingOut(), lesson: lesson.on, replay: replaying, clip: clipping, reduced: reduceMotion, state: s })) return think;
   const plan = ponderPlan(s, level); const entry = { moves: s.moves.length, level, plan: plan.slice(), pick: null, seen: [] };
   ponder.log.push(entry); if (ponder.log.length > 20) ponder.log.shift();

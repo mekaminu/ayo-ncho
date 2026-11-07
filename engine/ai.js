@@ -5,7 +5,7 @@ export const LEVELS = {
   easy:   { depth: 1, noise: 3.0 },   // plays like a child: shallow, a bit random
   steady: { depth: 3, noise: 1.5 },   // Auntie Bisi: counts a move and its answer, not much further (between Easy and Medium)
   medium: { depth: 4, noise: 0.6 },
-  hard:   { depth: 9, noise: 0.0 },
+  hard:   { depth: 9, noise: 0.0, vary: 0.001 }, // no noise; `vary`: in a game, moves exactly as good as her best are all hers to play (playMove)
 };
 
 function evaluate(state, me) {
@@ -63,6 +63,30 @@ export function rateMoves(state, level = "hard") {
   return legalMoves(state)
     .map((m) => { const { state: next } = applyMove(state, m); return { pit: m, value: search(next, cfg.depth - 1, -Infinity, Infinity, me) }; })
     .sort((a, b) => b.value - a.value || a.pit - b.pit);
+}
+
+// The move the opponent plays in a game (the worker's answer to "your move"). The same as chooseMove, except at a level with
+// `vary` (Mama Ngozi): with no noise she would play the same move in the same position every time, so a game won against her
+// could be won again by copying it move for move, and two games that open alike stay alike. Here she picks at random among the
+// moves her own search scores exactly as high as her best (within `vary`, a thousandth of a seed: ties only, which she used to
+// break by taking the lowest pit). A move worse than that is never played, and a decided position (a forced win or loss in
+// sight) gets her best, as before. Measured (7 Nov) against her old self: even over both games (Nchò 16–28–52 of 96, Ayo 16–7–1
+// of 24), Nnamdi beaten as before (81–1–14 of 96 in Nchò, her old self 84–0–12), and against a player who repeats the same moves two games in three now go their own way.
+// Half a seed of leeway was tried and cost her real strength (3–13 against her old self in Nchò), so ties only.
+// chooseMove itself stays as it was: the hint, her take, the review and Master's model of her all ask for her one best move.
+export function playMove(state, level = "medium", rng = Math.random) {
+  const cfg = LEVELS[level];
+  if (!cfg || !cfg.vary) return chooseMove(state, level, rng);
+  const rated = rateMoves(state, level);
+  if (!rated.length) return null;
+  return pickNear(rated, cfg.vary, rng);
+}
+// From a rated list (best first), one of the moves within `tol` seeds of the best, each as likely; the best when it is decided.
+export function pickNear(rated, tol, rng = Math.random) {
+  const best = rated[0].value;
+  if (Math.abs(best) >= 1000) return rated[0].pit;
+  const near = rated.filter((r) => r.value >= best - tol - 1e-9);
+  return near[Math.min(near.length - 1, Math.floor(rng() * near.length))].pit;
 }
 
 // ── Master (L7): the fifth strength, above Mama Ngozi. Iterative deepening alpha-beta (negamax) with a transposition
