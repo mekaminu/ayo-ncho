@@ -1,6 +1,6 @@
 // Ayo & Nchò server: serves the web app and runs the online rooms (WebSockets at /ws, the same rules engine as the board).
 // Protocol (JSON, one object per message):
-//   client → {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"offerdraw"} | {t:"drawanswer", yes} | {t:"shout", id} | {t:"peek", pit} | {t:"call", kind, data} | {t:"ping"}
+//   client → {t:"watch", code, key, name} (family round the board: follow the game, no seat) | {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch"} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"offerdraw"} | {t:"drawanswer", yes} | {t:"shout", id} | {t:"peek", pit} | {t:"call", kind, data} | {t:"ping"}
 //   server → {t:"joined", code, token, seat, room} | {t:"knocked", code, id, host, hostOnline} | {t:"knock", id, name} | {t:"room", room} (presence, a knock, rematch, new game; resync:true when asked for)
 //            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n} (that seat gave up) | {t:"askback", seat, n} (that seat asks to take its move back) | {t:"takeback", seat, n} (yes: that move is gone, n moves remain) | {t:"backno", seat, n} | {t:"drawoffer", seat, n} (that seat offers a draw) | {t:"draw", seat, n} (yes: the game ended level) | {t:"drawno", seat, n} | {t:"shout", seat, id} | {t:"peek", seat, pit, n} (to the other seat only: the pit the seat to move has picked, -1 put back) | {t:"error", code, msg} | {t:"pong"}
 // The door: {t:"join"} does not seat anyone. It KNOCKS: the knocker gets {t:"knocked"} and waits; the host's board gets {t:"knock"} (and a
@@ -14,6 +14,11 @@
 // Restarts: every room snapshot carries rid and sig, and move / resign / takeback carry the new sig; a board keeps them with the
 // moves as its ticket (ticketOf in rooms.js) and sends it with a rejoin. A room the server has forgotten is rebuilt from it
 // (see rooms.js); the secret is ROOM_SECRET.
+// Family round the board: a seated player's snapshot carries `watch`, the key for a watch link (web/online.js watchLink). Whoever opens
+// that link sends {t:"watch", code, key, name} and gets {t:"watching", code, id, room} — room is rooms.watchView: the game and the names,
+// never a token, a seal, a tag or the door. From then on they hear every move, give-up, take-back, draw and shout the players do, and a
+// {t:"room"} (a watch view) whenever who is at the board or watching changes; nothing they send can touch the game. Both boards' rooms
+// list the watchers by name. Eight at most per game ({t:"error", code:"crowd"}); a wrong key is "notfound", like a room that is gone.
 // /privacy, /terms and /support are the pages the stores ask for (server/legal.js).
 // GET /version says which build of the game this server carries (a hash of web/ and engine/), and the page is served with the
 // same hash in its <meta name="ayo-build">, so a page left open can tell a newer game is out (web/fresh.js).
@@ -73,15 +78,39 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   const wss = new WebSocketServer({ server, path: "/ws", maxPayload: 16 * 1024 });
   const sockets = new Map(); // room code → Set of sockets at that board
   const knockers = new Map(); // knock id → the socket waiting at the door
+  const watchers = new Map(); // room code → Set of sockets following that game without a seat (family round the board)
+
+  // what the watchers hear: the game as it is played (never the door, a peek or a call); a room message becomes their own view of it
+  const WATCHED = new Set(["move", "resign", "askback", "backno", "takeback", "drawoffer", "drawno", "draw", "shout"]);
+  const toWatchers = (code, msg) => {
+    const set = watchers.get(code); if (!set || !set.size) return;
+    let out = msg;
+    if (msg.t === "room") { try { out = { t: "room", room: rooms.watchView(code), ...(msg.started ? { started: true } : {}) }; } catch { return; } }
+    else if (!WATCHED.has(msg.t)) return;
+    for (const s of set) send(s, out);
+  };
 
   const send = (ws, msg) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(msg)); };
-  const broadcast = (code, msg) => { for (const s of sockets.get(code) || []) send(s, msg); };
+  const broadcast = (code, msg) => { for (const s of sockets.get(code) || []) send(s, msg); toWatchers(code, msg); };
+  const watchSocket = (ws, w) => {
+    ws.watch = { code: w.code, id: w.id };
+    if (!watchers.has(w.code)) watchers.set(w.code, new Set());
+    watchers.get(w.code).add(ws);
+    send(ws, { t: "watching", code: w.code, id: w.id, room: w.room });
+    broadcast(w.code, { t: "room", room: rooms.snapshot(w.code) }); // both boards (and the other watchers) see who has come to watch
+  };
+  const leaveWatch = (ws) => {
+    const { code, id } = ws.watch; ws.watch = null;
+    const set = watchers.get(code); if (set) { set.delete(ws); if (!set.size) watchers.delete(code); }
+    if (rooms.unwatch(code, id)) { try { broadcast(code, { t: "room", room: rooms.snapshot(code) }); } catch {} }
+  };
   const seatSocket = (ws, { code, token, seat, room, upgraded }) => {
     ws.room = code; ws.token = token; ws.seat = seat; ws.knock = null;
     if (!sockets.has(code)) sockets.set(code, new Set());
     sockets.get(code).add(ws);
     send(ws, { t: "joined", code, token, seat, room });
     for (const s of sockets.get(code)) if (s !== ws) send(s, upgraded ? { t: "room", room, resync: true } : { t: "room", room }); // a newer ticket moved the game on: the other board catches up
+    toWatchers(code, { t: "room" }); // the watchers see a player arrive (or come back)
   };
   // someone at the door: they wait on their own socket; the host's board hears the knock and sees the door list
   const knockSocket = (ws, k) => {
@@ -115,9 +144,10 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
       try {
         switch (m.t) {
           case "ping": return send(ws, { t: "pong" });
-          case "create": if (ws.room) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name, tag: m.tag }));
-          case "join": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return knockSocket(ws, rooms.knock(m.code, { name: m.name, tag: m.tag }));
-          case "rejoin": if (ws.room) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token, m.ticket && typeof m.ticket === "object" ? m.ticket : null, m.tag));
+          case "watch": if (ws.room || ws.knock || ws.watch) throw new RoomError("seated", "already at a board"); return watchSocket(ws, rooms.watch(m.code, m.key, { name: m.name }));
+          case "create": if (ws.room || ws.watch) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name, tag: m.tag }));
+          case "join": if (ws.room || ws.watch) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return knockSocket(ws, rooms.knock(m.code, { name: m.name, tag: m.tag }));
+          case "rejoin": if (ws.room || ws.watch) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token, m.ticket && typeof m.ticket === "object" ? m.ticket : null, m.tag));
           case "let": return answerDoor(ws, m);
           case "move": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.move(ws.room, ws.token, m.pit); return broadcast(ws.room, moveMessage(r)); }
           case "resign": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.resign(ws.room, ws.token); return broadcast(ws.room, resignMessage(r)); }
@@ -125,7 +155,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
           case "offerdraw": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.offerDraw(ws.room, ws.token); return broadcast(ws.room, drawMessage(r)); }
           case "drawanswer": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.answerDraw(ws.room, ws.token, !!m.yes); return broadcast(ws.room, drawMessage(r)); }
           case "backanswer": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.answerBack(ws.room, ws.token, !!m.yes); return broadcast(ws.room, backMessage(r)); }
-          case "sync": { if (!ws.room) throw new RoomError("unseated", "join a room first"); return send(ws, { t: "room", room: rooms.snapshot(ws.room), resync: true }); }
+          case "sync": { if (ws.watch && !ws.room) return send(ws, { t: "room", room: rooms.watchView(ws.watch.code), resync: true }); if (!ws.room) throw new RoomError("unseated", "join a room first"); return send(ws, { t: "room", room: rooms.snapshot(ws.room), resync: true }); }
           case "call": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.call(ws.room, ws.token, String(m.kind || ""), m.data); for (const s of sockets.get(ws.room) || []) if (s.seat === r.to) send(s, { t: "call", seat: r.seat, kind: r.kind, data: r.data }); return; }
           case "peek": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.peek(ws.room, ws.token, m.pit); for (const s of sockets.get(ws.room) || []) if (s.seat === r.to) send(s, { t: "peek", seat: r.seat, pit: r.pit, n: r.n }); return; }
           case "shout": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.shout(ws.room, ws.token, m.id); return broadcast(ws.room, { t: "shout", ...r }); }
@@ -142,6 +172,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
         const { code, id } = ws.knock; ws.knock = null; knockers.delete(id);
         if (rooms.withdraw(code, id)) { try { broadcast(code, { t: "room", room: rooms.snapshot(code) }); } catch {} }
       }
+      if (ws.watch) leaveWatch(ws);
       if (!ws.room) return;
       const set = sockets.get(ws.room); if (set) { set.delete(ws); if (!set.size) sockets.delete(ws.room); }
       if (rooms.has(ws.room) && rooms.setOnline(ws.room, ws.token, false) !== null) {
@@ -155,6 +186,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
     for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; try { ws.ping(); } catch {} }
     for (const code of rooms.sweep()) {
       for (const s of sockets.get(code) || []) send(s, { t: "error", code: "swept", msg: "the room has closed" }); sockets.delete(code);
+      for (const s of watchers.get(code) || []) { s.watch = null; send(s, { t: "error", code: "swept", msg: "the room has closed", re: "watch" }); } watchers.delete(code);
       for (const [id, s] of knockers) if (s.knock && s.knock.code === code) { s.knock = null; knockers.delete(id); send(s, { t: "error", code: "swept", msg: "the room has closed", re: "join" }); }
     }
   }, sweepEvery);

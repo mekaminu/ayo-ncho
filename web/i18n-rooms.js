@@ -136,6 +136,12 @@ export const FR_ROOMS = nb({
   'You have asked once for this move': 'Vous avez déjà demandé une fois pour ce coup',
   'Too late — they played on': 'Trop tard — la partie a continué',
   'Your friend answers this one': 'C’est à votre ami de répondre',
+  // family round the board (web/online.js watchersLine, the watch link)
+  'Enough people are watching this game already — try again later': 'Assez de monde regarde déjà cette partie — réessayez plus tard',
+  'Could not reach the game — check your signal and open the link again': 'Impossible de joindre la partie — vérifiez le réseau et rouvrez le lien',
+  '{a} is watching': '{a} regarde',
+  '{a} and {b} are watching': '{a} et {b} regardent',
+  '{a}, {b} and {n} more are watching': '{a}, {b} et {n} autres regardent',
   'No connection right now — reconnecting': 'Pas de connexion pour l’instant — reconnexion',
   // a move kept for the line (web/heldmove.js)
   'No signal': 'Pas de réseau',

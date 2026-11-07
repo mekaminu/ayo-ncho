@@ -29,6 +29,8 @@ export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read
 export const CODE_LENGTH = 4;
 export const SEAT_HOLD_MS = 10 * 60 * 1000;      // an empty room waits ten minutes for the friend before it is swept
 export const IDLE_MS = 6 * 60 * 60 * 1000;      // a game nobody has touched for six hours is swept
+export const MAX_WATCHERS = 8;                   // family round the board: at most eight people following one game
+export const WATCH_KEY_LENGTH = 16;              // base64url characters of the watch key: 96 bits, made from the secret, the code and the room's id
 
 export function makeCode(random = Math.random, length = CODE_LENGTH) {
   let s = "";
@@ -66,6 +68,10 @@ export class Rooms {
 
   mac(text) { return createHmac("sha256", this.secret).update(text).digest("base64url"); }
   tokenFor(code, rid, seat) { return this.mac(`seat|${code}|${rid}|${seat}`).slice(0, 32); }
+  // Family round the board: the key in a watch link. Only the two seated players are given it (in their snapshot), so only someone
+  // they send the link to can follow the game; it is made from the secret, the code and the room's id, so it still works once a room
+  // has been rebuilt after a restart, and a new room with the same code (a new rid) never answers an old link.
+  watchKey(code, rid) { return this.mac(`watch|${code}|${rid}`).slice(0, WATCH_KEY_LENGTH); }
   seal(room) { return this.mac(sealText(this.sealFields(room))).slice(0, SIG_LENGTH); }
   sealFields(room) {
     const g = room.game;
@@ -83,6 +89,7 @@ export class Rooms {
       code, rid, variant, rules: { ...RULES[variant], ...rules },
       seats: [{ token: this.tokenFor(code, rid, 0), name: cleanName(name, "Host"), tag: cleanTag(tag), online: true, wantsRematch: false }, null],
       knocks: [], // people at the door, oldest first: {id, name, tag, at}
+      watchers: [], // family round the board, oldest first: {id, name, at} — they follow the game and never play
       game: newGame(variant, rules), games: 0,
       createdAt: t, touchedAt: t,
     };
@@ -137,6 +144,41 @@ export class Rooms {
     return { id: k.id, name: k.name };
   }
 
+  // Family round the board: someone a player sent the watch link to follows the game live, with no seat and no say. The key must be
+  // this room's (a wrong or old key looks exactly like a room that is gone); eight at most. Returns {code, id, name, room: watchView}.
+  watch(code, key, { name } = {}) {
+    const room = this.rooms.get(normaliseCode(code));
+    if (!room || !this.keyMatches(room, key)) fail("notfound", "no room with that code");
+    const list = room.watchers || (room.watchers = []);
+    if (list.length >= MAX_WATCHERS) fail("crowd", "enough people are watching this game already");
+    const w = { id: randomUUID(), name: cleanName(name, "Someone"), at: this.now() };
+    list.push(w);
+    return { code: room.code, id: w.id, name: w.name, room: this.watchView(room.code) };
+  }
+  // The watcher closed the page (or lost the line): they leave the list. True when someone left.
+  unwatch(code, id) {
+    const room = this.rooms.get(normaliseCode(code)); if (!room || !room.watchers) return false;
+    const i = room.watchers.findIndex((w) => w.id === id); if (i < 0) return false;
+    room.watchers.splice(i, 1); return true;
+  }
+  keyMatches(room, key) {
+    const want = Buffer.from(this.watchKey(room.code, room.rid)), got = Buffer.from(String(key || ""));
+    return want.length === got.length && timingSafeEqual(want, got);
+  }
+  // What a watcher may see: the game, the names and who is at the board, any question asked across it, and who else is watching.
+  // Never the tokens, the seal, the watch key, the phones' tags or who is at the door.
+  watchView(code) {
+    const room = this.get(code);
+    return {
+      code: room.code, variant: room.variant, rules: { ...room.rules }, games: room.games, watching: true,
+      players: room.seats.map((s, i) => s ? { seat: i, name: s.name, online: s.online, wantsRematch: s.wantsRematch } : null),
+      ask: room.ask ? { seat: room.ask.seat, n: room.ask.n } : null,
+      drawAsk: room.drawAsk ? { seat: room.drawAsk.seat, n: room.drawAsk.n } : null,
+      watchers: (room.watchers || []).map((w) => ({ id: w.id, name: w.name })),
+      state: publicState(room.game),
+    };
+  }
+
   // A phone that lost signal comes back with its token and gets its seat and the whole game.
   // With a ticket (what the board holds of the room, sealed by this server), a room the server has forgotten — a restart, a
   // deploy — is rebuilt first (restored: true). A room rebuilt from an older ticket, before anyone has played in it, takes a
@@ -186,7 +228,7 @@ export class Rooms {
     const room = {
       code, rid: f.rid, variant: f.variant, rules: { ...f.rules },
       seats: f.names.map((name, i) => (name === null ? null : { token: this.tokenFor(code, f.rid, i), name, online: false, wantsRematch: false })),
-      knocks: [], game, games: f.games, ask: null, drawAsk: null,
+      knocks: [], watchers: [], game, games: f.games, ask: null, drawAsk: null,
       createdAt: t, touchedAt: t, restored: true,
     };
     this.rooms.set(code, room);
@@ -365,6 +407,8 @@ export class Rooms {
       ask: room.ask ? { seat: room.ask.seat, n: room.ask.n } : null, // a "take it back?" waiting for its answer (a rejoin sees it)
       drawAsk: room.drawAsk ? { seat: room.drawAsk.seat, n: room.drawAsk.n } : null, // a draw offered and not yet answered
       state: publicState(room.game),
+      watchers: (room.watchers || []).map((w) => ({ id: w.id, name: w.name })), // family round the board: who is following the game
+      watch: this.watchKey(room.code, room.rid), // the key for the watch link (web/online.js watchLink); only the seated players get a snapshot
       rid: room.rid, sig: this.seal(room), // the board keeps these with the moves, so the room can be rebuilt after a restart (ticketOf in web/online.js)
     };
   }

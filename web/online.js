@@ -20,6 +20,8 @@
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
 //   net.on('ticket', ({ code, token, ticket }) => …) // the room as this board holds it, sealed by the server: keep it (with the token) so a reload can rebuild the room after a restart
+//   net.on('watching', ({ code, room }) => …) // family round the board: following the game from a watch link, no seat (room: the watch view; again after a reconnect)
+//   net.watch(code, key, name) — follow a game without a seat; every 'move', 'resign', 'takeback', 'draw', 'shout' … then arrives as for a seat
 //   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token, ticket?) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.resign() / net.askBack() / net.answerBack(yes) / net.offerDraw() / net.answerDraw(yes) / net.leave()
 
 import { applyMove, resign, takeBack, mayTakeBack, agreeDraw, firstMover } from '../engine/ayo.js';
@@ -83,6 +85,25 @@ export function inviteLink(code, base = typeof location !== 'undefined' ? locati
   return `${base}?room=${encodeURIComponent(String(code || '').toUpperCase())}`;
 }
 
+// Family round the board: the watch link a seated player sends, ?watch=CODE-KEY (the key comes in the seat's room snapshot, room.watch).
+export function watchLink(code, key, base = typeof location !== 'undefined' ? location.origin + location.pathname : '/') {
+  return `${base}?watch=${encodeURIComponent(String(code || '').toUpperCase())}-${encodeURIComponent(String(key || ''))}`;
+}
+// What a watch link's ?watch= says: {code, key}, or null for anything that is not one.
+export function parseWatch(v) {
+  const m = /^([A-Za-z]{4})-([A-Za-z0-9_-]{16})$/.exec(String(v || '').trim());
+  return m ? { code: m[1].toUpperCase(), key: m[2] } : null;
+}
+// The names of who is watching, as both boards say it: "Mum is watching", "Mum and Uche are watching", "Mum, Uche and 2 more are watching".
+export function watchersLine(room, t = (s) => s) {
+  const names = (room && Array.isArray(room.watchers) ? room.watchers : []).map((w) => w.name);
+  if (!names.length) return '';
+  if (names.length === 1) return t('{a} is watching').replace('{a}', names[0]);
+  if (names.length === 2) return t('{a} and {b} are watching').replace('{a}', names[0]).replace('{b}', names[1]);
+  return t('{a}, {b} and {n} more are watching').replace('{a}', names[0]).replace('{b}', names[1]).replace('{n}', String(names.length - 2));
+}
+export const WATCH_RETRIES = 30; // a watcher whose game the server has forgotten (a restart) keeps trying ~5 minutes, until a player comes back and rebuilds it
+
 // A code typed on the Rooms screen: letters only, upper case, four at most (the server says if nobody opened it).
 export function cleanCode(s) { return String(s || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4); }
 // The invite, in the host's own voice, for WhatsApp and the share sheet.
@@ -99,6 +120,7 @@ export const ERROR_TEXT = {
   host: 'Only the host decides who comes in', noknock: 'They have gone from the door',
   noback: 'Only the move you just played can be taken back', asked: 'Already asked — waiting for an answer', askedonce: 'You have asked once for this move',
   noask: 'Too late — they played on', ownask: 'Your friend answers this one',
+  crowd: 'Enough people are watching this game already — try again later',
 };
 
 export class Online {
@@ -107,6 +129,7 @@ export class Online {
     this.url = url; this.WS = WebSocketImpl; this.setTimeout = setTimeoutFn; this.clearTimeout = clearTimeoutFn;
     this.ws = null; this.status = 'closed'; this.seat = null; this.code = null; this.token = null; this.room = null;
     this.knock = null; // {code, id, host, hostOnline} while this board waits at the door
+    this.watching = null; // {code, key, name} while this board follows a game from a watch link (no seat); this.seat stays null
     this.held = null; // a ticket brought back from a reload (rejoin), until the server sends the room
     this.intent = null; // what to send once the socket opens: {t:'create'…} | {t:'join'…} | {t:'rejoin'…}
     this.attempts = 0; this.timer = null; this.left = false;
@@ -118,6 +141,7 @@ export class Online {
 
   // --- seats ---
   create({ variant = 'ncho', rules = {}, name } = {}) { this.ask({ t: 'create', variant, rules, name }); }
+  watch(code, key, name) { this.watching = { code: String(code || '').toUpperCase(), key: String(key || ''), name, seen: false }; this.ask({ t: 'watch', code: this.watching.code, key: this.watching.key, name }); }
   join(code, name) { this.ask({ t: 'join', code: String(code || '').toUpperCase(), name }); }
   rejoin(code, token, ticket = null) { this.held = ticket || null; this.ask({ t: 'rejoin', code: String(code || '').toUpperCase(), token }); }
   ask(intent) { this.intent = intent; if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(this.wire(intent))); else this.connect(); }
@@ -141,7 +165,7 @@ export class Online {
   shout(id) { return this.send({ t: 'shout', id }); }
   peek(pit) { return this.send({ t: 'peek', pit }); } // the pit picked on our move (-1 put back), to the friend's board only (web/peek.js)
   call(kind, data = {}) { return this.send({ t: 'call', kind, data }); } // video and voice at the board (web/call.js): to the friend's seat only
-  leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; this.knock = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
+  leave() { this.left = true; this.clearTimeout(this.timer); this.timer = null; this.intent = null; this.knock = null; this.watching = null; if (this.ws) { try { this.ws.close(); } catch {} } this.ws = null; this.setStatus('closed'); }
 
   send(msg) {
     if (!this.ws || this.ws.readyState !== 1) { this.emit('error', { code: 'offline', msg: 'No connection right now — reconnecting', re: msg.t }); return false; }
@@ -164,6 +188,12 @@ export class Online {
   scheduleReconnect() {
     if (this.left) return;
     // only a seat we already hold, or a door we were already knocking at, is worth coming back for; a create/join that never got through is reported once
+    if (this.watching && !this.token) { // a watcher comes back to the same game by itself, but only for a while
+      if (this.attempts >= WATCH_RETRIES) { this.watching = null; this.setStatus('closed'); this.emit('error', { code: 'offline', msg: 'Could not reach the game — check your signal and open the link again', re: 'watch' }); return; }
+      this.intent = { t: 'watch', code: this.watching.code, key: this.watching.key, name: this.watching.name };
+      const delay = BACKOFF_MS[Math.min(this.attempts, BACKOFF_MS.length - 1)]; this.attempts += 1;
+      this.setStatus('reconnecting'); this.timer = this.setTimeout(() => { this.timer = null; this.connect(); }, delay); return;
+    }
     if (!this.token && !this.knock) { this.setStatus('closed'); this.emit('error', { code: 'offline', msg: 'Could not reach the server — check your signal and try again', re: this.intent && this.intent.t }); return; }
     if (this.token) this.intent = { t: 'rejoin', code: this.code, token: this.token }; else this.knock = { ...this.knock, id: null }; // at the door: the same join knocks again when the line is back
     const delay = BACKOFF_MS[Math.min(this.attempts, BACKOFF_MS.length - 1)]; this.attempts += 1;
@@ -171,13 +201,16 @@ export class Online {
     this.timer = this.setTimeout(() => { this.timer = null; this.connect(); }, delay);
   }
   // the page came back to the front (or the phone found signal): try now rather than waiting out the backoff
-  wake() { if (this.status === 'reconnecting' && (this.token || this.knock)) { this.clearTimeout(this.timer); this.timer = null; this.connect(); } }
+  wake() { if (this.status === 'reconnecting' && (this.token || this.knock || this.watching)) { this.clearTimeout(this.timer); this.timer = null; this.connect(); } }
 
   handle(m) {
     switch (m.t) {
       case 'joined':
         this.seat = m.seat; this.code = m.code; this.token = m.token; this.room = m.room; this.knock = null; this.intent = { t: 'rejoin', code: m.code, token: m.token };
         this.emit('joined', { seat: m.seat, code: m.code, token: m.token, room: m.room }); return this.kept();
+      case 'watching':
+        this.code = m.code; this.room = m.room; this.seat = null; if (this.watching) this.watching.seen = true; this.watchMiss = 0;
+        return this.emit('watching', { code: m.code, id: m.id, room: m.room });
       case 'knocked':
         this.code = m.code; this.knock = { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline };
         return this.emit('knocked', { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline, ...(m.hostTag ? { hostTag: m.hostTag } : {}) });
@@ -219,6 +252,14 @@ export class Online {
       case 'peek': return this.emit('peek', { seat: m.seat, pit: m.pit, n: m.n });
       case 'call': return this.emit('call', { seat: m.seat, kind: m.kind, data: m.data || {} });
       case 'error':
+        if (m.re === 'watch' && this.watching) {
+          // the game is gone from a server that restarted: a watcher who was already following it waits for a player to bring it back
+          if (m.code === 'notfound' && this.watching.seen) {
+            this.watchMiss = (this.watchMiss || 0) + 1;
+            if (this.watchMiss < WATCH_RETRIES) { this.attempts = this.watchMiss; try { this.ws && this.ws.close(); } catch {} return; } // the close tries again, waiting longer each time
+          }
+          this.watching = null; this.intent = null;
+        }
         if (m.code === 'swept' || (m.code === 'notfound' && m.re === 'rejoin') || m.code === 'token') { this.token = null; this.intent = null; this.held = null; } // nothing left to come back to
         if (m.re === 'join' && m.code !== 'knocking') { this.knock = null; this.intent = null; } // turned away, or the door is gone: no knocking again by ourselves
         return this.emit('error', { code: m.code, msg: ERROR_TEXT[m.code] || m.msg || 'Something went wrong', re: m.re });
