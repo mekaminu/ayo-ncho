@@ -39,6 +39,9 @@
 #        add --straight (with --smoke) to check setting the board straight: the mouse drags the wood (the board turns and tilts) and the
 #                  first time a toast says "Double-click the wood, or press 0, …"; <out>-off.png is the board left askew; a double-click on the
 #                  wood glides it back to rest (<out>), picking no pit and playing nothing; dragged again, the 0 key does the same
+#        add --arrows (with --smoke, best with --wide) to check turning the board from the keys: ← ← ← turn it a quarter round, ↑ looks
+#                  from higher, + brings it nearer, held keys stop at the limits (a soft click, never past them), the tip is said once,
+#                  nothing is picked or played, and 0 sets it straight; <out> is the board turned by the keys
 #        add --hover (with --smoke, best with --wide) to check the mouse on the Mac: over a pit you can play the cursor is a hand, a faint
 #                  brass ring lands on its rim and the hint line says "pit 3 · 5 seeds — click to see where they go" (screenshot <out>);
 #                  over their pit it says "their pit 2 · …" with no ring; over the wood a grab hand; off the board everything goes back
@@ -197,7 +200,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -2476,6 +2479,30 @@ with sync_playwright() as p:
             assert V()["off"]; assert not pg.evaluate("[...document.querySelectorAll('.toast')].filter(t=>/Double-click the wood/.test(t.textContent)).length>1")
             pg.keyboard.press("0"); pg.wait_for_timeout(1300); assert not V()["off"], ("the 0 key set it straight", V())
             print("straight: the 0 key too · tip said once")
+        if arrowc:  # turn the board from the keys: arrows turn and tilt, + − zoom, held keys stop at the limits, 0 puts it back
+            import math
+            V = lambda: pg.evaluate("window.__ayo.view")
+            pg.wait_for_function("document.querySelector('#turn').textContent==='your move' && !window.__ayo.busy && !window.__ayo.hurry.playing", timeout=240000)
+            pg.mouse.move(2, 2); pg.evaluate("localStorage.removeItem('ayo.keysViewTip')")
+            moves = len(pg.evaluate("window.__ayo.state")["moves"]); v0 = V(); assert not v0["off"], v0
+            for _ in range(3): pg.keyboard.press("ArrowLeft"); pg.wait_for_timeout(60)
+            settle = lambda: pg.wait_for_function("window.__ayo.tweens===0", timeout=10000)
+            pg.wait_for_function("[...document.querySelectorAll('.toast')].some(t=>/Arrow keys turn and tilt the board/.test(t.textContent))", timeout=4000)
+            settle(); v = V(); assert abs(v["theta"] - (v0["theta"] + 3 * math.pi / 12)) < 1e-6, ("three presses turn it a quarter round", v0, v)
+            assert pg.evaluate("localStorage.getItem('ayo.keysViewTip')") == "1", "the tip is said once"
+            pg.keyboard.press("ArrowUp"); settle(); v1 = V(); assert abs(v1["phi"] - max(0.35, v["phi"] - 0.08)) < 1e-6, ("↑ looks from higher", v, v1)
+            pg.keyboard.press("+"); settle(); v2 = V(); assert v2["dist"] < v1["dist"] - 1e-4, ("+ brings it nearer", v1, v2)
+            pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
+            for _ in range(25): pg.keyboard.press("ArrowDown"); pg.wait_for_timeout(30)
+            settle(); assert abs(V()["phi"] - 1.3) < 1e-6, ("held ↓ stops at the lowest tilt", V())
+            for _ in range(30): pg.keyboard.press("-"); pg.wait_for_timeout(30)
+            settle(); v3 = V(); assert abs(v3["dist"] - v3["fit"]["dist"] * 1.6) < 1e-6, ("held − stops at the farthest", v3)
+            for _ in range(30): pg.keyboard.press("="); pg.wait_for_timeout(30)
+            settle(); v4 = V(); assert abs(v4["dist"] - v4["fit"]["dist"] * 0.5) < 1e-6, ("held + stops at the nearest", v4)
+            assert pg.evaluate("window.__ayo.selected") is None and len(pg.evaluate("window.__ayo.state")["moves"]) == moves, "the arrows pick nothing and play nothing"
+            assert pg.evaluate("[...document.querySelectorAll('.toast')].filter(t=>/Arrow keys turn/.test(t.textContent)).length") <= 1
+            pg.keyboard.press("0"); pg.wait_for_timeout(1300); assert not V()["off"], ("0 sets it straight after the keys", V())
+            print("arrows: ←×3 turned %.3f, ↑ phi %.2f → %.2f, + nearer, limits held (phi 1.3, dist ×1.6 / ×0.5), nothing played, 0 straight" % (v["theta"] - v0["theta"], v["phi"], v1["phi"]))
         if hoverc:  # the mouse on the Mac: the pit under the pointer says what a click will do
             pg.mouse.move(4, 4); pg.wait_for_timeout(400)  # start with the mouse off the pits, so the line says what it says without one
             hv = lambda: pg.evaluate("window.__ayo.hover"); hint = lambda: pg.evaluate("document.querySelector('#hint').textContent")
@@ -2685,7 +2712,7 @@ with sync_playwright() as p:
         assert pg.evaluate("window.__ayo.mood") == page, "face did not take the mood"
         pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
     elif home: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled")
-    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc or ponderc or lastc or straightc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
+    elif keys or path or answer or explain or take or hurry or handc or hintc or hoverc or countc or undoc or waitc or ponderc or lastc or straightc or arrowc: pass  # the picture was taken with the pit picked (by its key, or with the path shown, or their move explained)
     else:
         data = pg.evaluate("document.getElementById('c').toDataURL('image/png')")
         open(out, "wb").write(base64.b64decode(data.split(",")[1]))

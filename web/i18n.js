@@ -48,7 +48,7 @@ export const FR = {
   'That game link could not be read': 'Impossible de lire le lien de cette partie',
   // the board's toolbar and cards
   'Ayo board': 'Plateau d’Ayo',
-  'The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back, S says the score': 'Les trous — les touches 1 à 6 choisissent les vôtres du plus proche au plus loin, Entrée sème, U annule, H donne un indice, Échap repose le trou, S dit le score',
+  'The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back, S says the score, arrow keys turn the board': 'Les trous — les touches 1 à 6 choisissent les vôtres du plus proche au plus loin, Entrée sème, U annule, H donne un indice, Échap repose le trou, S dit le score, les flèches tournent le plateau',
   'muted': 'son coupé',
   'waiting': 'attend',
   'captured': 'pris',
@@ -271,6 +271,7 @@ export const FR = {
   'Word size': 'Taille des mots',
   'Double-tap the wood to set the board straight': 'Touchez deux fois le bois pour remettre le plateau droit',
   'Double-click the wood, or press 0, to set the board straight': 'Double-cliquez sur le bois (ou la touche 0) pour remettre le plateau droit',
+  'Arrow keys turn and tilt the board, + and − bring it nearer · 0 sets it straight': 'Les flèches tournent et inclinent le plateau, + et − le rapprochent · 0 le remet droit',
   'Large': 'Grande',
   'Larger': 'Plus grande',
   'the hints, the lines under the board, the cards and Settings': 'les indices, les lignes sous le plateau, les cartes et les Réglages',

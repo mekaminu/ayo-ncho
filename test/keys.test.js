@@ -19,7 +19,7 @@ test("the keys the plan names, and nothing else", () => {
   assert.deepEqual(keyAction({ key: "u" }), { type: "undo" }); assert.deepEqual(keyAction({ key: "U" }), { type: "undo" });
   assert.deepEqual(keyAction({ key: "h" }), { type: "hint" }); assert.deepEqual(keyAction({ key: "H" }), { type: "hint" });
   assert.deepEqual(keyAction({ key: "Escape" }), { type: "deselect" });
-  for (const k of ["a", "7", "Tab", "ArrowUp", "F5", ""]) assert.equal(keyAction({ key: k }), null, k);
+  for (const k of ["a", "7", "Tab", "PageUp", "F5", ""]) assert.equal(keyAction({ key: k }), null, k);
   assert.equal(keyAction(null), null);
 });
 

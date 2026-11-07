@@ -25,7 +25,7 @@ import { SHOUTS, shoutText, shoutKnocks, SHOUT_GAP_MS, SHOUT_SHOW_MS } from './s
 import { CallFlow, callWords, pickMode, LineWatch, LINE } from './call.js';
 import { Talk } from './talk.js';
 import { keyAction, pitKey, pitLabel, pitEnabled, hintText } from './keys.js';
-import { restOf, isOff, glideMs, glideAt, isDoubleTap, mayStraighten, tipWords as straightTip } from './view.js';
+import { restOf, isOff, glideMs, glideAt, isDoubleTap, mayStraighten, tipWords as straightTip, nudgeView, nudgeMoves, mayNudge, keysTip, NUDGE } from './view.js';
 import { hurried, squeeze, longTurn, canHurry, hurryWords, HURRY_FLY_MS } from './hurry.js';
 import { slamOf, slamMoment, SLAM_NOTE } from './slam.js';
 import { sowPath, pickedHint, hintedHint, playedWords, answerOf, giftNoteWords } from './path.js';
@@ -2378,6 +2378,21 @@ function straighten() {
   tween(glideMs(from, fit), (t) => { if (id !== viewGlide) return; const v = glideAt(from, to, t); theta = v.theta; phi = v.phi; dist = v.dist; }, easeInOut);
   return true;
 }
+// turn the board from the keys (web/view.js nudgeView): ← → turn, ↑ ↓ higher or lower, + − nearer or farther, each a short glide
+// from wherever it is (a held key keeps it going); at a limit a soft click; the first press that moves it says how, once
+const keyGlide = { id: -1, to: null };
+function nudge(kind, dir) {
+  if (!mayNudge({ screen: body.classList.contains('screen'), clipping, idle })) return false;
+  const fit = viewFit(), from = { theta, phi, dist };
+  const base = keyGlide.id === viewGlide && keyGlide.to ? keyGlide.to : from; // a press while the last one glides steps on from where that one lands
+  if (!nudgeMoves(base, fit, kind, dir)) { click(0.45, 0.03); return true; }
+  const to = nudgeView(base, fit, kind, dir), id = ++viewGlide; keyGlide.id = id; keyGlide.to = to;
+  const done = () => { if (keyGlide.id === id) keyGlide.to = null; };
+  if (reduceMotion) { theta = to.theta; phi = to.phi; dist = to.dist; done(); }
+  else tween(NUDGE.ms, (t) => { if (id !== viewGlide) return; const v = glideAt(from, to, t); theta = v.theta; phi = v.phi; dist = v.dist; }, easeInOut).then(done);
+  if (prefs.get('keysViewTip', '0') !== '1') { prefs.set('keysViewTip', '1'); prefs.set('straightTip', '1'); toast(keysTip(), 3800); }
+  return true;
+}
 function straightTipOnce(mouseLike) { // the first drag, pinch or wheel that leaves the board well off says how to put it back
   if (prefs.get('straightTip', '0') === '1' || !viewMay() || !isOff({ theta, phi, dist }, viewFit())) return;
   prefs.set('straightTip', '1'); toast(straightTip({ mouse: mouseLike }), 3400);
@@ -2526,6 +2541,7 @@ addEventListener('keydown', (e) => {
     return e.preventDefault();
   }
   if (a.type === 'sow' && hurry.depth > 0 && hurryNow()) return e.preventDefault(); // Space / Enter while a turn plays hurries it
+  if (a.type === 'view') { if (!$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden || !$('#backCard').hidden || !$('#callCard').hidden) return; if (nudge(a.kind, a.dir)) e.preventDefault(); return; } // the arrows turn the board, even while a turn plays
   if (body.classList.contains('screen') || !$('#gameover').hidden || !$('#nameCard').hidden || !$('#knockCard').hidden || !$('#backCard').hidden || !$('#callCard').hidden) return; // keys play the board, not the screens or a card
   if (!keysUsed) { keysUsed = true; body.classList.add('keys'); showTurn(); } // from now on the hint line talks keys and your pits' badges show their key
   e.preventDefault();

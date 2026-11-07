@@ -43,7 +43,37 @@ export function isDoubleTap(prev, now) {
 // a tap would hurry a turn instead (that tap is the turn's)
 export function mayStraighten({ screen = false, clipping = false, hurrying = false, idle = false } = {}) { return !screen && !clipping && !hurrying && !idle; }
 
+// Turn the board from the keys (idea 7 Nov): on the Mac the board could be turned only by dragging it and brought nearer only
+// with the wheel; a keyboard alone (or a Fold with a keyboard and no mouse) could set it straight (0) but never look round it.
+// Now ← → turn it a twelfth of a turn a press, ↑ ↓ look from higher or lower, + and − bring it nearer or farther, each a short
+// glide, and a key held down keeps it going. The limits are the drag's, the pinch's and the wheel's: the board never leaves
+// the frame. 0 still puts it back.
+export const NUDGE = { turn: Math.PI / 12, tilt: 0.08, zoom: 1.12, ms: 170 };
+export const LIMITS = { phiMin: 0.35, phiMax: 1.3, near: 0.5, far: 1.6 }; // the tilt in radians from straight down; the zoom against the framing's distance
+
+// the view a press leads to, from where it is: kind 'turn' (dir +1 = ←, the way a drag to the left turns it), 'tilt'
+// (+1 = ↑, from higher up), 'zoom' (+1 = +, nearer); always inside the limits, so a key held at a limit stays there
+export function nudgeView(v, fit, kind, dir) {
+  const d = dir > 0 ? 1 : -1, out = { theta: v.theta, phi: v.phi, dist: v.dist };
+  if (kind === 'turn') out.theta = v.theta + d * NUDGE.turn;
+  else if (kind === 'tilt') out.phi = v.phi - d * NUDGE.tilt;
+  else if (kind === 'zoom') out.dist = v.dist / Math.pow(NUDGE.zoom, d);
+  out.phi = Math.min(LIMITS.phiMax, Math.max(LIMITS.phiMin, out.phi));
+  out.dist = Math.min(fit.dist * LIMITS.far, Math.max(fit.dist * LIMITS.near, out.dist));
+  return out;
+}
+// whether a press would move it at all (at a limit it would not: a soft click says so instead of a glide to nowhere)
+export function nudgeMoves(v, fit, kind, dir) {
+  const n = nudgeView(v, fit, kind, dir); return Math.abs(n.theta - v.theta) + Math.abs(n.phi - v.phi) + Math.abs(n.dist - v.dist) > 1e-6;
+}
+// may the keys turn it now: on the board, not the clip (it keeps its own camera) and not Home's slow turn; unlike setting it
+// straight, a turn playing does not stop it (a drag does not stop for one either)
+export function mayNudge({ screen = false, clipping = false, idle = false } = {}) { return !screen && !clipping && !idle; }
+
 // the toast that says how, once on a phone: a finger, the mouse (and the keys) on the Mac
 export function tipWords({ mouse = false } = {}) {
   return mouse ? 'Double-click the wood, or press 0, to set the board straight' : 'Double-tap the wood to set the board straight';
+}
+// …and the toast the first key press that moves the board says, once: how to look round it and how to put it back
+export function keysTip() { return 'Arrow keys turn and tilt the board, + and − bring it nearer · 0 sets it straight';
 }
