@@ -234,6 +234,9 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                    move from a third: the Game over card offers "Three in a row to Mama Ngozi — try Nnamdi for a while? · Medium"
 #                    (<out>); a tap starts Nnamdi and keeps the step; then a saved game one move from beating Nnamdi offers "Back to
 #                    Mama Ngozi? Try her again · Hard" (<out>-up.png) and a tap goes back to her and clears the step
+#        --askrate: ask for a rating (web/askrate.js) with ?rate=test standing in for the store's review plugin — a phone with two wins
+#                   and three days played and a saved game one move from beating Mama Ngozi: the winning move asks the store's sheet
+#                   once, ~1.8 s after the Game over card (<out>); a saved game one move from a loss asks nothing
 #        --record: your record against each opponent — a phone with games already played against all three and a saved game one move from a
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
@@ -243,6 +246,7 @@ keyhelpc = "--keyhelp" in sys.argv
 carryc = "--carry" in sys.argv
 sbackc = "--settingsback" in sys.argv
 stepc = "--stepdown" in sys.argv
+ratec = "--askrate" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1101,6 +1105,31 @@ if talkc:  # Their talk (idea 7 Nov): all / few / off for the computer's bubble
         assert t["now"] == "few" and t["log"][0][1] is True and t["bubble"], ("few: still greets", t)
         t = move_and_undo(); assert t["log"][-1] == ["undo", False], ("few: the undo line kept back", t); print("talk: few — greets, then keeps the undo line back")
         ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
+if ratec:  # ask for a rating, at the right moment (idea 7 Nov)
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        def one(endargs, shot):
+            end = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "endgame.js"), *endargs]).decode())
+            saved = {"moves": end["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "hard", "stats": {"biggest": 6, "captures": 2, "started": int(time.time() * 1000) - 6 * 60 * 1000}}
+            ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True); pg = ctx.new_page(); watch(pg, errors, "askrate: ")
+            init = {"ayo.tutorial": "3", "ayo.game": json.dumps(saved), "ayo.level": "hard", "ayo.talk": "few", "ayo.streak": json.dumps({"days": ["2026-11-01", "2026-11-03", "2026-11-05"], "seen": []}),
+                    "ayo.record": json.dumps({"easy": {"w": 1, "l": 0, "d": 0, "best": [30, 18], "run": 1}, "hard": {"w": 1, "l": 1, "d": 0, "best": [26, 22], "run": 1}, "last": 1})}
+            pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); const kv = %s; for (const k in kv) localStorage.setItem(k, kv[k]); }" % json.dumps(init))
+            pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home&rate=test", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+            pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+            tap(pg, end["pit"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.over", timeout=240000); pg.wait_for_selector("#gameover:not([hidden])", timeout=10000); pg.wait_for_timeout(2600)
+            if shot: pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=shot, animations="disabled")
+            r = pg.evaluate("window.__ayo.askRate"); ctx.close(); return r
+        r = one(["7", "ncho"], out)
+        assert r["supported"] and r["calls"] == 1 and r["asked"] == 1 and r["why"] == "ask", ("the third win asks once", r)
+        assert json.loads(r["stored"])["n"] == 1, r
+        print("askrate: the third win on the third day asks the store's sheet once —", r["stored"])
+        r = one(["7", "ncho", "lose"], None)
+        assert r["calls"] == 0 and r["why"] == "result", ("a loss asks nothing", r)
+        print("askrate: a loss asks nothing")
+        b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)
 if stepc:  # a gentler game, and the way back up (idea 7 Nov)
