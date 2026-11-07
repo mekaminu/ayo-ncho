@@ -96,14 +96,14 @@ export function room(rate, seed = 7) {
 }
 
 // The board's sound, wired to a Web Audio context `a` (live, or offline for a recording).
-export function boardAudio(a, voice = 'jobs') {
+export function boardAudio(a, voice = 'jobs', gain = 0.75) {
   const rate = a.sampleRate, mono = (d) => { const b = a.createBuffer(1, d.length, rate); b.getChannelData(0).set(d); return b; };
   const banks = {}; // each seed set's landings, made the first time that set is on the board
   const bankFor = (id) => banks[id] || (banks[id] = { knock: [0, 1, 2, 3, 4, 5].map((t) => mono(knock(rate, t, TOK, id))), clack: [0, 1, 2, 3].map((t) => mono(clack(rate, t, id))) });
   let voiceId = VOICES[voice] ? voice : 'jobs', bank = bankFor(voiceId);
   // everything goes through a gentle limiter (a capture drops a dozen seeds at once), with a little of the room
   const limit = a.createDynamicsCompressor(); limit.threshold.value = -8; limit.knee.value = 6; limit.ratio.value = 6; limit.attack.value = 0.001; limit.release.value = 0.12; limit.connect(a.destination);
-  const bus = a.createGain(); bus.gain.value = 0.75; bus.connect(limit);
+  const bus = a.createGain(); bus.gain.value = gain; bus.connect(limit); let busLevel = gain;
   const verb = a.createConvolver(), [L, R] = room(rate), ir = a.createBuffer(2, L.length, rate); ir.getChannelData(0).set(L); ir.getChannelData(1).set(R); verb.buffer = ir;
   const wet = a.createGain(); wet.gain.value = 0.16; bus.connect(verb); verb.connect(wet); wet.connect(limit);
   const last = {}; // never the same take twice running
@@ -118,6 +118,9 @@ export function boardAudio(a, voice = 'jobs') {
   return {
     ctx: a,
     get voiceId() { return voiceId; },
+    // the sound level (web/volume.js): the bus's own gain, 0.75 at Normal; eased over 80 ms so a change never clicks
+    get level() { return busLevel; },
+    setLevel(g) { g = Math.max(0, Math.min(2, +g || 0)); const now = a.currentTime; try { bus.gain.cancelScheduledValues(now); bus.gain.setValueAtTime(bus.gain.value, now); bus.gain.linearRampToValueAtTime(g, now + 0.08); } catch { bus.gain.value = g; } busLevel = g; return g; },
     // the seed set on the board: its own click and clack from the next landing on
     voice(id) { id = VOICES[id] ? id : 'jobs'; if (id !== voiceId) { voiceId = id; bank = bankFor(id); } return voiceId; },
     // a seed touching down: k how hard (0..1), on another seed or on the wood, pan −1 (left) … 1 (right),

@@ -149,6 +149,9 @@ export function makeMusic(a, { seed = 1 + Math.floor(Math.random() * 1e6), timer
     const now = a.currentTime; ramp(master.gain, 0, 1);
     for (const l of live) { try { l.s.stop(Math.max(l.when, now + 1.05)); } catch {} } live.length = 0; return me;
   };
+  // the sound level (web/volume.js): the tune's own level, eased; heard at once if it is playing
+  me.level = () => level;
+  me.setLevel = (v) => { level = Math.max(0, +v || 0); if (me.playing) ramp(master.gain, level, 0.3); return level; };
   me.duck = (k) => { k = Math.max(0, Math.min(1, k)); if (Math.abs(k - me.ducked) < 0.01) return me; me.ducked = k; ramp(duckG.gain, k, 0.6); return me; };
   Object.defineProperty(me, 'pending', { get: () => live.filter((l) => l.when >= a.currentTime).length });
   return me;

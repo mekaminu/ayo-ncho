@@ -199,7 +199,7 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 .pzRemind{color:var(--brass);font-size:calc(13px*var(--ts));padding:4px 8px 0;margin-top:-4px;display:flex;align-items:center;justify-content:center;gap:6px}
 .pzRemind.on{animation:pzRing .5s ease-out}
 @keyframes pzRing{0%{transform:rotate(0)}20%{transform:rotate(-8deg)}40%{transform:rotate(7deg)}60%{transform:rotate(-4deg)}80%{transform:rotate(2deg)}100%{transform:rotate(0)}}
-#remindTimeRow.off{opacity:.45}
+#remindTimeRow.off,#volumeRow.off{opacity:.45}
 .pzShow .face.s{width:22px;height:22px;border:1px solid rgba(230,183,111,.5)}
 .pzBadge.shown{color:var(--fg);background:var(--soft);border-color:var(--line)}
 .puzzle #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 200px)}
@@ -698,6 +698,7 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
     <div class="group"><span class="eyebrow">Feel</span>
       <div class="box">
         <div class="row"><div class="t"><b>Sound</b><span>wood knocks, rattle, scoop</span></div><button class="sw" role="switch" data-set="sound" aria-checked="true" aria-label="Sound"><i></i></button></div>
+        <div class="row" id="volumeRow"><div class="t"><b>Sound level</b><span id="volumeNow">the knocks and the music · as made</span></div><div class="seg" data-set="volume"><button class="segbtn" data-v="quiet">Quiet</button><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="loud">Loud</button></div></div>
         <div class="row"><div class="t"><b>Music</b><span>a quiet ubo (thumb piano) and udu tune under the board, made on the phone<em id="musicNow"></em></span></div><button class="sw" role="switch" data-set="music" aria-checked="false" aria-label="Music"><i></i></button></div>
         <div class="row"><div class="t"><b>Haptics</b><span>a tap for every seed</span></div><button class="sw" role="switch" data-set="haptics" aria-checked="true" aria-label="Haptics"><i></i></button></div>
         <div class="row"><div class="t"><b>Pass the phone</b><span>two of us: the board turns round to face whoever is to move; off when the phone lies flat between you</span></div><button class="sw" role="switch" data-set="swing" aria-checked="true" aria-label="Pass the phone"><i></i></button></div>

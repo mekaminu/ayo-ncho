@@ -194,7 +194,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
+out = sys.argv[1]; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; record = record or story
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -471,6 +471,40 @@ if tsc:  # bigger words (idea 6 Nov): Settings → Language → Word size; at La
         b.close()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     print("textsize ok"); sys.exit(0)
+if volc:  # sound level (idea 7 Nov): Settings → Feel → Sound level moves the board's sounds and the music, live, and says why with the speaker off
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS + ["--autoplay-policy=no-user-gesture-required"]); errors = []
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2); pg = ctx.new_page(); watch(pg, errors, "volume: ")
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.speed', 'fast'); }")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); pg.wait_for_timeout(600)
+        play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(700)
+        m = pg.evaluate("window.__ayo.legal[0]"); x, y = pg.evaluate("window.__ayo.pitAt(%d)" % m)
+        pg.mouse.click(x, y); pg.wait_for_timeout(400); pg.mouse.click(x, y); pg.wait_for_timeout(500)
+        pg.wait_for_function("!window.__ayo.busy", timeout=60000)
+        v = pg.evaluate("window.__ayo.volume"); assert v["pref"] == "normal" and abs(v["board"] - 0.75) < 1e-6, ("Normal is the board's own level", v)
+        pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000)
+        v = pg.evaluate("window.__ayo.volume"); assert v["pressed"] == ["normal"] and "as made" in v["note"] and not v["dim"], v
+        pg.click("[data-set=volume] [data-v=quiet]"); pg.wait_for_timeout(300)
+        v = pg.evaluate("window.__ayo.volume"); assert v["pref"] == "quiet" and abs(v["board"] - 0.2625) < 1e-6 and v["pressed"] == ["quiet"] and "soft" in v["note"], v
+        assert pg.evaluate("localStorage.getItem('ayo.volume')") == "quiet"
+        pg.click("[data-set=music]"); pg.wait_for_timeout(500)
+        v = pg.evaluate("window.__ayo.volume"); assert v["music"] is not None and abs(v["music"] - 0.07) < 1e-6, ("the music starts at the quiet level", v)
+        pg.evaluate("document.querySelector('#volumeRow').scrollIntoView({block:'center'})"); pg.wait_for_timeout(300)
+        pg.screenshot(path=out)
+        pg.click("[data-set=volume] [data-v=loud]"); pg.wait_for_timeout(300)
+        v = pg.evaluate("window.__ayo.volume"); assert abs(v["board"] - 1.2) < 1e-6 and abs(v["music"] - 0.3) < 1e-6 and "louder" in v["note"], ("loud, live, the music capped", v)
+        pg.click("[data-set=sound]"); pg.wait_for_timeout(300)
+        v = pg.evaluate("window.__ayo.volume"); assert v["dim"] and "sound is off" in v["note"], ("with the speaker off the row says why", v)
+        pg.click("[data-set=sound]"); pg.click("[data-set=music]"); pg.wait_for_timeout(200)
+        pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        assert pg.evaluate("window.__ayo.volume.pref") == "loud", "kept on the phone"
+        pg.evaluate("localStorage.setItem('ayo.lang','fr')"); pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000); pg.wait_for_timeout(400)
+        pg.evaluate("document.querySelector('#homeSettings').click()"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000); pg.wait_for_timeout(300)
+        fr = pg.evaluate("document.querySelector('#volumeRow').innerText"); assert "Intensité du son" in fr and "Forte" in fr and "plus forte" in fr, fr
+        print("volume ok · quiet 0.26 / loud 1.20 on the board, music 0.07 → 0.30 · French:", fr.replace("\n", " / ")[:90])
+        ctx.close(); b.close()
+    if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    sys.exit(0)
 if nextc:  # the next puzzle (idea 5 Nov): the result card counts down to midnight, turns at midnight, and Home's card turns with the day
     import datetime, zoneinfo
     with sync_playwright() as p:
