@@ -27,6 +27,8 @@ export const FR_ROOMS = nb({
   'Your friend sees this name when they knock on your board.': 'Votre ami voit ce nom en frappant à votre plateau.',
   'tap to open a room': 'touchez pour ouvrir une salle',
   'waiting for a friend': 'on attend un ami',
+  'waking the game’s server…': 'le serveur du jeu se réveille…', // web/warm.js
+  'still waking · up to a minute': 'il se réveille · une minute au plus',
   'someone is at the door': 'quelqu’un est à la porte',
   'no connection': 'pas de connexion',
   'tap to try again': 'touchez pour réessayer',

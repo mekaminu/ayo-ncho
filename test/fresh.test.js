@@ -94,7 +94,7 @@ test("the server: /version, and the page carries the same build (/ and /index.ht
 
 test("the service worker never keeps /version, and carries fresh.js for offline play", () => {
   const sw = fs.readFileSync(new URL("../web/sw.js", import.meta.url), "utf8");
-  assert.match(sw, /url\.pathname === '\/version'\) return;/);
+  assert.match(sw, /url\.pathname === '\/version'( \|\| url\.pathname === '\/healthz')?\)\) return;|url\.pathname === '\/version'\) return;/);
   assert.ok(sw.includes("'./fresh.js'"));
 });
 

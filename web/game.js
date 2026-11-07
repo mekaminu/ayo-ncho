@@ -64,6 +64,7 @@ import { circling as circlingOf, began as beganCircling, circlingRest, circlingW
 import { makeWake, wakeNote } from './wake.js';
 import { makeRest } from './rest.js';
 import { makeGlWatch, lineWords as glLineWords, WORDS as GL_WORDS } from './glloss.js';
+import { makeWarm, healthUrl, openingWords } from './warm.js';
 import { makeFresh, buildOf, safeNow as freshSafe, fetchBuild, FIRST_MS as FRESH_FIRST, EVERY_MS as FRESH_EVERY } from './fresh.js';
 import { makeFrameMeter, MIN_FRAMES, slowVerdict, mayJudge, lastGameWords, lastGameRecord, parseRecord as parseFrames, SLOW_TOAST } from './frametime.js';
 import { makeTelemetry, memorySink, resultOf, teleNote } from './telemetry.js';
@@ -80,6 +81,7 @@ import { mayOfferDraw, drawButton, drawWords } from './draw.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 import { oneTapOn, pressAction } from './onetap.js';
 import { makeGuard as makeKeepGuard, ARM_MS as KEEP_MS, playAsks, askWords as keepAsk } from './keepgame.js';
+const warm = makeWarm({ url: healthUrl(publicBase()), fetch: (u, o) => fetch(u, o), online: () => navigator.onLine !== false });
 
 const $ = (s) => document.querySelector(s);
 const params = new URLSearchParams(location.search);
@@ -660,7 +662,15 @@ function paintCode(code) { // the four tiles: dots while the room opens, then th
   if (code) { void tiles.offsetWidth; tiles.classList.add('fresh'); }
 }
 const STATUS_TEXT = { idle: 'tap to open a room', opening: 'opening a room…', open: 'waiting for a friend', door: 'someone is at the door', error: 'no connection · tap to try again' };
+// The server, woken early (web/warm.js): Home knocks on the free server so a room opens at once; while one is still opening
+// the card says the server is waking rather than a bare "opening a room…"
+const opening = { since: null, timer: null };
 function setRoomStatus(s, text) {
+  if (s === 'opening') {
+    if (opening.since === null) opening.since = Date.now();
+    if (!opening.timer) opening.timer = setInterval(() => { if (roomsShowing() && rooms.state === 'opening') paintRoomStatus(); else { clearInterval(opening.timer); opening.timer = null; } }, 1000);
+    text = openingWords(Date.now() - opening.since, warm.waking()) || text;
+  } else { opening.since = null; if (opening.timer) { clearInterval(opening.timer); opening.timer = null; } }
   rooms.state = s; const el = $('#roomStatus'); el.dataset.state = s; el.querySelector('span').textContent = text || STATUS_TEXT[s];
   const ready = (s === 'open' || s === 'door') && net && net.code;
   $('#waBtn').classList.toggle('off', !ready); $('#copyBtn').disabled = !ready; $('#shareLinkBtn').disabled = !ready;
@@ -713,6 +723,8 @@ function joinByCode(code) { // Got a code? Join their room: your own room closes
   startOnline(code, { stay: true }); paintRoomStatus(); click(1.2, 0.06);
 }
 $('#friendsBtn').addEventListener('click', () => { openRooms(); click(1.3, 0.08); });
+$('#friendsBtn').addEventListener('pointerdown', () => warm.ping('friends'), { passive: true });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !$('#home').hidden) warm.ping('back'); });
 $('#roomsBack').addEventListener('click', () => { if (friend) return leaveRoom(); stopOnline(); showScreen('home'); click(1, 0.05); });
 $('#roomStatus').addEventListener('click', () => { if (rooms.state === 'error' || rooms.state === 'idle') { if (net) { net.leave(); net = null; } openRoom(); } });
 $('#codeField').addEventListener('input', (e) => { const c = cleanCode(e.target.value); if (e.target.value !== c) e.target.value = c; $('#joinBtn').disabled = c.length !== 4; if ($('#joinNote').classList.contains('bad')) { $('#joinNote').textContent = ''; $('#joinNote').className = 'note'; } });
@@ -1830,6 +1842,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle
   if (which !== 'home') playDisarm(false); // Play's question goes with Home
   if (which !== 'play' && review.on) endReview(false);
   if (which !== 'store' && (shop.tryFinish || shop.trySeeds)) { shop.tryFinish = shop.trySeeds = null; applyLooks(); } // leaving the store puts your own look back
+  if (which === 'home') warm.ping('home');
   $('#store').hidden = which !== 'store'; $('#home').hidden = which !== 'home'; $('#settings').hidden = which !== 'settings'; $('#rooms').hidden = which !== 'rooms'; $('#puzzle').hidden = which !== 'puzzle';
   const board3d = which === 'play' || which === 'puzzle'; // the puzzle is played on the board, like a game, with the HUD and toolbar stepped aside
   body.classList.toggle('screen', !board3d); body.classList.toggle('playing', board3d); body.classList.toggle('puzzle', which === 'puzzle'); pitLayer.hidden = !board3d;
