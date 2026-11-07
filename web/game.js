@@ -12,6 +12,7 @@ import { greetMoment } from './greet.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { dailyPuzzle, attempt, shareText, todayKey, levelWord } from '../engine/puzzle.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, dayLine, levelSeeds, canShow, markShown } from './daily.js';
+import { weekStrip, weekLine, weekLabel, letterOf, solvedIn } from './week.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink } from './online.js';
 import { qrMatrix, qrBands, scanWords, QUIET } from './qr.js';
 import { makeBackNav, webStep, ROOM_WORDS } from './backnav.js';
@@ -1616,6 +1617,7 @@ function paintPuzzleResult(got, e, firstSolve) {
   const n = Math.min(Math.max(p.target, got), 16); const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', `${got} of ${p.target} seeds`);
   for (let i = 0; i < n; i++) { const s = document.createElement('span'); s.textContent = i < got ? '●' : '○'; if (i >= got) s.className = 'o'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
   $('#pzBest').textContent = `${e.got} of ${p.target}`; $('#pzRun').textContent = runLine(solvedRun(daily, p.key));
+  paintWeek(firstSolve);
   $('#pzAgain').textContent = hit ? 'Play it again' : 'Try again';
   $('#pzShow').hidden = !canShow(e); // after two misses Mama Ngozi offers to show the move
   paintPlayOut();
@@ -1623,6 +1625,26 @@ function paintPuzzleResult(got, e, firstSolve) {
   $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
   if (hit) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); buzz([20, 40, 20]); if (firstSolve) { const run = solvedRun(daily, p.key); if (run > 1) setTimeout(() => toast(`${run} days in a row`), 900); } }
   else { click(0.7, 0.08); }
+}
+// Your week of puzzles (web/week.js): Mon … Sun as seven little pits on the result card, a brass seed in each day solved; on
+// today's first solve its seed drops in after the card rises, with a knock, and the line's count ticks up with it.
+function paintWeek(drop = false) {
+  const p = puzzle.p; const box = $('#pzWeek'); if (!p || lesson.on) { box.hidden = true; return; } box.hidden = false;
+  const strip = weekStrip(daily, p.key, p.variant); const lang = i18n.lang; const pits = $('#pzWeekPits'); const ln = $('#pzWeekLine');
+  const dropping = drop && !reduceMotion && strip.some((d) => d.today && d.state === 'solved');
+  pits.replaceChildren(...strip.map((d) => {
+    const el = document.createElement('div'); el.className = `d ${d.state}${d.today ? ' today' : ''}${dropping && d.today ? ' drop' : ''}`;
+    const pit = document.createElement('span'); pit.className = 'p'; pit.append(document.createElement('i'));
+    const l = document.createElement('span'); l.className = 'l'; l.textContent = letterOf(d.i, lang);
+    const lv = document.createElement('span'); lv.className = 'lv'; for (let k = 0; k < (d.level || 0); k++) lv.append(document.createElement('b'));
+    el.append(pit, l, lv); return el;
+  }));
+  box.setAttribute('aria-label', weekLabel(strip, lang));
+  const all = solvedIn(strip) === 7;
+  if (dropping) { // the line shows the count before today's seed, then ticks as it lands
+    const before = strip.map((d) => (d.today ? { ...d, state: 'open' } : d)); ln.textContent = weekLine(before); ln.classList.remove('all');
+    setTimeout(() => { ln.textContent = weekLine(strip); ln.classList.toggle('all', all); click(1.9, 0.08); buzz(12); }, 900);
+  } else { ln.textContent = weekLine(strip); ln.classList.toggle('all', all); }
 }
 function paintPlayOut() { // play it out (web/playout.js): after your own move, the game can carry on from here against the opponent chosen on Home
   const b = $('#pzOut'); const ok = canPlayOut({ played: puzzle.played, mine: puzzle.mine, lesson: lesson.on, online, state });
@@ -1668,6 +1690,7 @@ async function puzzleShow() { // Show me: the position comes back, the answer pi
   const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', `the move captures ${r.got}`);
   for (let i = 0; i < Math.min(r.got, 16); i++) { const s = document.createElement('span'); s.textContent = '●'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
   $('#pzBest').textContent = `${shown.got} of ${p.target}`; $('#pzRun').textContent = runLine(solvedRun(daily, p.key));
+  paintWeek(false);
   $('#pzAgain').textContent = 'Now you'; $('#pzShow').hidden = true; paintNext(); $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
   toast(`${CHARACTERS.hard.name} showed you — now play it yourself`); click(1.2, 0.06);
 }
