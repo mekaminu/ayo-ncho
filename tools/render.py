@@ -237,6 +237,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 out = sys.argv[1]; talkc = "--talk" in sys.argv; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; tablec = "--table" in sys.argv; leftyc = "--lefty" in sys.argv; warmc = "--warm" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; ratedc = "--rated" in sys.argv; fullc = "--fullscreen" in sys.argv; record = record or story or bestsc
 keyhelpc = "--keyhelp" in sys.argv
 carryc = "--carry" in sys.argv
+sbackc = "--settingsback" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1073,7 +1074,7 @@ if talkc:  # Their talk (idea 7 Nov): all / few / off for the computer's bubble
             play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(500)
         def move_and_undo():
             n = len(pg.evaluate("window.__ayo.state")["moves"]); pit = pg.evaluate("window.__ayo.legal")[0]; x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
-            for _ in range(3):  # pick it (a first touch after Settings may only wake the board), then sow
+            for _ in range(3):  # pick it (Settings → Back now goes back to the board, see --settingsback; kept for a slow container), then sow
                 if pg.evaluate("window.__ayo.selected") == pit: break
                 pg.mouse.click(x, y); pg.wait_for_timeout(500)
             pg.mouse.click(x, y)
@@ -1094,6 +1095,46 @@ if talkc:  # Their talk (idea 7 Nov): all / few / off for the computer's bubble
         pg.evaluate("localStorage.setItem('ayo.talk', 'few')"); start(); t = pg.evaluate("window.__ayo.talk")
         assert t["now"] == "few" and t["log"][0][1] is True and t["bubble"], ("few: still greets", t)
         t = move_and_undo(); assert t["log"][-1] == ["undo", False], ("few: the undo line kept back", t); print("talk: few — greets, then keeps the undo line back")
+        ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
+if sbackc:  # Back from Settings goes back where you were (fix 7 Nov): one touch picks the pit after closing Settings; a rule changed on a game not yet begun deals a fresh board in place
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True); pg = ctx.new_page(); watch(pg, errors, "settingsback: ")
+        pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(500)
+        def settings_round(change=None):
+            pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000); pg.wait_for_timeout(200)
+            if change: change()
+            pg.click("#settingsBack"); pg.wait_for_selector("#settings[hidden]", state="attached", timeout=5000); pg.wait_for_timeout(400)
+            return pg.evaluate("window.__ayo.settingsBack()")["log"][-1]
+        assert pg.evaluate("window.__ayo.state.moves.length") == 0, "a game not yet begun"
+        to = settings_round(); assert to == "play" and pg.evaluate("document.querySelector('#home').hidden"), ("nothing played, nothing changed: back to the board", to)
+        pit = pg.evaluate("window.__ayo.legal")[0]; x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
+        pg.touchscreen.tap(x, y); pg.wait_for_timeout(500)
+        assert pg.evaluate("window.__ayo.selected") == pit, ("one touch picks the pit straight after Settings", pg.evaluate("window.__ayo.selected"))
+        print("settingsback: Settings and back on a fresh board — one touch picked pit", pit)
+        pg.keyboard.press("Escape"); pg.wait_for_timeout(300)
+        before = pg.evaluate("[window.__ayo.state.rules.last8, window.__ayo.deal.deals]")
+        toasts = []
+        def flip():
+            pg.click("[data-set=last8]"); pg.wait_for_timeout(150); toasts.append(pg.evaluate("[...document.querySelectorAll('.toast')].map((t) => t.textContent).join(' | ')"))
+        to = settings_round(flip); pg.wait_for_function("!window.__ayo.busy", timeout=30000); pg.wait_for_timeout(300)
+        after = pg.evaluate("[window.__ayo.state.rules.last8, window.__ayo.deal.deals]")
+        assert "a fresh board when you go back" in toasts[0], ("the word says what Back will do", toasts)
+        assert to == "new" and pg.evaluate("document.querySelector('#home').hidden") and after[0] != before[0], ("a rule changed before the first move: a fresh game on the board with it", to, before, after)
+        print("settingsback: the last-8 rule flipped before a move — dealt again on the board", before, "->", after, "·", toasts[0])
+        pg.screenshot(path=out)
+        pit = pg.evaluate("window.__ayo.legal")[0]; x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
+        pg.touchscreen.tap(x, y); pg.wait_for_timeout(400); pg.touchscreen.tap(x, y)
+        pg.wait_for_function("window.__ayo.state.moves.length >= 2 && window.__ayo.state.turn === window.__ayo.seat && !window.__ayo.busy", timeout=90000); pg.wait_for_timeout(800)
+        to = settings_round(); assert to == "play", ("a game under way, nothing changed: the board", to)
+        to = settings_round(lambda: pg.click("[data-set=last8]")); assert to == "home" and not pg.evaluate("document.querySelector('#home').hidden"), ("a rule changed mid-game: Home, as before", to)
+        pg.click("#homeSettings"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000); pg.click("#settingsBack"); pg.wait_for_timeout(300)
+        assert pg.evaluate("window.__ayo.settingsBack()")["log"][-1] == "home" and not pg.evaluate("document.querySelector('#home').hidden"), "opened from Home: back to Home"
+        print("settingsback: mid-game back to the board; a rule changed mid-game goes Home; opened from Home goes Home")
         ctx.close(); b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)

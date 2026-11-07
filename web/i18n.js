@@ -417,6 +417,7 @@ export const FR = {
   'The reminder comes with the app — a web page cannot remind you once it is closed': 'Le rappel vient avec l’appli — une page web ne peut pas vous prévenir une fois fermée',
   'She is still going over it — a moment': 'Elle revoit encore la partie — un instant',
   'Rules changed: next game uses them': 'Règles changées : la prochaine partie les suit',
+  'Rules changed: a fresh board when you go back': 'Règles changées : un plateau neuf au retour',
   'Redrawing the board…': 'On redessine le plateau…',
   'No camera here — voice only': 'Pas de caméra ici — voix seule',
   'Clip saved to your downloads': 'Clip enregistré dans vos téléchargements',

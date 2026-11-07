@@ -68,6 +68,8 @@ import { clearOn, marksPalette, doubleCaps, clearNote } from './clearmarks.js';
 import { circling as circlingOf, began as beganCircling, circlingRest, circlingWords, beganWords as circlingBegan, endedCircling, endedWords as circlingEnded, CALLING } from './circling.js';
 import { makeWake, wakeNote } from './wake.js';
 import { makeRest } from './rest.js';
+import { settingsBackTo, rulesWords } from './settingsback.js';
+const settingsLog = []; // where each Settings → Back went (the render check reads it)
 import { makeGlWatch, lineWords as glLineWords, WORDS as GL_WORDS } from './glloss.js';
 import { makeWarm, healthUrl, openingWords } from './warm.js';
 import { makeFresh, buildOf, safeNow as freshSafe, fetchBuild, FIRST_MS as FRESH_FIRST, EVERY_MS as FRESH_EVERY } from './fresh.js';
@@ -2130,7 +2132,7 @@ $('.choose[data-mode="local"]').addEventListener('click', () => { prefs.set('mod
 document.querySelectorAll('[data-game]').forEach((b) => b.addEventListener('click', () => { prefs.set('game.variant', b.dataset.game); prefs.set('rules.capture', ''); prefs.set('rules.relay', ''); prefs.set('rules.last8', ''); paintHome(); click(1.2, 0.05); }));
 document.querySelectorAll('.pill[data-level]').forEach((b) => b.addEventListener('click', () => { if (goldLocked(b.dataset.level)) return; level = b.dataset.level; prefs.set('level', level); prefs.set('mode', 'ai'); paintHome(); click(1.2, 0.05); }));
 $('.pill[data-mode="local"]').addEventListener('click', () => { prefs.set('mode', 'local'); paintHome(); click(1.2, 0.05); }); // two of us on this phone: no computer plays
-function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast('Rules changed: next game uses them'); }
+function rulesChanged() { prefs.set('game', 'null'); if (!$('#settings').hidden) toast(rulesWords({ online, from: settingsFrom, moves: state.moves.length, special: !!watch.on || playingOut() || review.on || puzzle.on })); }
 function playDisarm(repaint = true) { // Play goes back to saying Play (after three seconds, or leaving Home)
   clearTimeout(playAsk.timer); const was = playAsk.guard.armed; playAsk.guard.reset(); const b = $('#playBtn');
   if (!b.classList.contains('armed') && !was) return;
@@ -2151,9 +2153,14 @@ $('#playBtn').addEventListener('click', () => {
 $('#continueBtn').addEventListener('click', () => { if (resume()) { hideExplain(); layoutFromState(state); refreshStatic(); showScreen('play'); kickAi(); } });
 $('#homeBtn').addEventListener('click', () => { if (watch.on) { watch.stop = true; hurryNow(); return; } if (online) return leaveRoom(); if (!busy) { if (!endPlayout()) save(); showScreen('home'); } });
 $('#goHome').addEventListener('click', () => { if (online) return leaveRoom(); $('#gameover').hidden = true; showScreen('home'); });
-$('#homeSettings').addEventListener('click', () => { paintSettings(); showScreen('settings'); });
-$('#settingsBtn').addEventListener('click', () => { if (!busy) { paintSettings(); showScreen('settings'); } });
-$('#settingsBack').addEventListener('click', () => { if (online) return showScreen('play'); const r = settings.rules(); const same = state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(r) && state.moves.length; showScreen(same ? 'play' : 'home'); });
+let settingsFrom = 'home'; // where Settings was opened from: Back goes back there (web/settingsback.js)
+$('#homeSettings').addEventListener('click', () => { settingsFrom = 'home'; paintSettings(); showScreen('settings'); });
+$('#settingsBtn').addEventListener('click', () => { if (!busy) { settingsFrom = 'play'; paintSettings(); showScreen('settings'); } });
+$('#settingsBack').addEventListener('click', () => {
+  const to = settingsBackTo({ online, from: settingsFrom, sameRules: state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(settings.rules()), sameMode: local === (settings.mode === 'local'), moves: state.moves.length, special: !!watch.on || playingOut() || review.on || puzzle.on });
+  settingsLog.push(to);
+  if (to === 'new') { for (const t of document.querySelectorAll('.toast')) t.remove(); newRound(); showScreen('play'); click(1.3, 0.08); } else showScreen(to);
+});
 $('#settingsRules').addEventListener('click', () => openRules());
 // Privacy, terms and support: the server's pages, opened beside the game (a new tab, or the phone's browser from the apps) so the game stays where it was.
 // In the game's own language (?lang=fr for a French game), painted again when Settings opens or the language changes.
@@ -3037,5 +3044,6 @@ if (backNav) {
   for (const ev of ['click', 'keyup', 'pointerup']) addEventListener(ev, () => setTimeout(backSync, 60), { capture: true, passive: true });
   setInterval(backSync, 400); setTimeout(backSync, 0);
 }
+window.__ayo.settingsBack = () => ({ from: settingsFrom, log: settingsLog.slice() });
 window.__ayo.said = () => ({ line: saidEl ? saidEl.textContent : null, log: said.log.slice() });
 window.__ayo.back = () => backNav ? { guarded: backNav.guarded, pushes: backNav.pushes, backs: backNav.backs, mark: !!(history.state && history.state.ayoBack), log: backLog.slice() } : null;
