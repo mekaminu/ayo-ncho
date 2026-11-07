@@ -14,7 +14,7 @@ Eight moments and a crash, each with a few words from fixed lists (anything else
 | `game_end` | game, opponent, result (win / loss / draw), how it ended (played / gave_up / draw_agreed / circling), moves as a band (≤10 … >100), first game |
 | `lesson_end` | done or skipped, the step (1–3) |
 | `puzzle_play` | game, solved, shown |
-| `invite_sent` | whatsapp / copy / share |
+| `invite_sent` | whatsapp / copy / share / qr |
 | `invite_joined` | host / friend |
 | `store_open` | from home / settings |
 | `purchase` | which of the six products |
