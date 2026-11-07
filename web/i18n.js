@@ -839,6 +839,8 @@ export const PATTERNS = [
   [/^(\d+) draws?$/, (m) => pl(m[1], 'nul', 'nuls')],
   [/^Ready for (.+?)\? Play (him|her) next$/, (m) => `Prêt pour ${m[1]} ? Jouez contre ${m[2] === 'him' ? 'lui' : 'elle'} ensuite`],
   [/^([+−±]\d+) for (beating|losing to|a draw with) (.+?) \((\d+)\)$/, (m) => `${m[1]} pour ${{ beating: 'votre victoire sur', 'losing to': 'votre défaite contre', 'a draw with': 'un nul avec' }[m[2]]} ${m[3]} (${m[4]})`],
+  [/^Taken back · this game won't count for your rating$/, () => 'Coup repris · cette partie ne comptera pas pour votre classement'],
+  [/^Not rated · you took back (a move|(\d+) moves)$/, (m) => `Non classée · vous avez repris ${m[2] ? m[2] + ' coups' : 'un coup'}`],
   [/^(\d+) of 10 games, it is still finding you$/, (m) => `${m[1]} parties sur 10, le classement se cale encore`],
   [/^Your rating (\d+)$/, (m) => `Votre classement ${m[1]}`],
   [/^([+−±]\d+) last game$/, (m) => `${m[1]} à la dernière partie`],
