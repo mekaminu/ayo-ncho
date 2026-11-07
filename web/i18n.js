@@ -779,6 +779,11 @@ export const PATTERNS = [
   [/^play (pits? .+)$/, (m) => `jouez ${the(m[1])}`],
   [/^(pit \d) doesn't reach them$/, (m) => `${cap(the(m[1]))} n’atteint pas l’autre côté`],
   [/^they have no seeds: play (pits? .+)$/, (m) => `l’autre côté n’a plus de graines : jouez ${the(m[1])}`],
+  [/^(your|their) trough$/, (m) => (m[1] === 'your' ? 'votre réserve' : 'la réserve d’en face')], // count a trough by touch (web/count.js)
+  [/^(your|their) trough is empty$/, (m) => (m[1] === 'your' ? 'votre réserve est vide' : 'la réserve d’en face est vide')],
+  [/^(\d+) more to win$/, (m) => `encore ${m[1]} pour gagner`],
+  [/^(\d+) reached$/, (m) => `${m[1]} atteint`],
+  [/^(\d+) is out of reach$/, (m) => `${m[1]} n’est plus atteignable`],
   [/^((?:your |their )?pit \d) is empty$/, (m) => `${cap(the(m[1]))} est vide`],
   [/^Taking back your move and ([^·—:]+?)'s reply$/, (m) => `On reprend votre coup et la réponse de ${who(m[1])}`],
   [/^Taking back ([^·—:]+?)'s move$/, (m) => `On reprend le coup de ${who(m[1])}`],
