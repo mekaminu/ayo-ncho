@@ -7,6 +7,10 @@
 #        add --sideways to check a phone held on its side (844x390, touch): the board lies across the screen, your row nearest you,
 #                  each pit where a tap lands on it, bigger than the upright board on the same screen (?sideways=0); a real move and the
 #                  reply played sideways (<out>); turned upright (390x844) and onto the Mac (1180x820) it stands up as before, and back
+#        add --table to check the Fold half folded on its side (idea 7 Nov): Chromium's own foldable emulation (a crease across an
+#                  832x690 screen, two viewport segments) — the board lies in the lower half under the crease, every card, the
+#                  hint line and the buttons stand above it, each pit where a tap lands; a real move and the reply (<out>); opened
+#                  flat again it is one picture as before, folded again it lies back down; ?table=1 alone makes the crease too
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
 #        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
@@ -220,7 +224,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; record = record or story or bestsc
+out = sys.argv[1]; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; tablec = "--table" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; record = record or story or bestsc
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -895,6 +899,54 @@ if sidec:  # a phone held sideways (idea 5 Nov): the board lies across a short, 
         pg.set_viewport_size({"width": 844, "height": 390}); pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.side") > 1, "on its side again"
         print("sideways: upright and on the Mac it stands up as before, and lies down again")
         ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
+if tablec:  # the Fold half folded on its side (idea 7 Nov): board on the flat half, the cards stand up above the crease
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []; W, H, TOP, GAP = 832, 690, 340, 10
+        ctx = b.new_context(viewport={"width": W, "height": H}, device_scale_factor=2, has_touch=True); pg = ctx.new_page(); watch(pg, errors, "table: ")
+        cdp = ctx.new_cdp_session(pg)
+        def fold(on):  # Chromium's foldable emulation: a horizontal crease, the screen in two segments one above the other
+            m = {"width": W, "height": H, "deviceScaleFactor": 2, "mobile": True}
+            if on: m["displayFeature"] = {"orientation": "horizontal", "offset": TOP, "maskLength": GAP}
+            cdp.send("Emulation.setDeviceMetricsOverride", m)
+        fold(True)
+        pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")
+        pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        segs = pg.evaluate("window.viewport && window.viewport.segments ? window.viewport.segments.length : 0"); assert segs == 2, ("the emulation should give two segments", segs)
+        play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(900)
+        t = pg.evaluate("window.__ayo.table"); assert t == {"top": TOP, "bottom": TOP + GAP}, t
+        assert pg.evaluate("document.documentElement.classList.contains('tabletop')") and abs(pg.evaluate("window.__ayo.side") - math.pi / 2) < 1e-9
+        P = [pg.evaluate("window.__ayo.pitAt(%d)" % i) for i in range(12)]; T = [pg.evaluate("window.__ayo.troughAt(%d)" % i) for i in range(2)]
+        for i, (x, y) in enumerate(P + T): assert TOP + GAP < y < H and 0 < x < W, ("pit or trough %d should lie on the flat half" % i, x, y)
+        mine, theirs = P[:6], P[6:]; assert mine[0][1] > theirs[0][1] + 20, ("your row nearest you", P)
+        assert P[5][0] - P[0][0] > W * 0.45, ("the board should fill the flat half's width", P)
+        for sel in [".hud.top", ".hud.bottom", ".bar", "#hint"]:
+            r = pg.evaluate("(() => { const e = document.querySelector('%s'); if (!e || getComputedStyle(e).display === 'none') return null; return e.getBoundingClientRect().toJSON(); })()" % sel)
+            if r and r["height"] > 0: assert r["top"] >= 0 and r["bottom"] <= TOP, ("%s should stand above the crease" % sel, r)
+        a, c = pg.evaluate("document.querySelector('.hud.top').getBoundingClientRect().toJSON()"), pg.evaluate("document.querySelector('.hud.bottom').getBoundingClientRect().toJSON()")
+        assert a["right"] <= c["left"] + 1, ("the two cards side by side", a, c)
+        for i, (x, y) in enumerate(P): assert pg.evaluate("window.__ayo.hitTest(%f, %f)" % (x, y))[:1] == [i], "a tap on pit %d should land on it" % i
+        print("table: crease at %d-%d, pits from y=%.0f to %.0f, %.0f px end to end, cards and buttons above, every tap lands" % (TOP, TOP + GAP, min(y for _, y in P), max(y for _, y in P), P[5][0] - P[0][0]))
+        legal = pg.evaluate("window.__ayo.legal"); pit = legal[len(legal) // 2]; x, y = P[pit]
+        pg.touchscreen.tap(x, y); pg.wait_for_timeout(300); assert pg.evaluate("window.__ayo.selected") == pit, "the first tap should pick the pit"
+        pg.touchscreen.tap(x, y)
+        pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy", timeout=240000); pg.wait_for_timeout(1200)
+        # Playwright's own screenshot sets the screen's size again and so would open the fold: take the picture through the same CDP session
+        import base64; open(out, "wb").write(base64.b64decode(cdp.send("Page.captureScreenshot", {"format": "png"})["data"]))
+        assert pg.evaluate("window.__ayo.table") is not None, "still folded for the picture"; print("table: played pit %d and Nnamdi replied" % pit)
+        fold(False); pg.wait_for_timeout(800)
+        assert pg.evaluate("window.__ayo.table") is None and not pg.evaluate("document.documentElement.classList.contains('tabletop')"), "opened flat: one picture again"
+        y0 = min(pg.evaluate("window.__ayo.pitAt(%d)" % i)[1] for i in range(12)); assert y0 < TOP, ("flat, the board uses the whole screen again", y0)
+        fold(True); pg.wait_for_timeout(800); assert pg.evaluate("window.__ayo.table") is not None, "folded again it lies back down"
+        print("table: opened flat it is one picture again, folded it lies back down")
+        ctx.close()
+        c2 = b.new_context(viewport={"width": W, "height": H}, device_scale_factor=1, has_touch=True); q = c2.new_page(); watch(q, errors, "table=1: ")
+        q.add_init_script("localStorage.setItem('ayo.tutorial', '3')")
+        q.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home&table=1", wait_until="load"); q.wait_for_function("window.__done===true", timeout=180000)
+        play_btn(q); q.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); q.wait_for_timeout(600)
+        assert q.evaluate("window.__ayo.table") == {"top": H // 2, "bottom": H // 2}, "?table=1 makes the crease across the middle"
+        c2.close(); b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)
 if looksc:  # the store's seed sets (L10): close renders of each, then the lock in Settings and the swap in place

@@ -32,7 +32,7 @@ test("the camera stands on your pits' side, and the far seat's half turn still f
 test("the page adds the quarter turn to the camera only, and carries sideways.js offline", () => {
   const g = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
   assert.match(g, /const a = theta \+ side; camera\.position\.set\(target\.x \+ dist \* Math\.sin\(phi\) \* Math\.sin\(a\)/);
-  assert.match(g, /side = sidewaysAngle\(w, h, params\.get\('sideways'\)\)/);
+  assert.match(g, /side = (table \? Math\.PI \/ 2 : )?sidewaysAngle\(w, h, params\.get\('sideways'\)\)/); // (the Fold half folded lies it across too, web/tabletop.js)
   assert.match(g, /badgeFlip\(theta \+ side\)/);
   assert.equal((g.match(/theta = side|side = theta/g) || []).length, 0, "the seat's angle never takes the quarter turn");
   assert.ok(readFileSync(new URL("../web/sw.js", import.meta.url), "utf8").includes("'./sideways.js'"));
