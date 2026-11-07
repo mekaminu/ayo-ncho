@@ -220,6 +220,9 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  played and the result card's strip must read solved · tried · shown · solved · (today's seed dropping in) · ahead ·
 #                  ahead, the line tick from "2 of 7" to "This week · 3 of 7 · Sunday's the hard one" (<out>), the card still on the screen;
 #                  then the same in French
+#        --talk: their talk (web/chatter.js) — on the phone (390x844) a new game opens with the greeting in the bubble; Settings →
+#                 Opponent → Their talk → Off (<out>, the row) and an Undo makes the face react with no bubble; Few, after a reload, greets
+#                 again and keeps the Undo line back; kept in storage
 #        --rated: a fair rating (web/rated.js) — a settled rating of 1180 and a saved game one move from beating Mama Ngozi: Continue,
 #                  Undo (your move and her reply fly back) must toast "Taken back · this game won't count for your rating" once and keep
 #                  the count over a reload; then the game is put back one move from the win (the count still 1), the winning move is
@@ -231,7 +234,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
-out = sys.argv[1]; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; tablec = "--table" in sys.argv; leftyc = "--lefty" in sys.argv; warmc = "--warm" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; ratedc = "--rated" in sys.argv; record = record or story or bestsc
+out = sys.argv[1]; talkc = "--talk" in sys.argv; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv; undoc = "--undo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; tablec = "--table" in sys.argv; leftyc = "--lefty" in sys.argv; warmc = "--warm" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; ratedc = "--rated" in sys.argv; record = record or story or bestsc
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -939,6 +942,40 @@ if sidec:  # a phone held sideways (idea 5 Nov): the board lies across a short, 
         pg.set_viewport_size({"width": 1180, "height": 820}); pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.side") == 0, "the Mac keeps the upright board"
         pg.set_viewport_size({"width": 844, "height": 390}); pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.side") > 1, "on its side again"
         print("sideways: upright and on the Mac it stands up as before, and lies down again")
+        ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
+if talkc:  # Their talk (idea 7 Nov): all / few / off for the computer's bubble
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True); pg = ctx.new_page(); watch(pg, errors, "talk: ")
+        pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")
+        def start():
+            pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+            play_btn(pg); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=30000); pg.wait_for_timeout(500)
+        def move_and_undo():
+            n = len(pg.evaluate("window.__ayo.state")["moves"]); pit = pg.evaluate("window.__ayo.legal")[0]; x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
+            for _ in range(3):  # pick it (a first touch after Settings may only wake the board), then sow
+                if pg.evaluate("window.__ayo.selected") == pit: break
+                pg.mouse.click(x, y); pg.wait_for_timeout(500)
+            pg.mouse.click(x, y)
+            try: pg.wait_for_function("window.__ayo.state.moves.length >= %d && !window.__ayo.busy" % (n + 2), timeout=60000)
+            except Exception: print("talk: stuck", pg.evaluate("[window.__ayo.selected, window.__ayo.busy, window.__ayo.state.turn, window.__ayo.state.moves, document.querySelector('#settings').hidden, document.elementFromPoint(%f, %f).id]" % (x, y))); raise; pg.wait_for_timeout(3000)  # the reply, and any capture line has gone
+            pg.click("#undo"); pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length <= %d" % n, timeout=30000); pg.wait_for_timeout(300)
+            return pg.evaluate("window.__ayo.talk")
+        start(); t = pg.evaluate("window.__ayo.talk")
+        assert t["now"] == "all" and t["log"] and t["log"][0][1] is True and t["bubble"], ("all: the greeting shows", t)
+        pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])", timeout=5000); pg.wait_for_timeout(300)
+        assert pg.evaluate("document.querySelector('#talkNow').textContent") == "every line, as they play"
+        pg.click("[data-set=talk] [data-v=off]"); pg.wait_for_timeout(200)
+        assert pg.evaluate("localStorage.getItem('ayo.talk')") == "off" and pg.evaluate("document.querySelector('#talkNow').textContent") == "no words; the face still shows it"
+        pg.evaluate("document.querySelector('[data-set=talk]').closest('.row').scrollIntoView({block:'center'})"); pg.wait_for_timeout(300); pg.screenshot(path=out)
+        pg.click("#settingsBack"); pg.wait_for_timeout(600)
+        t = move_and_undo(); last = t["log"][-1]
+        assert last == ["undo", False] and not t["bubble"], ("off: no bubble at the undo", t); print("talk: off — Undo, the face reacts, no words")
+        pg.evaluate("localStorage.setItem('ayo.talk', 'few')"); start(); t = pg.evaluate("window.__ayo.talk")
+        assert t["now"] == "few" and t["log"][0][1] is True and t["bubble"], ("few: still greets", t)
+        t = move_and_undo(); assert t["log"][-1] == ["undo", False], ("few: the undo line kept back", t); print("talk: few — greets, then keeps the undo line back")
         ctx.close(); b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)
