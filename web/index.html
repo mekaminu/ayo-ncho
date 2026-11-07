@@ -572,6 +572,21 @@ body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewi
 .wide .bar{left:auto;right:0;bottom:50%;transform:translateY(50%);flex-direction:column;padding:0 max(24px,env(safe-area-inset-right,0px)) 0 0}
 .wide #hint{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 24px);left:50%}
 .wide #words{bottom:auto;top:calc(env(safe-area-inset-top,0px) + 32px + max(var(--hint-h,28px),28px));flex-direction:column} /* on the Mac the words hang under the hint line, her take below their move */
+/* Left hand (web/hand.js, Settings → Feel → Hand): the side layout mirrored, the buttons down the left for a left thumb, the scores and faces down the right */
+html.lefty .hud{left:auto;right:0;padding:0 max(24px,env(safe-area-inset-right,0px)) 0 0;align-items:flex-end}
+html.lefty .hud .col{align-items:flex-end;text-align:right}
+html.lefty .hud .who{flex-direction:row-reverse}
+html.lefty .bar{right:auto;left:0;padding:0 0 0 max(24px,env(safe-area-inset-left,0px))}
+html.lefty #bubble{left:auto;right:max(24px,env(safe-area-inset-right,0px));border-radius:14px 14px 4px 14px}
+html.lefty #myBubble{left:auto;right:max(24px,env(safe-area-inset-right,0px));border-radius:14px 14px 4px 14px}
+html.lefty #shoutMenu,html.lefty #callMenu{right:auto;left:max(84px,calc(env(safe-area-inset-left,0px) + 84px));justify-content:flex-start}
+html.lefty body.reviewing #words{left:auto;right:24px}
+/* the swap itself: each bar fades and slides in from its new edge */
+@keyframes handInL{from{opacity:0;translate:-28px 0}to{opacity:1;translate:0 0}}
+@keyframes handInR{from{opacity:0;translate:28px 0}to{opacity:1;translate:0 0}}
+html.handswap .bar{animation:handInR .45s cubic-bezier(.2,.8,.2,1)}html.handswap.lefty .bar{animation-name:handInL}
+html.handswap .hud{animation:handInL .45s cubic-bezier(.2,.8,.2,1)}html.handswap.lefty .hud{animation-name:handInR}
+@media (prefers-reduced-motion:reduce){html.handswap .bar,html.handswap .hud{animation:none}}
 /* Home on a wide screen (the Fold open, the Mac): one column down the left over the dark side of the light, the board
    free on the right. (4 Nov: on Meka's Fold open the cards sat on the right on top of the board and the left was empty.) */
 .wide #home{flex-direction:column;justify-content:flex-start;align-items:flex-start}
@@ -777,6 +792,7 @@ html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
         <div class="row" id="remindTimeRow"><div class="t"><b>Remind me at</b><span>the phone's own clock</span></div><div class="seg" data-set="remindAt"><button class="segbtn" data-v="9">9:00</button><button class="segbtn" data-v="13">13:00</button><button class="segbtn" data-v="19">19:00</button></div></div>
         <div class="row"><div class="t"><b>Sowing speed</b><span>how fast the hand moves</span></div><div class="seg" data-set="speed"><button class="segbtn" data-v="slow">Slow</button><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="fast">Fast</button></div></div>
         <div class="row"><div class="t"><b>Lighter board</b><span>for slow phones and weak signal · <em id="qualityNow">auto</em></span></div><div class="seg" data-set="quality"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="lite">On</button><button class="segbtn" data-v="full">Off</button></div></div>
+        <div class="row"><div class="t"><b>Hand</b><span>on a wide screen (the Fold open, a phone on its side, the Mac) · <em id="handNow">buttons down the right</em></span></div><div class="seg" data-set="hand"><button class="segbtn" data-v="right">Right</button><button class="segbtn" data-v="left">Left</button></div></div>
         <div class="row"><div class="t"><b>Seed physics</b><span>seeds bounce and roll; off, they fly straight to their pit · <em id="physicsNow">auto</em></span></div><div class="seg" data-set="physics"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="on">On</button><button class="segbtn" data-v="off">Off</button></div></div>
         <div class="row"><div class="t"><b>Battery saver</b><span>when the battery is low the board draws less and seeds fly straight, back to full on the charger · <em id="batteryNow">auto</em></span></div><div class="seg" data-set="battery"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="off">Off</button></div></div>
       </div>

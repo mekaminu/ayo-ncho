@@ -36,6 +36,7 @@ import { mayHold, holdMove, releaseOf, heldWords } from './heldmove.js';
 import { takeOn as judgeMove, takeWords, takeLine, NAME as COACH } from './coach.js';
 import { sidewaysAngle, SIDE_PHI } from './sideways.js';
 import { tableFold, tableRoom as foldRoom, tableVars, TABLE_PHI } from './tabletop.js';
+import { handPref, handNow, mirrored, wideRoom, handNote, handToast } from './hand.js';
 import { retryOf, isRetry, retryOffer, retryButton, retryToast, retryEyebrow, retryLine, retryShare } from './retry.js';
 import { playoutOf, isPlayout, canPlayOut, playedOut, undoOk, undoReady, playoutButton, playoutToast, playoutEyebrow, playoutShare } from './playout.js';
 import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare, nearSeatAt, tableCards, tableStart, setNames as setLocalNames, readNames, keepNames, faceMark, pillLine } from './local.js';
@@ -89,6 +90,8 @@ const prefs = { get: (k, d) => { try { return localStorage.getItem('ayo.' + k) ?
 const textSizeNow = () => sizePref(params0().get('textsize') || prefs.get('textsize', 'normal'));
 function params0() { try { return new URLSearchParams(location.search); } catch { return new URLSearchParams(); } }
 applyScale(document, textSizeNow());
+// Left hand (web/hand.js): Settings → Feel → Hand mirrors the side layout; ?hand=left|right for a visit (the renders)
+let HAND = handNow(prefs.get('hand', 'right'), params.get('hand'));
 // the page's language (web/i18n.js, Launch L18): Settings → Language, Auto follows the phone; ?lang=fr|en for a visit
 const langPref = () => params.get('lang') || prefs.get('lang', 'auto');
 const i18n = makeI18n({ doc: document, lang: pickLang(langPref(), navigator.languages || [navigator.language]) }).start();
@@ -171,11 +174,28 @@ function onScreen(w, h) { // the board's box on screen, in px
   for (const [x, y, z] of EDGE) { vp.set(x, y, z).project(camera); const px = (vp.x + 1) / 2 * w, py = (1 - vp.y) / 2 * h; l = Math.min(l, px); r = Math.max(r, px); t = Math.min(t, py); b = Math.max(b, py); }
   return { l, r, t, b };
 }
+// Left hand: the bars fade out, change sides and slide in from their new edge while the board glides to the middle of
+// the room they now leave (the camera's view offset eased from where it was), so nothing jumps
+function swapHands() {
+  const de = document.documentElement, on = mirrored(HAND, { wide, table });
+  if (de.classList.contains('lefty') === on) return;
+  const from = camera.view && camera.view.enabled ? { x: camera.view.offsetX, y: camera.view.offsetY } : null;
+  de.classList.toggle('lefty', on); de.classList.remove('handswap'); void de.offsetWidth; if (!reduceMotion) de.classList.add('handswap');
+  setTimeout(() => de.classList.remove('handswap'), 520);
+  frame();
+  if (!from || reduceMotion || !camera.view) return;
+  const to = { x: camera.view.offsetX, y: camera.view.offsetY }, t0 = performance.now(), D = 420;
+  const step = (now) => { const k = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - k, 3);
+    if (!camera.view || !camera.view.enabled) return;
+    camera.view.offsetX = from.x + (to.x - from.x) * e; camera.view.offsetY = from.y + (to.y - from.y) * e; camera.updateProjectionMatrix();
+    if (k < 1) requestAnimationFrame(step); };
+  camera.view.offsetX = from.x; camera.view.offsetY = from.y; camera.updateProjectionMatrix(); requestAnimationFrame(step);
+}
 // the room the bars leave for the board, measured from the page (so it follows the notch, the home bar and the fonts)
 function room(w, h) {
   const top = $('.hud.top').getBoundingClientRect(), bot = $('.hud.bottom').getBoundingClientRect(), bar = $('.bar').getBoundingClientRect();
   if (table) return foldRoom(table, w, h); // the Fold half folded: the whole flat half, the cards are all above the crease
-  if (wide) return { l: Math.max(top.right, bot.right) + 16, r: Math.min(w, bar.left) - 16, t: top.top + 40, b: h - 18 }; // the scores down the left, the buttons down the right, the hint line across the top
+  if (wide) { const cards = { left: Math.min(top.left, bot.left), right: Math.max(top.right, bot.right) }; return { ...wideRoom(mirrored(HAND, { wide, table }) ? 'left' : 'right', { cards, bar, w, top: top.top }), b: h - 18 }; } // the scores down one side, the buttons down the other (Left hand mirrors them), the hint line across the top
   return { l: 14, r: w - 14, t: top.bottom + 10, b: bot.top - 48 }; // between the opponent's row and the hint line over your row (room for two lines of it)
 }
 // Frame the board: all of it, both troughs and every pit, in the room the bars leave, whatever the screen's shape (a tall
@@ -202,7 +222,7 @@ function resize() {
   const nowWide = w > h * 1.1; if (nowWide !== wide) { wide = nowWide; theta = baseTheta; }
   table = tableFold(typeof window.viewport !== 'undefined' && window.viewport ? window.viewport.segments : null, w, h, params.get('table'));
   side = table ? Math.PI / 2 : sidewaysAngle(w, h, params.get('sideways')); // on the table the board lies across, your row nearest you
-  const de = document.documentElement; de.classList.toggle('wide', wide); de.classList.toggle('sideways', !!side && !table); de.classList.toggle('tabletop', !!table);
+  const de = document.documentElement; de.classList.toggle('wide', wide); de.classList.toggle('sideways', !!side && !table); de.classList.toggle('tabletop', !!table); de.classList.toggle('lefty', mirrored(HAND, { wide, table }));
   if (table) for (const [k, v] of Object.entries(tableVars(table, h))) de.style.setProperty(k, v);
   frame();
 }
@@ -1860,6 +1880,7 @@ function paintSettings() {
   set('quality', prefs.get('quality', 'auto')); $('#qualityNow').textContent = `now ${Q.lite ? 'lighter' : 'full'} (${quality.reason})` + (lastGameWords(parseFrames(prefs.get('frames.last', ''))) ? ' · ' + lastGameWords(parseFrames(prefs.get('frames.last', ''))) : '');
   set('lang', prefs.get('lang', 'auto')); set('textsize', textSizeNow()); $('#sizeNow').textContent = sizeNote(textSizeNow()); paintLegal(); $('#langNow').textContent = langNote(prefs.get('lang', 'auto'), i18n.lang);
   set('battery', prefs.get('battery', 'auto')); $('#batteryNow').textContent = noteFor(batt.s);
+  set('hand', HAND); $('#handNow').textContent = handNote(HAND);
   set('physics', prefs.get('physics', 'auto')); $('#physicsNow').textContent = `now ${PHYS.physics ? 'on' : 'off'} (${PHYS.reason})`;
   document.querySelectorAll('.choose[data-level]').forEach((b) => { const on = settings.mode !== 'local' && b.dataset.level === level; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Chosen' : 'Choose'; });
   const two = $('.choose[data-mode="local"]'); two.setAttribute('aria-pressed', settings.mode === 'local'); two.textContent = settings.mode === 'local' ? 'Chosen' : 'Choose';
@@ -2037,6 +2058,7 @@ document.querySelectorAll('#settings [data-set]').forEach((el) => {
       else if (name === 'starts') { prefs.set('starts.pref', v); toast(v === 'loser' ? 'From the next game: the loser goes first' : v === 'you' ? 'From the next game: you always start' : 'From the next game: they always start'); }
       else if (name === 'quality') { if (v !== prefs.get('quality', 'auto') || prefs.get('quality.measured', '') === 'slow') { prefs.set('quality', v); prefs.set('quality.measured', ''); /* a choice in Settings starts the speed judgement afresh */ save(); toast('Redrawing the board…'); setTimeout(() => location.reload(), 500); } }
       else if (name === 'battery') { prefs.set('battery', v); battSet(); }
+      else if (name === 'hand') { prefs.set('hand', handPref(v)); params.delete('hand'); const was = HAND; HAND = handPref(v); if (was !== HAND) swapHands(); toast(handToast(HAND)); } // at once: the bars slide across, the board follows
       else if (name === 'physics') { prefs.set('physics', v); PHYS = decidePhysics({ pref: v, lite: quality.lite, param: params.get('physics'), saver: batt.s.on }); toast(PHYS.physics ? 'Seeds bounce and roll again' : 'Seeds fly straight to their pit'); } // applies to the next seed, no new game
       paintSettings(); click(1.2, 0.05);
     }));
