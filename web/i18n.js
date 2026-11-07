@@ -896,6 +896,8 @@ export const PATTERNS = [
   [/^(new )?best win (\d+)–(\d+)$/, (m) => `${m[1] ? 'nouvelle ' : ''}meilleure victoire ${m[2]}–${m[3]}`],
   [/^(\d+) draws?$/, (m) => pl(m[1], 'nul', 'nuls')],
   [/^Ready for (.+?)\? Play (him|her) next$/, (m) => `Prêt pour ${m[1]} ? Jouez contre ${m[2] === 'him' ? 'lui' : 'elle'} ensuite`],
+  [/^(Three|Six|Nine|\d+) in a row to (.+?) — try (.+?) for a while\?$/, (m) => `${{ Three: 'Trois', Six: 'Six', Nine: 'Neuf' }[m[1]] || m[1]} défaites de suite face à ${m[2]} — ${m[3]} un moment ?`],
+  [/^Back to (.+?)\? Try (him|her) again$/, (m) => `Retour à ${m[1]} ? Retentez votre chance contre ${m[2] === 'him' ? 'lui' : 'elle'}`],
   [/^([+−±]\d+) for (beating|losing to|a draw with) (.+?) \((\d+)\)$/, (m) => `${m[1]} pour ${{ beating: 'votre victoire sur', 'losing to': 'votre défaite contre', 'a draw with': 'un nul avec' }[m[2]]} ${m[3]} (${m[4]})`],
   [/^Taken back · this game won't count for your rating$/, () => 'Coup repris · cette partie ne comptera pas pour votre classement'],
   [/^Not rated · you took back (a move|(\d+) moves)$/, (m) => `Non classée · vous avez repris ${m[2] ? m[2] + ' coups' : 'un coup'}`],

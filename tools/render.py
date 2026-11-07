@@ -230,6 +230,10 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #        --bests: as --record with a phone that has played 5 Nchò games and has smaller bests: the Game over card must say "Your best
 #                 ever" with the engine's numbers (web/bests.js run in node), the seed and glint, Biggest turn in brass; then a tap on it
 #                 watches that turn again and the card comes back; the bests are kept in storage
+#        --stepdown: a gentler game, and the way back up (web/stepdown.js) — two losses running to Mama Ngozi and a saved game one
+#                    move from a third: the Game over card offers "Three in a row to Mama Ngozi — try Nnamdi for a while? · Medium"
+#                    (<out>); a tap starts Nnamdi and keeps the step; then a saved game one move from beating Nnamdi offers "Back to
+#                    Mama Ngozi? Try her again · Hard" (<out>-up.png) and a tap goes back to her and clears the step
 #        --record: your record against each opponent — a phone with games already played against all three and a saved game one move from a
 #                  win over Mama Ngozi (tools/endgame.js finds it): Home shows the record under each opponent's name (<out>-home.png), Continue
 #                  brings the game back, the winning move is played, and the Game over card shows "you lead 3–1 · new best win 28–20" and her
@@ -238,6 +242,7 @@ out = sys.argv[1]; talkc = "--talk" in sys.argv; qrc = "--qr" in sys.argv; dealc
 keyhelpc = "--keyhelp" in sys.argv
 carryc = "--carry" in sys.argv
 sbackc = "--settingsback" in sys.argv
+stepc = "--stepdown" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -1095,6 +1100,38 @@ if talkc:  # Their talk (idea 7 Nov): all / few / off for the computer's bubble
         pg.evaluate("localStorage.setItem('ayo.talk', 'few')"); start(); t = pg.evaluate("window.__ayo.talk")
         assert t["now"] == "few" and t["log"][0][1] is True and t["bubble"], ("few: still greets", t)
         t = move_and_undo(); assert t["log"][-1] == ["undo", False], ("few: the undo line kept back", t); print("talk: few — greets, then keeps the undo line back")
+        ctx.close(); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+    srv.shutdown(); print("wrote", out); sys.exit(0)
+if stepc:  # a gentler game, and the way back up (idea 7 Nov)
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        def one(endargs, lv, rec, stepped, shot):
+            end = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "endgame.js"), *endargs]).decode())
+            saved = {"moves": end["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": lv, "stats": {"biggest": 6, "captures": 2, "started": int(time.time() * 1000) - 6 * 60 * 1000}}
+            ctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True); pg = ctx.new_page(); watch(pg, errors, "stepdown: ")
+            init = {"ayo.tutorial": "3", "ayo.game": json.dumps(saved), "ayo.record": json.dumps(rec), "ayo.level": lv, "ayo.talk": "few"}
+            if stepped: init["ayo.stepped"] = json.dumps(stepped)
+            pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); const kv = %s; for (const k in kv) localStorage.setItem(k, kv[k]); }" % json.dumps(init))
+            pg.goto("http://127.0.0.1:8766/web/index.html?capture=1&stay=home", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+            pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+            tap(pg, end["pit"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.state.over", timeout=240000); pg.wait_for_selector("#gameover:not([hidden])", timeout=10000); pg.wait_for_timeout(2500)
+            nx = pg.evaluate("window.__ayo.nextUp"); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=shot, animations="disabled"); pg.evaluate("window.__freeze=false")
+            return ctx, pg, nx
+        ctx, pg, nx = one(["7", "ncho", "lose"], "hard", {"hard": {"w": 1, "l": 4, "d": 0, "best": [26, 22], "run": -2}, "last": 1}, None, out)
+        assert nx == {"text": "Three in a row to Mama Ngozi — try Nnamdi for a while? · Medium", "level": "medium"}, ("the third loss running offers a step down", nx)
+        assert pg.evaluate("window.__ayo.record.hard.run") == -3
+        print("stepdown: three in a row to Mama Ngozi —", nx["text"])
+        pg.click("#goNext"); pg.wait_for_function("document.querySelector('#gameover').hidden && !window.__ayo.state.over && window.__ayo.state.moves.length <= 1", timeout=30000)
+        got = pg.evaluate("[window.__ayo.level, localStorage.getItem('ayo.stepped')]")
+        assert got == ["medium", json.dumps({"from": "hard", "to": "medium"}, separators=(",", ":"))], ("a new game against Nnamdi, the step kept", got)
+        print("stepdown: a tap starts Nnamdi and keeps the step")
+        ctx.close()
+        ctx, pg, nx = one(["7", "ncho"], "medium", {"medium": {"w": 2, "l": 1, "d": 0, "best": [27, 21], "run": 0}, "hard": {"w": 1, "l": 5, "d": 0, "best": [26, 22], "run": -3}, "last": 1}, {"from": "hard", "to": "medium"}, out[:-4] + "-up.png")
+        assert nx == {"text": "Back to Mama Ngozi? Try her again · Hard", "level": "hard"}, ("beating Nnamdi offers the way back", nx)
+        pg.click("#goNext"); pg.wait_for_function("document.querySelector('#gameover').hidden && !window.__ayo.state.over", timeout=30000)
+        assert pg.evaluate("[window.__ayo.level, localStorage.getItem('ayo.stepped')]") == ["hard", "null"], pg.evaluate("[window.__ayo.level, localStorage.getItem('ayo.stepped')]")
+        print("stepdown: beat Nnamdi —", nx["text"], "— a tap goes back to Mama Ngozi and clears the step")
         ctx.close(); b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("wrote", out); sys.exit(0)

@@ -76,6 +76,7 @@ import { makeFresh, buildOf, safeNow as freshSafe, fetchBuild, FIRST_MS as FRESH
 import { makeFrameMeter, MIN_FRAMES, slowVerdict, mayJudge, lastGameWords, lastGameRecord, parseRecord as parseFrames, SLOW_TOAST } from './frametime.js';
 import { makeTelemetry, memorySink, resultOf, teleNote } from './telemetry.js';
 import { makeReminders, testNotifications, remindNote, hourOf, hourLabel, offerShown, offerWords } from './remind.js';
+import { offerAfter, afterTake as stepTaken, parseStepped } from './stepdown.js';
 import { STEPS as LESSON, stepsOf as lessonSteps, lessonGame, doneEyebrow as lessonDoneEyebrow, DONE_LINE as LESSON_DONE_LINE, ROW_LINE as LESSON_ROW, DONE as LESSON_DONE, startState as lessonStart, eyebrow as lessonEyebrow, SKIP as LESSON_SKIP, replyWords as lessonReply, wrongPit as LESSON_WRONG, isNewPhone, lessonDue, firstLevel, nextUp } from './lesson.js';
 import { phoneTag, Blocked, mayBlock, sortKnocks, blockWords, ARM_MS as BLOCK_MS, REPORT_PAGE, REPORT_HASH } from './block.js';
 import { makeWaiting, WAIT_MOOD, drumPit, shiverAt, DRUM_MS, DRUM_GAP_MS, DRUMS } from './waiting.js';
@@ -537,6 +538,7 @@ const names = { easy: 'Adaeze', steady: 'Auntie Bisi', medium: 'Nnamdi', hard: '
 const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
 const playAsk = { guard: makeKeepGuard(KEEP_MS), timer: 0 }; // Play keeps your game: Play asks once while a game is under way (web/keepgame.js)
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
+let stepped = parseStepped(prefs.get('stepped', null)), goOffer = null; // the step down taken (web/stepdown.js), until the way back up
 let stats = { biggest: 0, captures: 0, started: Date.now() };
 // your record against each opponent, kept on this phone (web/record.js): wins–losses and your best win, on their Home pill and the Game over card
 let records = parseRecord(prefs.get('record', null));
@@ -1879,7 +1881,7 @@ function endLesson(playNow) { // Skip, Back to home, or Play: the board goes to 
 }
 $('#lsNext').addEventListener('click', () => { lessonNext(); click(1.2, 0.05); });
 $('#lessonBtn').addEventListener('click', () => { if (!online) { openLesson('home'); click(1.3, 0.08); } });
-$('#goNext').addEventListener('click', () => { const lv = $('#goNext').dataset.level; if (!lv || online) return; level = lv; prefs.set('level', lv); prefs.set('mode', 'ai'); mood = 'calm'; newRound(); showScreen('play'); click(1.3, 0.08); });
+$('#goNext').addEventListener('click', () => { const lv = $('#goNext').dataset.level; if (!lv || online) return; stepped = stepTaken(stepped, goOffer); prefs.set('stepped', JSON.stringify(stepped)); goOffer = null; level = lv; prefs.set('level', lv); prefs.set('mode', 'ai'); mood = 'calm'; newRound(); showScreen('play'); click(1.3, 0.08); });
 
 // ---------- screens ----------
 const body = document.body;
@@ -2242,8 +2244,10 @@ function paintRecord(a, b) {
   const box = $('#goRecord'); $('#goNext').hidden = true; if (online && !puzzle.on) { paintTally(box); return null; }
   if (online || puzzle.on || local) { box.hidden = true; return null; } // two of us keeps no record: the phone cannot tell who sat where
   const r = recordGame(records, level, a, b, stats.started); records = r.data; if (r.counted) prefs.set('record', JSON.stringify(records));
-  const nx = r.counted ? nextUp(level, r.moment, names) : null; // your first win over them: the next one up is offered
-  if (nx) { $('#goNext').textContent = nx.text; $('#goNext').dataset.level = nx.level; $('#goNext').hidden = false; }
+  const up = r.counted ? nextUp(level, r.moment, names) : null; // your first win over them: the next one up is offered
+  // a gentler game, and the way back up (web/stepdown.js): three losses in a row offer the one a step down; beating them offers the way back
+  const nx = offerAfter({ level, outcome: r.outcome, entry: r.entry, counted: r.counted, stepped, names, next: up, open: (lv) => levelOpen(lv, owned(), GOLD_PREVIEW) });
+  goOffer = nx; if (nx) { $('#goNext').textContent = nx.text; $('#goNext').dataset.level = nx.level; $('#goNext').dataset.kind = nx.kind; $('#goNext').hidden = false; }
   const text = recordLine(r.entry, r.counted && r.newBest); if (!text) { box.hidden = true; return null; }
   $('#goRecLine').innerHTML = text.split(' · ').map((p) => p.startsWith('new best') ? `<em>${p}</em>` : p).join(' · '); // our own numbers and words, nothing typed
   const word = r.counted ? (r.moment === 'firstWin' ? line(level, 'firstWin') : r.moment === 'run' ? runWord(level, r.entry.run) : '') : '';
