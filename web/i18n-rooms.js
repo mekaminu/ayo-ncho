@@ -142,6 +142,24 @@ export const FR_ROOMS = nb({
   '{a} is watching': '{a} regarde',
   '{a} and {b} are watching': '{a} et {b} regardent',
   '{a}, {b} and {n} more are watching': '{a}, {b} et {n} autres regardent',
+  // family round the board, slice 2 (web/spectate.js): the watch link and the board for whoever opens it
+  'Send a watch link': 'Envoyer le lien pour regarder',
+  'Family watching? Send them a watch link': 'La famille veut regarder\u202f? Envoyez-lui le lien',
+  'The watch link comes once the room is open': 'Le lien pour regarder arrive dès que la salle est ouverte',
+  'Watch link copied — whoever opens it follows the game': 'Lien copié — qui l’ouvre suit la partie',
+  'Come and watch our game of Ayo & Nchò live — open the link and follow every move, no seat needed.': 'Venez regarder notre partie d’Ayo & Nchò en direct — ouvrez le lien et suivez chaque coup, sans prendre place.',
+  'That watch link has closed — the game is over or the link is old': 'Ce lien pour regarder est fermé — la partie est finie ou le lien est trop ancien',
+  'The players see this name while you watch. Asked once, kept on this phone.': 'Les joueurs voient ce nom pendant que vous regardez. Demandé une fois, gardé sur ce téléphone.',
+  'Watch': 'Regarder',
+  'Watching': 'Vous regardez',
+  'Finding the game…': 'On cherche la partie…',
+  'Waiting for a player': 'On attend un joueur',
+  'not here yet': 'pas encore là',
+  'to move': 'à jouer',
+  'the game is over': 'la partie est finie',
+  'They agreed a draw': 'Match nul, d’un commun accord',
+  'A move was taken back': 'Un coup a été repris',
+  'A new game': 'Une nouvelle partie',
   'No connection right now — reconnecting': 'Pas de connexion pour l’instant — reconnexion',
   // a move kept for the line (web/heldmove.js)
   'No signal': 'Pas de réseau',
@@ -235,6 +253,14 @@ export function roomPatterns({ who, item, need }) {
     [R(`${N} did not let you in this time`), (m) => `${who(m[1])} ne vous a pas fait entrer cette fois`],
     [R(`${N} decides`), (m) => `${who(m[1])} décide`],
     [R(`${N} joined`), (m) => `${who(m[1])} a rejoint la salle`],
+    // family round the board, slice 2 (web/spectate.js)
+    [R(`${N} came to watch`), (m) => `${who(m[1])} vient regarder`],
+    [R(`${N} is watching`), (m) => `${who(m[1])} regarde`], // the chip on the board (web/online.js watchersLine, set in English)
+    [R(`${N} and ${N} are watching`), (m) => `${who(m[1])} et ${who(m[2])} regardent`],
+    [R(`${N}, ${N} and (\\d+) more are watching`), (m) => `${who(m[1])}, ${who(m[2])} et ${m[3]} autres regardent`],
+    [R(`Watching ${N} and ${N}`), (m) => `Vous regardez ${who(m[1])} et ${who(m[2])}`],
+    [R(`Watching ${N}'s room`), (m) => `Vous regardez la salle de ${who(m[1])}`],
+    [R(`waiting for ${N}'s friend`), (m) => `on attend l’ami de ${who(m[1])}`],
     [R(`Waiting for ${N}…`), (m) => `On attend ${who(m[1])}…`],
     // their hand over the board (web/peek.js): the line under the friend's name while their finger is on a pit
     // the score at the table (web/tally.js): the Game over card's line and the toast when the next game starts

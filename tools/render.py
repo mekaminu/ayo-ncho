@@ -248,6 +248,7 @@ sbackc = "--settingsback" in sys.argv
 stepc = "--stepdown" in sys.argv
 ratec = "--askrate" in sys.argv
 lookc = "--look" in sys.argv
+familyc = "--family" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -256,7 +257,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8766), functools.partial(Quiet, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 node = None
-if online or legal or freshc or cdnc or qrc or warmc:  # the real server on its own port, so two pages can meet at one board
+if online or legal or freshc or cdnc or qrc or warmc or familyc:  # the real server on its own port, so two pages can meet at one board
     def start_node():  # with a fixed ROOM_SECRET, so a restart mid-game can be checked (the rooms come back from the boards' tickets)
         n = subprocess.Popen(["node", os.path.join(root, "server", "index.js")], env={**os.environ, "PORT": "8767", "ROOM_SECRET": "render-check-secret"}, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         for _ in range(100):
@@ -1819,6 +1820,66 @@ if frrooms:  # French (L18, slice 5): two French phones meet in a room — the R
     node.terminate()
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     srv.shutdown(); print("frrooms: ok · wrote", out); sys.exit(0)
+if familyc:  # family round the board (web/spectate.js): Meka opens a room, Tete comes in, Mum opens the watch link and follows the game live
+    import atexit; atexit.register(lambda: node.terminate())
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        vp = {"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}
+        def page(name, tag):
+            pg = b.new_context(viewport=vp, device_scale_factor=1).new_page(); watch(pg, errors, tag)
+            if name: pg.add_init_script("localStorage.setItem('ayo.name', %s)" % json.dumps(name))
+            return pg
+        host = page("Meka", "host: "); host.goto("http://127.0.0.1:8767/?capture=1&stay=home", wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
+        host.click("#friendsBtn"); host.wait_for_function("window.__ayo.room && window.__ayo.room.code && window.__ayo.room.seat===0 && window.__ayo.room.watch", timeout=20000)
+        host.wait_for_function("!document.querySelector('#watchLinkBtn').disabled", timeout=10000)
+        code = host.evaluate("window.__ayo.room.code"); key = host.evaluate("window.__ayo.room.watch")
+        outr = out[:-4] + "-room.png"; host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=outr, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")  # the room card with its watch link
+        friend = page("Tete", "friend: "); friend.goto("http://127.0.0.1:8767/?capture=1&room=" + code, wait_until="load"); friend.wait_for_function("window.__done===true", timeout=180000)
+        host.wait_for_selector("#knockCard:not([hidden])", timeout=20000); host.click("#knockYes")
+        for pg in (host, friend): pg.wait_for_function("window.__ayo.room && window.__ayo.room.friend && window.__ayo.room.friend.name", timeout=20000)
+        # Mum has never played: the name card asks once, with Watch on its button
+        mum = page(None, "mum: "); mum.goto("http://127.0.0.1:8767/?capture=1&watch=%s-%s" % (code, key), wait_until="load"); mum.wait_for_function("window.__done===true", timeout=180000)
+        mum.wait_for_selector("#nameCard:not([hidden])", timeout=10000)
+        assert mum.evaluate("document.querySelector('#nameGo').textContent") == "Watch", mum.evaluate("document.querySelector('#nameGo').textContent")
+        mum.fill("#nameField", "Mum"); mum.click("#nameGo")
+        mum.wait_for_function("window.__ayo.spect.on && window.__ayo.spect.id && window.__ayo.spect.near==='Meka' && window.__ayo.spect.far==='Tete'", timeout=20000)
+        sp = mum.evaluate("window.__ayo.spect"); print("family: Mum sees", sp["near"], "near and", sp["far"], "far ·", sp["hint"])
+        assert sp["hint"].startswith("Watching · ") and not sp["press"], sp
+        for pg in (host, friend): pg.wait_for_function("window.__ayo.spect.chip==='Mum is watching'", timeout=20000)
+        assert host.evaluate("window.__ayo.room.watchers") == ["Mum"]
+        print("family: both boards say", repr(host.evaluate("window.__ayo.spect.chip")))
+        for chip in ("#undo", "#hintBtn", "#shoutBtn", "#callBtn"): assert mum.evaluate("getComputedStyle(document.querySelector('%s')).display" % chip) == "none", chip + " shows on a watcher's board"
+        # Meka plays; Mum's board follows, seed for seed
+        mum_before = mum.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
+        tap(host, 2)
+        mum.wait_for_function("window.__ayo.spect.moves===1 && !window.__ayo.busy", timeout=240000)
+        host.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===1", timeout=240000)
+        mum_after = mum.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
+        assert mum_after != mum_before and mum_after == host.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')"), "Mum's board did not follow Meka's move"
+        assert mum.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]") == host.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]")
+        mum.wait_for_function("window.__ayo.spect.hint==='Watching · Tete\\'s move'", timeout=20000)
+        # a tap on Mum's board does nothing: it is not her game
+        tap(mum, 7); mum.wait_for_timeout(600)
+        assert mum.evaluate("window.__ayo.spect.moves") == 1 and host.evaluate("window.__ayo.state.moves.length") == 1, "a watcher's tap must not play"
+        mum.wait_for_timeout(300)
+        outm = out; mum.evaluate("window.__freeze=true"); mum.wait_for_timeout(200); mum.screenshot(path=outm, timeout=120000, animations="disabled"); mum.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        outh = out[:-4] + "-host.png"; host.evaluate("window.__freeze=true"); host.wait_for_timeout(200); host.screenshot(path=outh, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        # Tete gives up from the shout row (twice, as ever): Mum's card says whose game it was, with no Play again
+        friend.wait_for_function("!window.__ayo.busy && window.__ayo.state.moves.length===1", timeout=240000); friend.wait_for_timeout(400)
+        friend.click("#shoutBtn"); friend.wait_for_function("!document.querySelector('#shoutMenu').hidden", timeout=10000)
+        assert not friend.evaluate("document.querySelector('#watchPill').hidden"), "the shout row offers the watch link to a seated player"
+        friend.evaluate("(() => { const b = document.querySelector('#giveUpBtn'); b.click(); b.click(); })()")  # the two taps the button asks for
+        mum.wait_for_selector("#gameover:not([hidden])", timeout=60000)
+        title = mum.evaluate("document.querySelector('#goTitle').textContent"); print("family: Mum's card says", repr(title))
+        assert title == "Tete gave up · Meka wins", title
+        assert mum.evaluate("document.querySelector('#rematch').hidden") and mum.evaluate("document.querySelector('#goMe span').textContent") == "Meka"
+        mum.wait_for_timeout(400); outo = out[:-4] + "-over.png"; mum.evaluate("window.__freeze=true"); mum.wait_for_timeout(200); mum.screenshot(path=outo, timeout=120000, animations="disabled"); mum.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        # Mum goes Home: the players' boards stop saying she is watching
+        mum.click("#goHome"); host.wait_for_function("window.__ayo.spect.chip===''", timeout=20000)
+        print("family: Mum left, the chip went")
+        assert not errors, errors
+        b.close()
+    node.terminate(); print("wrote", out); sys.exit(0)
 if online:
     import atexit; atexit.register(lambda: node.terminate())  # the server never outlives a failed check (whichever one is running)
     with sync_playwright() as p:
