@@ -67,6 +67,8 @@
 #        add --trough to check counting a trough by touch: a saved game near the finish (the --race one), a real finger rests on each
 #                  trough, its seeds are counted to the engine's score and the line says "your trough · 22 seeds · 3 more to win"
 #                  (screenshot <out>, the near trough); lifting plays nothing; the French line too
+#        add --igbo (with --smoke) to check count in Igbo (idea 8 Nov): the --count check with Settings → Language → Count in →
+#                  Igbo: the word under the brass number is the Igbo for the count ("isii") and the hint line ends with it
 #        add --count (with --smoke) to check counting a pit by touch: a real finger (touch events) rests on their richest pit, the number
 #                  over it counts up seed by seed to the engine's count and the hint line says "their pit 2 · 6 seeds" (screenshot <out>);
 #                  lifting the finger plays nothing; a hold on your own pit counts it and does not pick it; a finger that drags turns the
@@ -253,6 +255,9 @@ ratec = "--askrate" in sys.argv
 lookc = "--look" in sys.argv
 familyc = "--family" in sys.argv
 leanc = "--lean" in sys.argv
+igboc = "--igbo" in sys.argv; countc = countc or igboc
+IGBO1 = ["efu", "otu", "abụọ", "atọ", "anọ", "ise", "isii", "asaa", "asatọ", "itoolu"]
+def igbo(n): return IGBO1[n] if n < 10 else ("iri" if n // 10 == 1 else "iri " + IGBO1[n // 10]) + ((" na " + IGBO1[n % 10]) if n % 10 else "")
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -2207,6 +2212,7 @@ if online:
 with sync_playwright() as p:
     b = p.chromium.launch(args=ARGS)
     pg = b.new_page(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2 if not (wide or home) else 1, has_touch=countc or troughc)
+    if igboc: pg.add_init_script("localStorage.setItem('ayo.count', 'igbo')")
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" and "Failed to load resource" not in m.text else None)
@@ -3356,6 +3362,8 @@ with sync_playwright() as p:
             k = (t - 6 * (1 - you)) + 1; want = "their pit %d · %d seed%s" % (k, n, "" if n == 1 else "s")
             assert hint().startswith(want), (hint(), want)
             pg.wait_for_function("window.__ayo.count.done", timeout=8000); c = A(); assert c["text"] == str(n), c
+            if igboc: assert c["igbo"] and c["word"] == igbo(n) and hint().endswith(" · " + igbo(n)), ("counted in Igbo", c, hint(), igbo(n))
+            else: assert c["word"] is None, c
             print("count:", c["words"], "· counted to", c["text"])
             pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
             touch("touchEnd"); pg.wait_for_timeout(300)

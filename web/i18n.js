@@ -19,6 +19,7 @@
 // first game's tips.
 
 import { FR_ROOMS, roomPatterns } from './i18n-rooms.js';
+import { IGBO_WORDS } from './igbo.js';
 
 export const LANGS = ['auto', 'en', 'fr'];
 
@@ -342,6 +343,12 @@ export const FR = {
   'block someone from the camera button in a game with a friend: their knocks at your rooms are turned away and they cannot call you; only on this phone': 'bloquez quelqu’un depuis le bouton caméra pendant une partie entre amis : on ne lui ouvre plus vos salles et il ne peut plus vous appeler ; sur ce téléphone seulement',
   'Language': 'Langue',
   'Word size': 'Taille des mots',
+  'Count in': 'Compter en', // count in Igbo (web/igbo.js): the Igbo words themselves stay as they are
+  'Figures': 'Chiffres',
+  'hold a pit or a trough to count it': 'touchez longuement un trou ou une réserve pour le compter',
+  'in figures': 'en chiffres',
+  'Counting in figures': 'On compte en chiffres',
+  'Counting in Igbo': 'On compte en igbo',
   'Double-tap the wood to set the board straight': 'Touchez deux fois le bois pour remettre le plateau droit',
   'Double-click the wood, or press 0, to set the board straight': 'Double-cliquez sur le bois (ou la touche 0) pour remettre le plateau droit',
   'Arrow keys turn and tilt the board, + and − bring it nearer · 0 sets it straight': 'Les flèches tournent et inclinent le plateau, + et − le rapprochent · 0 le remet droit',
@@ -775,8 +782,8 @@ for (const k in FR) FR[k] = FR[k].replace(/ ([:;?!])/g, '\u00a0$1');
 // the names two players typed for two of us (web/local.js, Settings → Opponent → Our names): kept as they are, like the opponents'
 const TYPED = new Set();
 export function keepTyped(names = []) { TYPED.clear(); for (const n of names) if (n && !Object.prototype.hasOwnProperty.call(FR, n)) TYPED.add(n); }
-const kept = (p) => KEEP.has(p) || TYPED.has(p);
-const KEEP = new Set(['Adaeze', 'Auntie Bisi', 'Nnamdi', 'Mama Ngozi', 'Papa Ike', 'Nchò', 'Ayo', 'Gold', 'Tete', 'Player', 'Iroko']);
+const kept = (p) => KEEP.has(p) || TYPED.has(p) || IGBO_WORDS.has(p); // a count said in Igbo stays Igbo
+const KEEP = new Set(['Adaeze', 'Auntie Bisi', 'Nnamdi', 'Mama Ngozi', 'Papa Ike', 'Nchò', 'Ayo', 'Gold', 'Tete', 'Player', 'Iroko', 'Igbo', 'otu, abụọ, atọ, anọ…', 'otu, abụọ, atọ…']);
 const LOOK_FR = { 'river stones': 'les galets', 'benin bronze': 'le bronze du Bénin', "grandpa's board": 'le plateau de grand-père', cowries: 'les cauris', 'palm kernels': 'les noix de palme' };
 const look = (s) => LOOK_FR[s.toLowerCase()] || s;
 // a look named in a sentence: "Les cauris sont à vous", "pour le bronze du Bénin"; a wood, Gold and the bundle by their own name

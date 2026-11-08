@@ -74,6 +74,7 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 .handc.tick{animation:hcTick .18s ease-out}.handc.again{animation:hcAgain .45s ease-out}
 .handc.lean{margin:-26px 0 0 -11px;white-space:nowrap;font-size:calc(12px*var(--ts));font-weight:600;padding:1px 8px;transition:opacity .4s}.handc.lean.tick{animation:hcAgain .45s ease-out}.handc.lean.fade{opacity:0} /* who is ahead: the bead's word, for a moment after it moves */
 .handc.count{margin:-24px 0 0 -11px;font-size:calc(15px*var(--ts));line-height:20px;min-width:22px;transition:opacity .25s}.handc.count.done{animation:hcAgain .45s ease-out}.handc.count.fade{opacity:0} /* count a pit by touch: the number over the pit a finger rests on */
+.cword{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);margin:2px 0 0 0;white-space:nowrap;pointer-events:none;font-size:calc(12px*var(--ts));font-weight:600;font-style:italic;line-height:16px;padding:0 6px;border-radius:8px;color:var(--brass);background:rgba(20,12,6,.72);translate:-50% 0;transition:opacity .25s}.cword.done{color:#ffe2a8}.cword.fade{opacity:0} /* count in Igbo: the word under the brass number */
 @keyframes hcTick{from{scale:1.18}to{scale:1}}@keyframes hcAgain{0%{scale:1.4;box-shadow:0 0 0 2px #fff3d0,0 0 16px rgba(255,214,140,.9)}100%{scale:1}}
 .badge.last{color:#1a120b;background:var(--brass);box-shadow:0 0 0 1px rgba(255,220,160,.6),0 0 10px rgba(230,183,111,.55)} /* the last 8: the pits still holding seeds */
 #last8,#circling{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.7);color:var(--fg);border-radius:999px;padding:5px 12px;font:500 calc(12px*var(--ts)) Inter,system-ui,sans-serif;line-height:1.35;pointer-events:none}
@@ -845,6 +846,7 @@ html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
     <div class="group"><span class="eyebrow">Language</span>
       <div class="box">
         <div class="row"><div class="t"><b>Language</b><span id="langNow">follows the phone's language · English now</span></div><div class="seg" data-set="lang"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="en" lang="en">English</button><button class="segbtn" data-v="fr" lang="fr">Français</button></div></div>
+        <div class="row"><div class="t"><b>Count in</b><span id="countNow">hold a pit or a trough to count it · in figures</span></div><div class="seg" data-set="count"><button class="segbtn" data-v="figures">Figures</button><button class="segbtn" data-v="igbo" lang="ig">Igbo</button></div></div>
         <div class="row"><div class="t"><b>Word size</b><span id="sizeNow">the hints, the lines under the board, the cards and Settings · as drawn</span></div><div class="seg" data-set="textsize"><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="large">Large</button><button class="segbtn" data-v="larger">Larger</button></div></div>
       </div>
     </div>
