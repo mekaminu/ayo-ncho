@@ -27,6 +27,8 @@
 // The page carries Open Graph tags written per address (server/preview.js), so a shared invite or puzzle link shows the board,
 // who is asking and today's ask in WhatsApp's card.
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
+// Floods (server/guard.js): each connection has a pace ({t:"error", code:"slow"} past it, closed if it keeps on); each address may hold
+// 40 connections, open 20 rooms in ten minutes and knock at 6 doors at once ({t:"error", code:"full"} / "busy" past those).
 import express from "express";
 import http from "node:http";
 import path from "node:path";
@@ -36,6 +38,7 @@ import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage, backMessag
 import { mountLegal } from "./legal.js";
 import { pageWithPreview } from "./preview.js";
 import { compressedStatic, sendText } from "./compress.js";
+import { Pace, Doorman, addressOf, GUARD } from "./guard.js";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 
@@ -57,7 +60,7 @@ export function pageWithBuild(html, build) { return html.replace('<meta name="ay
 
 export const THREE_FILE = path.join(__dirname, "..", "node_modules", "three", "build", "three.module.min.js");
 
-export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000, env = process.env } = {}) {
+export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000, env = process.env, guard = {}, now = Date.now } = {}) {
   const app = express();
   mountLegal(app, env);
   const build = buildId(), page = pageWithBuild(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), build);
@@ -138,17 +141,28 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
     }
   };
 
-  wss.on("connection", (ws) => {
+  // one bad visitor can't spoil the evening (server/guard.js): a pace per connection, caps per address
+  const G = { ...GUARD, ...guard };
+  const doorman = new Doorman({ now, ...G });
+  wss.on("connection", (ws, req) => {
+    ws.addr = addressOf(req);
+    if (!doorman.open(ws.addr, ws)) { send(ws, { t: "error", code: "full", msg: "too many connections from here right now, try again in a minute" }); ws.close(1013, "busy"); return; }
+    ws.pace = new Pace({ now, burst: G.burst, perSecond: G.perSecond, closeAfter: G.closeAfter });
     ws.isAlive = true;
     ws.on("pong", () => { ws.isAlive = true; });
     ws.on("message", (raw) => {
+      const pace = ws.pace.take();
+      if (pace === "close") { ws.close(1008, "too fast"); return; }
+      if (pace === "drop") { if (ws.pace.say()) send(ws, { t: "error", code: "slow", msg: "slow down a moment" }); return; }
       let m; try { m = JSON.parse(String(raw)); } catch { return send(ws, { t: "error", code: "bad", msg: "not JSON" }); }
       if (!m || typeof m !== "object") return send(ws, { t: "error", code: "bad", msg: "not a message" });
       try {
+        if (m.t === "create" && !ws.room && !ws.watch && !doorman.mayCreate(ws.addr)) throw new RoomError("full", "too many rooms opened from here lately, try again in a few minutes");
+        if (m.t === "join" && !ws.room && !ws.watch && !ws.knock && doorman.knocking(ws.addr) >= G.knocksPerAddress) throw new RoomError("busy", "knocking at too many doors at once");
         switch (m.t) {
           case "ping": return send(ws, { t: "pong" });
           case "watch": if (ws.room || ws.knock || ws.watch) throw new RoomError("seated", "already at a board"); return watchSocket(ws, rooms.watch(m.code, m.key, { name: m.name }));
-          case "create": if (ws.room || ws.watch) throw new RoomError("seated", "already at a board"); return seatSocket(ws, rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name, tag: m.tag }));
+          case "create": { if (ws.room || ws.watch) throw new RoomError("seated", "already at a board"); let r; try { r = rooms.create({ variant: m.variant, rules: m.rules && typeof m.rules === "object" ? m.rules : {}, name: m.name, tag: m.tag }); } catch (e) { doorman.unCreate(ws.addr); throw e; } return seatSocket(ws, r); }
           case "join": if (ws.room || ws.watch) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return knockSocket(ws, rooms.knock(m.code, { name: m.name, tag: m.tag }));
           case "rejoin": if (ws.room || ws.watch) throw new RoomError("seated", "already at a board"); if (ws.knock) throw new RoomError("knocking", "already at the door"); return seatSocket(ws, rooms.rejoin(m.code, m.token, m.ticket && typeof m.ticket === "object" ? m.ticket : null, m.tag));
           case "let": return answerDoor(ws, m);
@@ -171,6 +185,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
       }
     });
     ws.on("close", () => {
+      doorman.close(ws.addr, ws);
       if (ws.knock) { // gone from the door: the host's list shrinks
         const { code, id } = ws.knock; ws.knock = null; knockers.delete(id);
         if (rooms.withdraw(code, id)) { try { broadcast(code, { t: "room", room: rooms.snapshot(code) }); } catch {} }
@@ -186,6 +201,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
 
   // keepalive: a phone that vanished without closing is dropped after two missed pings; stale rooms are swept
   const timer = setInterval(() => {
+    doorman.sweep();
     for (const ws of wss.clients) { if (!ws.isAlive) { ws.terminate(); continue; } ws.isAlive = false; try { ws.ping(); } catch {} }
     for (const code of rooms.sweep()) {
       for (const s of sockets.get(code) || []) send(s, { t: "error", code: "swept", msg: "the room has closed" }); sockets.delete(code);
@@ -196,7 +212,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   timer.unref();
 
   const close = () => new Promise((res) => { clearInterval(timer); for (const ws of wss.clients) ws.terminate(); wss.close(() => server.close(() => res())); });
-  return { app, server, wss, rooms, close, build };
+  return { app, server, wss, rooms, close, build, doorman };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
