@@ -2093,7 +2093,7 @@ $('#lessonBtn').addEventListener('click', () => { if (!online) { openLesson('hom
 $('#goNext').addEventListener('click', () => { const lv = $('#goNext').dataset.level; if (!lv || online) return; stepped = stepTaken(stepped, goOffer); prefs.set('stepped', JSON.stringify(stepped)); goOffer = null; level = lv; prefs.set('level', lv); prefs.set('mode', 'ai'); mood = 'calm'; newRound(); showScreen('play'); click(1.3, 0.08); });
 
 // ---------- screens ----------
-const body = document.body;
+const body = document.body; const stage = document.getElementById("game") || body; // the <main> landmark: what the game adds to the page goes inside it (tools/a11y.py)
 function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle' | 'store'
   if (which !== 'home') playDisarm(false); // Play's question goes with Home
   if (which !== 'play' && review.on) endReview(false);
@@ -2282,7 +2282,7 @@ function sayText(text, mood = 'calm', ms = 2600, moment = 'chat') { // the oppon
 function owned() { return parseOwned(visitOwned ?? prefs.get('owned', '[]')); } // what the phone bought (L12), or the test store's visit
 function goldLocked(lv) { if (levelOpen(lv, owned(), GOLD_PREVIEW)) return false; toast(lockedWords(names[lv], inApp()), 3200); click(0.7, 0.05); return true; }
 function paintGold() { document.querySelectorAll('[data-level]').forEach((b) => { if (!GOLD_LEVELS.includes(b.dataset.level)) return; const shut = !levelOpen(b.dataset.level, owned(), GOLD_PREVIEW); b.classList.toggle('locked', shut); const row = b.closest('.row'); if (row) row.classList.toggle('locked', shut); }); }
-function toast(text, ms = 1800) { const t = document.createElement('div'); t.className = ms > 1800 ? 'toast long' : 'toast'; t.textContent = text; body.appendChild(t); setTimeout(() => t.remove(), ms); }
+function toast(text, ms = 1800) { const t = document.createElement('div'); t.className = ms > 1800 ? 'toast long' : 'toast'; t.textContent = text; stage.appendChild(t); setTimeout(() => t.remove(), ms); }
 
 // Settings → Opponent → Our names (two of us): kept as typed, shown at once — the cards, the faces, the turn, Home's pill and
 // Continue line — in a game under way too; an empty field is Player 1 / Player 2 again
@@ -2868,7 +2868,7 @@ const TIPS = [
 let tipStep = +prefs.get('tutorial', '0');
 function showTip(text) {
   if (!text || params.get('still') || params.get('capture') || puzzle.on) return;
-  let t = $('#tip'); if (!t) { t = document.createElement('div'); t.id = 'tip'; t.innerHTML = '<p></p><button class="btn ghost" style="padding:8px 12px;font-size:calc(13px*var(--ts))">Got it</button>'; body.appendChild(t); t.querySelector('button').addEventListener('click', () => { t.remove(); }); }
+  let t = $('#tip'); if (!t) { t = document.createElement('div'); t.id = 'tip'; t.innerHTML = '<p></p><button class="btn ghost" style="padding:8px 12px;font-size:calc(13px*var(--ts))">Got it</button>'; stage.appendChild(t); t.querySelector('button').addEventListener('click', () => { t.remove(); }); }
   t.querySelector('p').textContent = text;
 }
 function tipFor(events) {
@@ -3296,7 +3296,7 @@ const rest = makeRest({ on: params.get('rest') !== '0' });
 const glw = makeGlWatch(); let glFresh = 0; const glEl = document.createElement('div');
 glEl.id = 'glLost'; glEl.setAttribute('role', 'status'); glEl.setAttribute('aria-live', 'polite'); glEl.hidden = true;
 glEl.innerHTML = '<div class="seeds"><i></i><i></i><i></i></div><b></b><small></small><button type="button" hidden></button>';
-document.body.appendChild(glEl);
+stage.appendChild(glEl);
 glEl.querySelector('button').addEventListener('click', () => { glw.log.push({ t: 'reload' }); try { save(); sessionStorage.setItem('ayo.glback', '1'); } catch {} if (window.__glReload) window.__glReload(); else location.reload(); });
 function glPaint(kind) {
   if (glEl.dataset.kind === (kind || '')) return; glEl.dataset.kind = kind || '';
