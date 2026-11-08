@@ -35,6 +35,7 @@ import { WebSocketServer } from "ws";
 import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage, backMessage, drawMessage } from "./rooms.js";
 import { mountLegal } from "./legal.js";
 import { pageWithPreview } from "./preview.js";
+import { compressedStatic, sendText } from "./compress.js";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 
@@ -62,10 +63,12 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   const build = buildId(), page = pageWithBuild(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), build);
   app.get("/version", (_req, res) => { res.set("Cache-Control", "no-store"); res.json({ v: build }); });
   const haveLocal = fs.existsSync(THREE_FILE);
-  app.get(["/", "/index.html"], (_req, res) => { res.set("Cache-Control", "no-cache"); res.type("html").send(pageWithPreview(page, _req, rooms)); });
-  app.get("/vendor/three.module.min.js", (_req, res) => { if (!haveLocal) return res.status(404).end(); res.set("Access-Control-Allow-Origin", "*"); res.sendFile(THREE_FILE, { maxAge: "7d" }); });
-  app.use("/engine", express.static(ENGINE));
-  app.use(express.static(WEB));
+  app.get(["/", "/index.html"], (req, res) => { res.set("Cache-Control", "no-cache"); sendText(req, res, pageWithPreview(page, req, rooms)); });
+  // the game's files go out squeezed (server/compress.js); images and anything not text fall through to express.static
+  const three = compressedStatic(path.dirname(THREE_FILE), { file: THREE_FILE, maxAge: 7 * 24 * 3600, headers: { "Access-Control-Allow-Origin": "*" } });
+  app.get("/vendor/three.module.min.js", (req, res, next) => { if (!haveLocal) return res.status(404).end(); three(req, res, next); });
+  app.use("/engine", compressedStatic(ENGINE), express.static(ENGINE));
+  app.use(compressedStatic(WEB), express.static(WEB));
   app.get("/healthz", (_req, res) => res.json({ ok: true, rooms: rooms.size }));
   app.get("/api/rooms/:code", (req, res) => {
     const code = normaliseCode(req.params.code);
