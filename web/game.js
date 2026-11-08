@@ -11,6 +11,7 @@ import { decideSaver, saverPlan, drawDue, toastFor, noteFor, watchBattery } from
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES, dayKey } from './streak.js';
 import { greetMoment } from './greet.js';
 import { keep as keepRematch, rematchMoment } from './rematch.js';
+import { rematchButtons, askWords, switchedWords, wishOf } from './nextgame.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { beatQuery, parseBeat, beatDay, beatAsk, beatResult, beatShowWords, beatWatchWords, beatShownEyebrow, beatLinkWords, beatShare } from './beat.js';
 import { dailyPuzzle, attempt, shareText as dayShareText, todayKey, levelWord } from '../engine/puzzle.js';
@@ -620,7 +621,7 @@ const roomParam = params.get('still') ? null : params.get('room');
 // family round the board (web/spectate.js): ?watch=CODE-KEY follows a friend's game live with no seat (a game sent as a link, web/watch.js, has its own ?watch=)
 const watchParam = params.get('still') ? null : parseWatch(params.get('watch'));
 let online = false, roomWanted = null; // online while a room is open, knocked on or joined (from the Rooms screen, or ?room=CODE from an invite link); roomWanted: 'NEW' or the code asked for
-let net = null, friend = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
+let net = null, friend = null, meSeat = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
 // your move, even in another tab: what the friend does while this page is out of sight is said on the tab's title, icon and the app's badge
 let awayIcon = null; const awayIconLoad = () => { if (awayIcon === null) { awayIcon = ''; fetch('./icon.svg').then((r) => r.text()).then((t) => { awayIcon = t; }).catch(() => {}); } };
 const away = makeAway({ doc: document, nav: navigator, t: (w) => i18n.t(w), icon: () => awayIcon, chime: () => { click(1.6, 0.07); setTimeout(() => click(2.1, 0.07), 150); } });
@@ -1135,7 +1136,7 @@ function callRoom() { if (call.f.phase !== 'idle' && (!friend || !friend.online)
 function callEnd() { if (call.f.phase !== 'idle') { const e = call.f.hangUp(); callDo(e); } callMenu.hidden = true; $('#callCard').hidden = true; }
 
 function syncRoom(room) { // the room as the server shows it: the friend's seat and the whole game
-  friend = room.players[them] || null; tableRoom = room.rid ? { code: room.code, rid: room.rid, games: room.games || 0 } : null;
+  friend = room.players[them] || null; meSeat = room.players[you] || null; tableRoom = room.rid ? { code: room.code, rid: room.rid, games: room.games || 0 } : null;
   const s = stateFrom(room.state);
   const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
   state = s; if (!same) { layoutFromState(state); peekIn.pit = -1; peekOut.reset(); }
@@ -1281,11 +1282,11 @@ function startOnline(code, { stay = false } = {}) {
     else if (back) toast('Back at the board'); else if (!friend && !roomsShowing()) toast(`Room ${code} — share this page's link`);
   });
   on('room', ({ room, started, resync }) => {
-    const had = friend, wanted = friend && friend.wantsRematch; syncRoom(room);
+    const had = friend, wanted = wishOf(friend, state && state.variant), wasGame = state && state.variant; syncRoom(room); const switched = !!started && !!wasGame && wasGame !== state.variant; // Ayo next (web/nextgame.js)
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
     if (!had && friend) { tele.track('invite_joined', { as: 'host' }, `j:${net && net.code}`); if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
-    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); resetDraw(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); const tl = tableRoom ? tallyStart(tallyOf(tally, roomKey(tableRoom.code, tableRoom.rid)), you, friend ? friend.name : oppLabel()) : ''; toast((tl ? tl[0].toUpperCase() + tl.slice(1) : 'New game') + ' — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`), tl ? 2600 : 1800); }
-    else if (friend && friend.wantsRematch && !wanted) { toast(`${friend.name} wants to play again`); awayNote('rematch'); if (!$('#gameover').hidden) $('#rematch').textContent = `Play again — ${friend.name} is ready`; }
+    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); resetDraw(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); const tl = tableRoom ? tallyStart(tallyOf(tally, roomKey(tableRoom.code, tableRoom.rid)), you, friend ? friend.name : oppLabel()) : ''; if (switched) { click(1.2, 0.08); setTimeout(() => click(1.6, 0.08), 140); } toast((switched ? switchedWords(state.variant) + (tl ? ' · ' + tl : '') : tl ? tl[0].toUpperCase() + tl.slice(1) : 'New game') + ' — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`), tl ? 2600 : 1800); }
+    else { const fw = wishOf(friend, state.variant); if (fw && fw !== wanted) { toast(askWords(friend.name, fw, state.variant)); awayNote('rematch'); } if (!$('#gameover').hidden) paintRematch(); } // the friend asked (or asked for the other game): the buttons say so
   });
   on('move', (m) => { drawOnMove(m.seat); if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
   on('resign', (m) => { resetDraw(); if (m.seat === them) { const s = stateFrom(m.state); awayNote('over', { result: s.winner === you ? 'won' : 'lost', gaveUp: true }); } moveQueue = moveQueue.then(() => showResign(m)).catch((e) => console.error(e)); });
@@ -1392,7 +1393,7 @@ function spectOver() { // the Game over card for a watcher: whose game it was, t
   $('#goEyebrow').textContent = `${s.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${s.moves.length} moves`; $('#goTitle').textContent = spectateTitle(s, spect.room);
   $('#goMe span').textContent = a.name; $('#goOppName').textContent = b.name; $('#goMyScore').textContent = s.stores[0]; $('#goOppScore').textContent = s.stores[1];
   $('#goMe').classList.toggle('win', s.winner === 0); $('#goOpp').classList.toggle('win', s.winner === 1);
-  for (const id of ['#goBests', '#goStory', '#goReview', '#goRecord', '#goRating', '#goNext', '#goRetry', '#rematch', '#replayBtn', '#clipBtn', '#shareBtn']) $(id).hidden = true;
+  for (const id of ['#goBests', '#goStory', '#goReview', '#goRecord', '#goRating', '#goNext', '#goRetry', '#rematch', '#rematchAlt', '#replayBtn', '#clipBtn', '#shareBtn']) $(id).hidden = true;
   $('#gameover').classList.add('watching'); stopReview();
   if ($('#gameover').hidden) { $('#gameover').hidden = false; if (!gave) { click(1.5, 0.12); setTimeout(() => click(2, 0.12), 120); } }
 }
@@ -1405,11 +1406,12 @@ function spectError(e) {
 function startWatching(w) {
   online = true; local = false; spect.on = true; you = 0; them = 1; baseTheta = 0; theta = 0;
   net = new Online(wsUrl()); const self = net; const on = (t, fn) => self.on(t, (d) => { if (net === self) fn(d); });
+  let spectWas = null; // the game being watched, so a switch to the other one (Ayo next) is said
   on('watching', ({ id, room }) => {
-    const first = !spect.room; spect.id = id; syncSpect(room);
+    const first = !spect.room; spect.id = id; spectWas = room.variant; syncSpect(room);
     if (first) { const [a, b] = spectateCards(room); toast(room.players[1] ? `Watching ${a.name} and ${b.name}` : `Watching ${a.name}'s room`, 2400); click(1.3, 0.08); setTimeout(() => click(1.7, 0.08), 120); }
   });
-  on('room', ({ room, started }) => { syncSpect(room); if (started) { $('#gameover').hidden = true; $('#gameover').classList.remove('watching'); toast('A new game'); click(1.4, 0.08); } });
+  on('room', ({ room, started }) => { if (spectWas === null) spectWas = room.variant; syncSpect(room); if (started) { $('#gameover').hidden = true; $('#gameover').classList.remove('watching'); toast(spectWas !== room.variant ? switchedWords(room.variant) + ' — a new game' : 'A new game'); click(1.4, 0.08); } spectWas = room.variant; });
   on('move', (m) => { moveQueue = moveQueue.then(() => spectMove(m)).catch((e) => console.error(e)); });
   on('resign', (m) => { moveQueue = moveQueue.then(() => spectEnd(m, 'resign')).catch((e) => console.error(e)); });
   on('draw', (m) => { moveQueue = moveQueue.then(() => spectEnd(m, 'draw')).catch((e) => console.error(e)); });
@@ -2438,7 +2440,7 @@ function gameOver() {
   $('#goEyebrow').textContent = out ? (isRetry(playout) ? retryEyebrow(state.variant, playout.n, playedOut(playout, state)) : isTakeover(playout) ? takeoverEyebrow(state.variant, playout.n, playedOut(playout, state)) : playoutEyebrow(state.variant, playedOut(playout, state))) + (endedCircling(state) ? ' · ' + circlingEnded() : '') : `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves${gave ? ' · ' + gave.who : endedCircling(state) ? ' · ' + circlingEnded() : ''}`; // a called game says why it ended
   $('#goTitle').textContent = gave ? gave.title : local ? localTitle(state) : draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
   $('#goMyScore').textContent = a; $('#goOppScore').textContent = b; $('#goOppName').textContent = oppLabel();
-  $('#rematch').textContent = online ? (friend && friend.wantsRematch ? `Play again — ${friend.name} is ready` : 'Play again') : 'Play again'; $('#rematch').disabled = false;
+  paintRematch();
   $('#goMe').classList.toggle('win', gave ? win : a >= b); $('#goOpp').classList.toggle('win', gave ? state.winner === them : b > a); // an agreed draw lights neither
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
   const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
@@ -3080,7 +3082,17 @@ function shake(pit) { const [x, z] = pitCenters[pit]; board.ring.position.x = x;
 
 $('#undo').addEventListener('click', undo);
 $('#hintBtn').addEventListener('click', hint);
-$('#rematch').addEventListener('click', () => { if (online) { if (net.rematch()) { $('#rematch').textContent = `Waiting for ${oppLabel()}…`; $('#rematch').disabled = true; click(1.3, 0.08); } return; } newRound(); showScreen('play'); });
+// Ayo next (web/nextgame.js): in a room the big button asks for its game (the same again, or the one the friend asked for) and the quiet one under it for the other
+function paintRematch() {
+  const alt = $('#rematchAlt'), main = $('#rematch');
+  if (!online || spect.on || !friend) { alt.hidden = true; main.textContent = 'Play again'; main.disabled = false; delete main.dataset.game; return; }
+  const b = rematchButtons({ current: state.variant, mine: wishOf(meSeat, state.variant), theirs: wishOf(friend, state.variant), name: friend.name });
+  main.textContent = b.main.text; main.disabled = b.main.disabled; main.dataset.game = b.main.game;
+  alt.textContent = b.alt.text; alt.dataset.game = b.alt.game; alt.hidden = false;
+}
+function askRematch(game) { if (net && net.rematch(game)) { $('#rematch').disabled = true; click(1.3, 0.08); } }
+$('#rematchAlt').addEventListener('click', () => { if (online) askRematch($('#rematchAlt').dataset.game); });
+$('#rematch').addEventListener('click', () => { if (online) return askRematch($('#rematch').dataset.game); newRound(); showScreen('play'); });
 $('#rulesBtn').addEventListener('click', () => { if ($('#rules').hidden) openRules(); else $('#rules').hidden = true; });
 // ---------- the keys, on How to play (idea 7 Nov; web/keyhelp.js): wherever a keyboard is likely (a mouse or trackpad, or any key
 // already pressed) the card ends with every key the board answers to, for where you are playing; ? opens it at that list, and

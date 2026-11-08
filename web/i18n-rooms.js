@@ -234,6 +234,7 @@ function nb(o) { for (const k of Object.keys(o)) o[k] = o[k].replace(/ ([:;?!])/
 // The lines with a name or a number in them. `who` keeps a name as it is; `item` names a look with its article.
 export const LOOKS = "Mahogany|Iroko|Ebony|Benin bronze|Grandpa's board|Job's tears|River stones|Cowries|Palm kernels|The whole market|Gold";
 export function roomPatterns({ who, item, need }) {
+  const GA = { 'Nchò': 'au Nchò', 'Ayo': 'à l’Ayo' }, GLE = { 'Nchò': 'le Nchò', 'Ayo': 'l’Ayo' }, GAU = { 'Nchò': 'au Nchò', 'Ayo': 'à l’Ayo' }; // jouer au Nchò / à l’Ayo; plutôt le Nchò; place au Nchò
   const N = '((?!\\d)[^·—:]+?)'; // a name (never a count: "2 days played" is the streak's)
   const R = (s) => new RegExp('^' + s + '$');
   const L = `(${LOOKS})`; // a look's name, so a line about anything else is never caught
@@ -270,6 +271,16 @@ export function roomPatterns({ who, item, need }) {
     [R(`Watching ${N}'s room`), (m) => `Vous regardez la salle de ${who(m[1])}`],
     [R(`waiting for ${N}'s friend`), (m) => `on attend l’ami de ${who(m[1])}`],
     [R(`Waiting for ${N}…`), (m) => `On attend ${who(m[1])}…`],
+    // Ayo next (web/nextgame.js): the room's Game over buttons and toasts when the next game is the other one
+    [R(`Waiting for ${N}… · (Nchò|Ayo) next`), (m) => `On attend ${who(m[1])}… · ${GLE[m[2]]} ensuite`],
+    [R(`(Nchò|Ayo) again instead`), (m) => `Plutôt ${GLE[m[1]]} encore`],
+    [R(`(Nchò|Ayo) next instead`), (m) => `Plutôt ${GLE[m[1]]} ensuite`],
+    [R(`Play (Nchò|Ayo) next — ${N} is ready`), (m) => `Jouer ${GA[m[1]]} ensuite — ${who(m[2])} est prêt`],
+    [R(`Play (Nchò|Ayo) next`), (m) => `Jouer ${GA[m[1]]} ensuite`],
+    [R(`${N} wants to play (Nchò|Ayo) next`), (m) => `${who(m[1])} veut jouer ${GA[m[2]]} ensuite`],
+    [R(`Now (Nchò|Ayo)`), (m) => `Place ${GAU[m[1]]}`],
+    [R(`Now (Nchò|Ayo) — a new game`), (m) => `Place ${GAU[m[1]]} — une nouvelle partie`],
+    [R(`Now (Nchò|Ayo)(?: · (.+?))? — (.+)`), (m) => `Place ${GAU[m[1]]}` + (m[2] ? ` · ${need(m[2])}` : '') + ` — ${need(m[3])}`],
     // their hand over the board (web/peek.js): the line under the friend's name while their finger is on a pit
     // the score at the table (web/tally.js): the Game over card's line and the toast when the next game starts
     [R(`${N} leads (\\d+)–(\\d+)`), (m) => `${who(m[1])} mène ${m[2]}–${m[3]}`],

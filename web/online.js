@@ -22,7 +22,7 @@
 //   net.on('ticket', ({ code, token, ticket }) => …) // the room as this board holds it, sealed by the server: keep it (with the token) so a reload can rebuild the room after a restart
 //   net.on('watching', ({ code, room }) => …) // family round the board: following the game from a watch link, no seat (room: the watch view; again after a reconnect)
 //   net.watch(code, key, name) — follow a game without a seat; every 'move', 'resign', 'takeback', 'draw', 'shout' … then arrives as for a seat
-//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token, ticket?) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch() / net.resign() / net.askBack() / net.answerBack(yes) / net.offerDraw() / net.answerDraw(yes) / net.leave()
+//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token, ticket?) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch(game?) / net.resign() / net.askBack() / net.answerBack(yes) / net.offerDraw() / net.answerDraw(yes) / net.leave()
 
 import { applyMove, resign, takeBack, mayTakeBack, agreeDraw, firstMover } from '../engine/ayo.js';
 
@@ -156,7 +156,7 @@ export class Online {
   kept() { const ticket = ticketOf(this.room); if (ticket) { this.held = null; this.emit('ticket', { code: this.code, token: this.token, ticket }); } }
   let(id, yes = true) { return this.send({ t: 'let', id, in: !!yes }); } // the host answers the door
   move(pit) { return this.send({ t: 'move', pit }); }
-  rematch() { return this.send({ t: 'rematch' }); }
+  rematch(game) { return this.send(game ? { t: 'rematch', game } : { t: 'rematch' }); } // game: 'ncho' or 'ayo' to ask for that one next (web/nextgame.js); none = the same again
   resign() { return this.send({ t: 'resign' }); } // give up the game in play
   askBack() { return this.send({ t: 'askback' }); } // ask to take back the move just played
   answerBack(yes) { return this.send({ t: 'backanswer', yes: !!yes }); }

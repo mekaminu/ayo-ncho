@@ -24,6 +24,7 @@ import { isShout, mayShout } from "../web/shouts.js";
 import { callMessage, passGate } from "../web/call.js";
 import { cleanTag } from "../web/block.js";
 import { isPeek, mayPeek, passPeek } from "../web/peek.js";
+import { afterAsk, wishOf } from "../web/nextgame.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
 export const CODE_LENGTH = 4;
@@ -384,16 +385,22 @@ export class Rooms {
   }
 
   // Play again at the same board: when both seats have asked, a fresh game starts (the loser of the last game moves first).
-  rematch(code, token) {
+  // Ayo next (web/nextgame.js): an ask may name the game it wants (`game`: "ncho" or "ayo"; none means the same again). Asking
+  // for the other game clears the friend's ask for the old one; the new game starts only when both have asked for the same one.
+  // A switch starts the other game with its own rules; the same game again keeps the room's rules as they were.
+  rematch(code, token, game) {
     const room = this.get(code);
     const seat = this.seatOf(room, token);
-    room.seats[seat].wantsRematch = true; room.touchedAt = this.now();
-    const both = room.seats[0] && room.seats[1] && room.seats[0].wantsRematch && room.seats[1].wantsRematch;
-    if (!both) return { started: false, room: this.snapshot(code) };
+    const wishes = room.seats.map((s) => wishOf(s, room.variant));
+    const r = afterAsk(wishes, seat, game, room.variant);
+    room.seats.forEach((s, i) => { if (s) { s.wantsRematch = !!r.wishes[i]; s.wantsGame = r.wishes[i] || null; } });
+    room.touchedAt = this.now();
+    if (!r.start || !room.seats[0] || !room.seats[1]) return { started: false, room: this.snapshot(code) };
+    if (r.start !== room.variant) { room.variant = r.start; room.rules = { ...RULES[r.start] }; }
     const g = newGame(room.variant, room.rules);
     g.turn = g.first = room.game.winner === 0 ? 1 : room.game.winner === 1 ? 0 : (room.games % 2); // the loser starts; after a draw, alternate
     room.game = g; room.games += 1; room.ask = null; room.drawAsk = null; room.restored = false;
-    for (const s of room.seats) if (s) { s.wantsRematch = false; s.backN = null; s.drawN = null; }
+    for (const s of room.seats) if (s) { s.wantsRematch = false; s.wantsGame = null; s.backN = null; s.drawN = null; }
     return { started: true, room: this.snapshot(code) };
   }
 
@@ -402,7 +409,7 @@ export class Rooms {
     const room = this.get(code);
     return {
       code: room.code, variant: room.variant, rules: { ...room.rules }, games: room.games,
-      players: room.seats.map((s, i) => s ? { seat: i, name: s.name, ...(s.tag ? { tag: s.tag } : {}), online: s.online, wantsRematch: s.wantsRematch } : null), // tag: each phone's random tag, for block (web/block.js)
+      players: room.seats.map((s, i) => s ? { seat: i, name: s.name, ...(s.tag ? { tag: s.tag } : {}), online: s.online, wantsRematch: s.wantsRematch, ...(s.wantsRematch ? { wantsGame: s.wantsGame || room.variant } : {}) } : null), // wantsGame: the game that seat asked for next (web/nextgame.js); tag: each phone's random tag, for block (web/block.js)
       knocks: room.knocks.map((k) => ({ id: k.id, name: k.name, ...(k.tag ? { tag: k.tag } : {}) })), // who is at the door (the host's board shows them; never shown to the knockers)
       ask: room.ask ? { seat: room.ask.seat, n: room.ask.n } : null, // a "take it back?" waiting for its answer (a rejoin sees it)
       drawAsk: room.drawAsk ? { seat: room.drawAsk.seat, n: room.drawAsk.n } : null, // a draw offered and not yet answered
