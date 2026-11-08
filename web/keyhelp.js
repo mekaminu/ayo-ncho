@@ -17,7 +17,7 @@ export function keyRows({ online = false, full = false } = {}) {
     { id: 'deselect', keys: ['Esc'], what: 'put the pit back, or close a card' },
     { id: 'undo', keys: ['U'], what: online ? 'ask to take your move back' : 'undo your move' },
   ];
-  if (!online) rows.push({ id: 'hint', keys: ['H'], what: 'a hint' });
+  if (!online) rows.push({ id: 'redo', keys: ['R'], what: 'put back the moves you undid' }, { id: 'hint', keys: ['H'], what: 'a hint' });
   rows.push(
     { id: 'turn', keys: ['←', '→'], what: 'turn the board' },
     { id: 'tilt', keys: ['↑', '↓'], what: 'look from higher or lower' },

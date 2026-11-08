@@ -94,6 +94,7 @@ import { ponderOn, ponderPlan, ponderAt, GLANCE_MS, SETTLE_MS as PONDER_SETTLE_M
 import { mayOfferDraw, drawButton, drawWords } from './draw.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
 import { oneTapOn, pressAction } from './onetap.js';
+import { afterUndo as redoAfterUndo, ready as redoReady, step as redoStep, afterMove as redoAfterMove, gameKey, chipWords as redoWords, CHIP as REDO_CHIP, TITLE as REDO_TITLE, HINT as REDO_HINT } from './redo.js';
 import { makeGuard as makeKeepGuard, ARM_MS as KEEP_MS, playAsks, askWords as keepAsk } from './keepgame.js';
 const warm = makeWarm({ url: healthUrl(publicBase()), fetch: (u, o) => fetch(u, o), online: () => navigator.onLine !== false });
 
@@ -562,6 +563,7 @@ async function passTurn() { // two of us: the player to move takes the near seat
 const names = { easy: 'Adaeze', steady: 'Auntie Bisi', medium: 'Nnamdi', hard: 'Mama Ngozi', master: 'Papa Ike' };
 const levelLabel = (l) => `${names[l]} · ${l[0].toUpperCase() + l.slice(1)}`;
 const playAsk = { guard: makeKeepGuard(KEEP_MS), timer: 0 }; // Play keeps your game: Play asks once while a game is under way (web/keepgame.js)
+let redoLine = null, redoReply = null; // put it back (web/redo.js): the moves Undo took back, and the computer's reply waiting to be played again
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
 let stepped = parseStepped(prefs.get('stepped', null)), goOffer = null; // the step down taken (web/stepdown.js), until the way back up
 let stats = { biggest: 0, captures: 0, started: Date.now() };
@@ -804,7 +806,7 @@ function paintRoomStatus() { // what the room card says, from the connection and
 function stopOnline() { // leave before anyone joined (Back on the Rooms screen, or a knock the host refused): the board is yours again, no reload
   heldMv = null; callEnd(); away.back(); if (net) { net.leave(); net = null; } friend = null; online = false; roomWanted = null; you = 0; them = 1; baseTheta = 0; theta = 0; busy = false; prefs.set('room', 'null');
   $('#knockCard').hidden = true; hideBackCard(); backAsk.pending = false; backAsk.askedN = -1; drawAsk.pending = false; drawAsk.theirs = false; drawAsk.offeredN = -1; body.classList.remove('online'); seenWatchers = null; $('#watchers').hidden = true; if (location.search) history.replaceState(null, '', location.pathname);
-  hideExplain(); if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); paintRules();
+  hideExplain(); if (!resume()) { state = newGame(settings.game, settings.rules()); redoLine = null; } layoutFromState(state); refreshStatic(); paintRules();
 }
 function joinByCode(code) { // Got a code? Join their room: your own room closes and you knock on theirs
   if (net) { net.leave(); net = null; prefs.set('room', 'null'); }
@@ -1452,6 +1454,7 @@ function refreshStatic() {
   showTurn();
 }
 function showTurn() {
+  paintRedo();
   const tc = tableOn() && !watch.on && !puzzle.on ? tableCards(state, nearCard()) : null; document.body.classList.toggle('table', !!tc); document.body.classList.toggle('farturn', !!(tc && tc.farTurn)); tableNear = tc ? tc.near.seat : null;
   if (watch.on) { paintWatch(); return; } // watching a game sent as a link: its own words, nothing to press
   if (spect.on) { paintSpect(); paintPits(); return; } // following a friend's game from a watch link: nothing to press
@@ -1770,6 +1773,7 @@ async function sowEvents(events, prevStores, pace) {
 async function play(pit) {
   const { state: next, events } = applyMove(state, pit);
   const prevStores = state.stores; const mover = state.turn; const before = state; state = next; busy = true; deselect(); $('#undo').disabled = true; teleStart(state);
+  redoLine = redoAfterMove(redoLine, state.moves, gameKey(state)); paintRedo(); if (!redoLine && mover === you) redoReply = null; // put it back: the next move waiting walks the line on, any other ends it
   if (mover === you) {
     hideExplain(); // their last move is old news once you have played
     const got = state.stores[mover] - prevStores[mover]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === mover).length; // two of us: the biggest turn by either
@@ -1789,7 +1793,8 @@ async function play(pit) {
   if (mover === them) explain(before, pit, events); // their move, explained: the ghost of its path and the words, tap to watch it again
   if (state.turn === them) {
     showTurn(); await wait(350); if (mood === 'calm') react('think');
-    const m = await theirPick(state); // their hand weighs a pit or two while the search runs (web/ponder.js)
+    const back = redoReply; redoReply = null; // putting it back: the reply they gave before, exactly
+    const m = back !== null ? (await wait(300), back) : await theirPick(state); // their hand weighs a pit or two while the search runs (web/ponder.js)
     if (m === null || state.turn !== them) return;
     const judging = mover === you ? judge(before, pit) : null; // Mama Ngozi rates the move you just played while the reply is shown
     if (mood === 'think') react('calm'); select(m); await wait(550); // show which pit the opponent chose
@@ -1883,7 +1888,7 @@ function playOut() { // the card goes, the HUD comes back, and their reply is th
 }
 function endPlayout() { // Home from a play-out: your own game comes back (it was never touched), or a fresh board
   if (!playingOut()) { playout = null; return false; }
-  playout = null; hideExplain(); hideTake(); if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); return true;
+  playout = null; hideExplain(); hideTake(); if (!resume()) { state = newGame(settings.game, settings.rules()); redoLine = null; } layoutFromState(state); refreshStatic(); deselect(); paintRules(); return true;
 }
 function paintRemindOffer() { // in the apps, on the first few days the puzzle is played: one tap for the daily reminder
   const b = $('#pzRemind'); b.classList.remove('on'); if (lesson.on) { b.hidden = true; return; }
@@ -1942,7 +1947,7 @@ setTimeout(dayTick, 1000); document.addEventListener('visibilitychange', () => {
 function puzzleAgain() { if (busy) return; const p = puzzle.p; puzzle.played = false; puzzle.mine = false; puzzle.got = 0; state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); click(1.2, 0.05); }
 function closePuzzle() { // Back to home: the board goes back to your game (or a fresh one)
   if (busy) return; puzzle.on = false; puzzle.played = false; $('#pzCard').hidden = true;
-  if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
+  if (!resume()) { state = newGame(settings.game, settings.rules()); redoLine = null; } layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
 }
 async function sharePuzzle() {
   const p = puzzle.p; const text = tLines(shareText(p, puzzle.got) + '\n' + weekShare(weekStrip(daily, p.key, p.variant))) + (linkable() ? `\n${publicBase()}?puzzle=1` : '');
@@ -2011,7 +2016,7 @@ function endLesson(playNow) { // Skip, Back to home, or Play: the board goes to 
   if (prefs.get('level', null) === null) prefs.set('level', level); // a new phone keeps Easy from now on (it is no longer new)
   $('#lsCard').hidden = true; $('#pzHome').textContent = 'Back to home'; $('#puzzle').setAttribute('aria-label', 'Daily puzzle'); deselect();
   if (playNow || (lesson.then === 'play' && was !== 'done')) { newRound(); showScreen('play'); if (tipStep === 0) showTip(TIPS[0]); return; }
-  if (!resume()) state = newGame(settings.game, settings.rules()); layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
+  if (!resume()) { state = newGame(settings.game, settings.rules()); redoLine = null; } layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
 }
 $('#lsNext').addEventListener('click', () => { lessonNext(); click(1.2, 0.05); });
 $('#lessonBtn').addEventListener('click', () => { if (!online) { openLesson('home'); click(1.3, 0.08); } });
@@ -2562,7 +2567,7 @@ function resume() {
 function newRound() {
   playout = null; if (deal.live) { deal.again = true; return; } // a new game is already being dealt: once its seeds are down, start the one asked for
   stopReview(); hideExplain(); takeSaid = false; local = settings.mode === 'local'; const st = comingStart(local);
-  seat(local ? st.first : 0); state = newGame(settings.game, settings.rules(), st.first); stats = { biggest: 0, captures: 0, started: Date.now() };
+  seat(local ? st.first : 0); state = newGame(settings.game, settings.rules(), st.first); redoLine = null; redoReply = null; stats = { biggest: 0, captures: 0, started: Date.now() };
   const dp = window.__dealPace || 1; // (the render check slows it down to take its picture on a software-rendered page)
   const plan = dealPlan(homeCounts(), state, { gap: DEAL_GAP_MS * dp, pitGap: DEAL_PIT_GAP_MS * dp, fly: DEAL_FLY_MS * dp }); // where the last game's seeds lie, and what the new one wants
   if (!dealsIn(plan, { reduceMotion, clipping })) layoutFromState(state);
@@ -2722,10 +2727,34 @@ async function undo() {
   sim.finish(); layoutFromState(before); // the seeds go back from where they lie, not in a jump (web/takeback.js)
   await flyBack(before, after, u.played, words);
   const tb = tookBack(stats, !local && !playingOut() && !lesson.on); stats = tb.stats; // a fair rating: this game no longer counts (web/rated.js)
+  redoLine = redoAfterUndo(redoLine, before.moves, u.keep, gameKey(before)); redoReply = null; // put it back: what was taken back waits under the board
   state = after; layoutFromState(state); busy = false; refreshStatic(); deselect(); save(); click(0.7, 0.06);
   if (tb.note) toast(UNDO_NOTE, 2600);
   if (local) await passTurn();
 }
+// put it back (web/redo.js): after an Undo, a chip under the board (and R) plays the moves taken back again, the computer's
+// reply exactly as it was; a different pit ends it
+const redoBtn = $('#redoBtn');
+function redoMay() {
+  if (!redoReady(redoLine, state.moves, gameKey(state))) return false;
+  return !online && !watch.on && !spect.on && !puzzle.on && !lesson.on && !busy && !state.over && (local || state.turn === you) && !body.classList.contains('screen');
+}
+function paintRedo() {
+  const on = redoMay(); if (redoBtn.hidden === !on && (!on || redoBtn.dataset.n === String(redoLine.rest.length))) return;
+  redoBtn.hidden = !on; if (!on) return;
+  const n = redoLine.rest.length; redoBtn.dataset.n = String(n); $('#redoWords').textContent = redoWords(n);
+  redoBtn.setAttribute('aria-label', `${REDO_CHIP} · ${redoWords(n)}`);
+}
+async function redo() {
+  if (!redoMay()) return false;
+  const st = redoStep(redoLine, { local }); if (!st) return false;
+  redoBtn.hidden = true; hideExplain(); deselect(); click(0.9, 0.05);
+  redoReply = st.reply; $('#hint').textContent = REDO_HINT;
+  select(st.mine); await wait(reduceMotion ? 120 : 380); // the pit lights first, as a tap would
+  await play(st.mine);
+  return true;
+}
+redoBtn.addEventListener('click', () => { redo(); });
 function paintRules() { $('#lessonRow').textContent = LESSON_ROW[lessonGame(settings.game)]; $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
 
 // ---------- first-game tutorial: three tips, then never again ----------
@@ -2940,6 +2969,7 @@ addEventListener('keydown', (e) => {
   if (a.type === 'pit') { if (canPress()) pressPit(a.pit, 'key'); else click(0.5, 0.04); }
   else if (a.type === 'sow') { if (selected !== null) pressPit(selected, 'key'); else if (canPress()) $('#hint').textContent = hintText('pick', { keys: true }); }
   else if (a.type === 'undo') undo();
+  else if (a.type === 'redo') { if (!online) redo(); }
   else if (a.type === 'hint') hint();
   else if (a.type === 'straight') straighten();
   else if (a.type === 'say') sayStand();

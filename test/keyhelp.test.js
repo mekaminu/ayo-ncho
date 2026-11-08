@@ -19,17 +19,18 @@ test("? asks for the list, from keyAction, and never with a modifier held or whi
 });
 
 test("the rows follow where you play: a hint and undo against the computer, take it back with a friend; F only where full screen works", () => {
-  assert.deepEqual(ids(), ["pit", "sow", "deselect", "undo", "hint", "turn", "tilt", "zoom", "straight", "say", "help"]);
+  assert.deepEqual(ids(), ["pit", "sow", "deselect", "undo", "redo", "hint", "turn", "tilt", "zoom", "straight", "say", "help"]);
   assert.deepEqual(ids({ full: true }).slice(-2), ["full", "help"]);
   const on = keyRows({ online: true });
   assert.ok(!on.some((r) => r.id === "hint"), "no hint against a friend");
+  assert.ok(!on.some((r) => r.id === "redo"), "nothing to put back against a friend: a take-back is agreed");
   assert.equal(on.find((r) => r.id === "undo").what, "ask to take your move back");
   assert.equal(keyRows().find((r) => r.id === "undo").what, "undo your move");
   assert.deepEqual(keyRows()[0].keys, ["1", "–", "6"]);
 });
 
 test("every key the list names does what it says in keyAction", () => {
-  const press = { pit: "3", sow: "Enter", deselect: "Escape", undo: "u", hint: "h", turn: "ArrowLeft", tilt: "ArrowUp", zoom: "+", straight: "0", say: "s", full: "f", help: "?" };
+  const press = { pit: "3", sow: "Enter", deselect: "Escape", undo: "u", redo: "r", hint: "h", turn: "ArrowLeft", tilt: "ArrowUp", zoom: "+", straight: "0", say: "s", full: "f", help: "?" };
   const rows = keyRows({ full: true });
   for (const r of rows) {
     const a = keyAction({ key: press[r.id] });

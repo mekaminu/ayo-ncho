@@ -43,11 +43,11 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 @media (prefers-reduced-motion:reduce){.table #hint,.table #words{transition:opacity .25s}}
 /* the words under the board: their move, explained (tappable to watch it again slowly) and, above it on the phone, Mama Ngozi's take on your own last move */
 #words{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 124px + max(var(--hint-h,28px),28px));display:flex;flex-direction:column-reverse;align-items:center;gap:6px;width:max-content;max-width:min(92vw,560px);z-index:2;transition:opacity .25s}
-#lastMove,#take,#watchOn{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.45);color:var(--fg);border-radius:999px;padding:6px 10px 6px 12px;font:500 calc(12px*var(--ts)) Inter,system-ui,sans-serif;line-height:1.35;text-align:left;cursor:pointer;animation:rise .3s ease-out;transition:border-color .15s,transform .15s}
-#lastMove b,#take b,#watchOn b{color:var(--brass);font-weight:600;white-space:nowrap}
-#lastMove b::after,#take b::after,#watchOn b::after{content:" ·";opacity:.5}
-#lastMove i,#take i,#watchOn i{font-style:normal;color:var(--brass);display:inline-flex;align-items:center;gap:4px;border-left:1px solid rgba(230,183,111,.35);padding-left:8px;white-space:nowrap;opacity:.9}
-#lastMove:hover,#take:hover,#watchOn:hover{border-color:var(--brass)}#lastMove:active,#take:active,#watchOn:active{transform:scale(.97)}
+#lastMove,#take,#watchOn,#redoBtn{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.45);color:var(--fg);border-radius:999px;padding:6px 10px 6px 12px;font:500 calc(12px*var(--ts)) Inter,system-ui,sans-serif;line-height:1.35;text-align:left;cursor:pointer;animation:rise .3s ease-out;transition:border-color .15s,transform .15s}
+#lastMove b,#take b,#watchOn b,#redoBtn b{color:var(--brass);font-weight:600;white-space:nowrap}
+#lastMove b::after,#take b::after,#watchOn b::after,#redoBtn b::after{content:" ·";opacity:.5}
+#lastMove i,#take i,#watchOn i,#redoBtn i{font-style:normal;color:var(--brass);display:inline-flex;align-items:center;gap:4px;border-left:1px solid rgba(230,183,111,.35);padding-left:8px;white-space:nowrap;opacity:.9}
+#lastMove:hover,#take:hover,#watchOn:hover,#redoBtn:hover{border-color:var(--brass)}#lastMove:active,#take:active,#watchOn:active,#redoBtn:active{transform:scale(.97)}
 #lastMove.live,#take.live,#watchOn.live{border-color:var(--brass);pointer-events:none}#lastMove.live i,#take.live i,#watchOn.live i{opacity:.5}
 #take{padding:4px 10px 4px 5px;border-color:rgba(230,183,111,.6)}
 #take .face.s,#watchOn .face.s{margin:0;width:22px;height:22px;border:1px solid rgba(230,183,111,.5)}
@@ -464,7 +464,7 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 #review .btns .done{background:var(--brass);color:#1a120b;border-color:var(--brass)}
 .wide body.reviewing #words{left:24px;transform:none;top:calc(env(safe-area-inset-top,0px) + 150px);bottom:auto} /* on the Mac the review sits down the left, under her card, clear of the board */
 .wide #review{width:min(300px,28vw)}
-body.reviewing #lastMove,body.reviewing #take,body.reviewing #last8,body.reviewing #circling{display:none}
+body.reviewing #lastMove,body.reviewing #redoBtn,body.reviewing #take,body.reviewing #last8,body.reviewing #circling{display:none}
 @media (prefers-reduced-motion:reduce){#gameover .review,#review{animation:none}}
 .bests{display:flex;flex-shrink:0;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:linear-gradient(100deg,rgba(230,183,111,.16),rgba(230,183,111,.05));border:1px solid rgba(230,183,111,.45);color:var(--fg);font:inherit;text-align:left;width:100%;cursor:default;animation:recIn .45s cubic-bezier(.3,1.4,.5,1) .35s backwards;position:relative;overflow:hidden}
 .bests.tap{cursor:pointer}.bests .col{gap:2px;min-width:0;flex:1}.bests .eyebrow{color:var(--brass)}
@@ -646,7 +646,7 @@ html.tabletop #bubble{left:max(22px,env(safe-area-inset-left,0px));top:calc(env(
 html.tabletop #myBubble{left:auto;right:max(22px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 76px);bottom:auto}
 html.tabletop #shoutMenu,html.tabletop #callMenu{left:50%;right:auto;transform:translateX(-50%);top:auto;bottom:calc(var(--fold-up,50vh) + 66px);width:min(70vw,520px);justify-content:center}
 html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
-@media (prefers-reduced-motion:reduce){.lab.race.glint,.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#take,#watchOn,#last8.new,#circling.new,#circling em.bump,.nowCard.pop,.streak.fresh{animation:none}}
+@media (prefers-reduced-motion:reduce){.lab.race.glint,.score.bump,.card,#tip,.toast,#oppFace.react,#lastMove,#redoBtn,#take,#watchOn,#last8.new,#circling.new,#circling em.bump,.nowCard.pop,.streak.fresh{animation:none}}
 </style>
 <script>/* bigger words (web/textsize.js): the saved word size before the page paints, so it never flashes small first */try{var ts={large:1.15,larger:1.3}[localStorage.getItem('ayo.textsize')];if(ts)document.documentElement.style.setProperty('--ts',ts)}catch(e){}</script>
 </head>
@@ -659,6 +659,7 @@ html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
 <div id="hint" role="status"></div>
 <div id="words"><div id="review" hidden role="group" aria-label="Mama Ngozi's review"><div class="top"><span class="face s" id="revFace" aria-hidden="true"></span><span class="col"><b>Mama Ngozi's review</b><i id="revSay" hidden></i></span></div><span id="revWords" role="status"></span><div class="btns"><button type="button" id="revPrev" aria-label="The move before">‹ Back</button><button type="button" id="revAgain" aria-label="Play it again">Again</button><button type="button" id="revNext" aria-label="The next move">Next ›</button><button type="button" id="revDone" class="done">Done</button></div></div>
 <button id="lastMove" hidden type="button" title="Watch their move again, slowly"><b id="lastName"></b><span id="lastWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>again</i></button>
+<button id="redoBtn" hidden type="button" title="Play the moves you took back again · R"><b>Put it back</b><span id="redoWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 14l5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13"/></svg>again</i></button>
 <button id="take" hidden type="button" title="Play Mama Ngozi's move through, slowly"><span class="face s" id="takeFace" aria-hidden="true"></span><b id="takeName">Mama Ngozi</b><span id="takeWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg>show</i></button>
 <button id="watchOn" hidden type="button" title="Stop here and play on from this position"><span class="face s" id="watchOnFace" aria-hidden="true"></span><b>Play on from here</b><span id="watchOnWords"></span><i><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>play</i></button>
 <div id="last8" hidden role="status"><b>Last 8</b><span id="last8Words"></span></div>
