@@ -102,6 +102,7 @@ import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, m
 import { oneTapOn, pressAction } from './onetap.js';
 import { afterUndo as redoAfterUndo, ready as redoReady, step as redoStep, afterMove as redoAfterMove, gameKey, chipWords as redoWords, CHIP as REDO_CHIP, TITLE as REDO_TITLE, HINT as REDO_HINT } from './redo.js';
 import { makeGuard as makeKeepGuard, ARM_MS as KEEP_MS, playAsks, askWords as keepAsk } from './keepgame.js';
+import { keep } from './bounded.js'; // a long evening (idea 8 Nov): the page's own records keep their last few entries
 // the day's share line, with "· with a nudge" on a solve that had one (web/nudge.js)
 const shareText = (p, got) => nudgeShare(dayShareText(p, got), dailyEntry(daily, p.key, p.variant));
 const warm = makeWarm({ url: healthUrl(publicBase()), fetch: (u, o) => fetch(u, o), online: () => navigator.onLine !== false });
@@ -227,7 +228,7 @@ const lookLog = []; // each change of look and where it came to rest (the render
 function relook() {
   const from = { phi, dist, x: camera.view && camera.view.enabled ? camera.view.offsetX : 0, y: camera.view && camera.view.enabled ? camera.view.offsetY : 0 };
   frame(); const to = { phi, dist, x: camera.view && camera.view.enabled ? camera.view.offsetX : 0, y: camera.view && camera.view.enabled ? camera.view.offsetY : 0 };
-  lookLog.push({ look: LOOK, phi: to.phi, dist: to.dist });
+  keep(lookLog, { look: LOOK, phi: to.phi, dist: to.dist });
   if (reduceMotion || !camera.view || !camera.view.enabled) return;
   const id = ++viewGlide; phi = from.phi; dist = from.dist;
   tween(LOOK_MS, (t) => { if (id !== viewGlide) return; phi = from.phi + (to.phi - from.phi) * t; dist = from.dist * Math.pow(to.dist / from.dist, t);
@@ -640,11 +641,11 @@ const full = { asked: false, enters: 0, exits: 0, restores: 0, log: [] };
 async function fullGo(on, via = 'settings') {
   if (fullSup !== 'ok') return false;
   if (on) {
-    const ok = await enterFull(document.documentElement); full.log.push(['enter', via, ok]);
+    const ok = await enterFull(document.documentElement); keep(full.log, ['enter', via, ok]);
     if (!ok) { prefs.set('full', '0'); if (via !== 'restore') { toast(FULL_REFUSED, 2600); click(0.7, 0.05); } paintFull(); return false; }
     prefs.set('full', '1'); full.enters++; if (via === 'restore') full.restores++; else { toast(fullToast(true, { keys: via === 'key' || keysUsed }), 2600); click(1.2, 0.06); buzz(10); }
   } else {
-    full.asked = true; prefs.set('full', '0'); const ok = await exitFull(document); full.log.push(['exit', via, ok]); full.exits++;
+    full.asked = true; prefs.set('full', '0'); const ok = await exitFull(document); keep(full.log, ['exit', via, ok]); full.exits++;
     setTimeout(() => { full.asked = false; }, 600); if (via !== 'restore') { toast(fullToast(false), 1600); click(0.9, 0.05); }
   }
   paintFull(); return true;
@@ -653,7 +654,7 @@ function paintFull() {
   const row = $('#fullRow'); if (!row) return; row.hidden = fullSup !== 'ok';
   const b = row.querySelector('.sw'); b.setAttribute('aria-checked', String(fullOn())); $('#fullNow').textContent = fullNote(fullSup, fullOn());
 }
-const fullChanged = () => { const v = afterChange({ full: isFull(document), asked: full.asked }); if (v !== null) { prefs.set('full', v); full.log.push(['left', 'browser']); } full.asked = false; paintFull(); };
+const fullChanged = () => { const v = afterChange({ full: isFull(document), asked: full.asked }); if (v !== null) { prefs.set('full', v); keep(full.log, ['left', 'browser']); } full.asked = false; paintFull(); };
 document.addEventListener('fullscreenchange', fullChanged); document.addEventListener('webkitfullscreenchange', fullChanged);
 // after a reload or an update: the first tap or key anywhere takes the page back to full screen, once
 const fullRestore = (e) => {
@@ -992,7 +993,7 @@ function callDo(effects) {
   paintCall();
 }
 function callSay(key) {
-  call.log.push(key);
+  keep(call.log, key, 200);
   const w = callWords(key, callName(), call.f.theirs);
   if (key === 'asked') { showCallCard(); knockSound(); awayNote('call', { mode: call.f.theirs }); return; }
   $('#callCard').hidden = true;
@@ -1034,7 +1035,7 @@ function lineStart() {
       if (window.__lineBad !== undefined && window.__lineBad !== null) { res = call.line.push(window.__lineBad ? { rtt: 1500, kbps: 60, loss: 0.2, pairs: 1 } : { rtt: 40, kbps: 2000, loss: 0, pairs: 1 }); }
       else { const st = await talk.stats(); if (talk !== call.talk) return; if (st) res = call.line.read(st); }
     }
-    if (res) { call.lineLog.push(res); callDo(res === 'weak' ? call.f.lineWeak() : call.f.lineBetter()); }
+    if (res) { keep(call.lineLog, res); callDo(res === 'weak' ? call.f.lineWeak() : call.f.lineBetter()); }
     call.lineTimer = setTimeout(tick, window.__lineMs || LINE.everyMs);
   };
   call.lineTimer = setTimeout(tick, window.__lineMs || LINE.everyMs);
@@ -1375,18 +1376,18 @@ function syncSpect(room) { // the game as a watcher sees it: seat 0 near, seat 1
 async function spectMove({ seat, pit, events, state: pub }) { // a move lands: the player's pit glows, then the seeds go, as on their own boards
   const prev = state.stores.slice(); state = stateFrom(pub); spect.moves = state.moves.length; busy = true; deselect(); hideExplain();
   select(pit, false); await wait(reduceMotion ? 120 : 550); deselect();
-  await animate(events, prev); busy = false; refreshStatic(); spect.log.push(['move', seat, pit]);
+  await animate(events, prev); busy = false; refreshStatic(); keep(spect.log, ['move', seat, pit], 400);
   if (state.over) { await winMoment(); spectOver(); } else $('#gameover').hidden = true;
 }
 async function spectEnd({ seat, state: pub }, how) { // given up, or a draw both agreed
   state = stateFrom(pub); busy = true; deselect(); hideExplain();
   const n = spectateCards(spect.room)[seat].name; toast(how === 'resign' ? `${n} gave up` : 'They agreed a draw'); [0.9, 0.7].forEach((p, k) => setTimeout(() => click(p, 0.09), k * 160));
-  await wait(reduceMotion ? 0 : 520); busy = false; refreshStatic(); spect.log.push([how, seat]); spectOver();
+  await wait(reduceMotion ? 0 : 520); busy = false; refreshStatic(); keep(spect.log, [how, seat], 400); spectOver();
 }
 async function spectBack({ state: pub, undone, before }) { // a take-back the players agreed: the seeds fly back as on their boards
   const b = stateFrom(before), a = stateFrom(pub); hideExplain(); deselect(); busy = true; toast('A move was taken back');
   sim.finish(); layoutFromState(b); await flyBack(b, a, undone);
-  state = a; spect.moves = a.moves.length; layoutFromState(state); busy = false; deselect(); refreshStatic(); spect.log.push(['back']);
+  state = a; spect.moves = a.moves.length; layoutFromState(state); busy = false; deselect(); refreshStatic(); keep(spect.log, ['back'], 400);
 }
 function spectOver() { // the Game over card for a watcher: whose game it was, the two scores, Back to home (no Play again, no record of yours)
   const s = state, [a, b] = spectateCards(spect.room); const gave = s.resigned != null;
@@ -1401,7 +1402,7 @@ function spectError(e) {
   const gone = e.code === 'notfound' || e.code === 'swept';
   const words = gone ? 'That watch link has closed — the game is over or the link is old' : e.msg;
   $('#oppName').textContent = words; $('#oppSub').textContent = 'tap Home to go back'; $('#hint').textContent = ''; $('#turn').textContent = '';
-  if (e.code !== 'offline' || !spect.room) toast(words, 3200); click(0.6, 0.06); spect.log.push(['error', e.code]);
+  if (e.code !== 'offline' || !spect.room) toast(words, 3200); click(0.6, 0.06); keep(spect.log, ['error', e.code], 400);
 }
 function startWatching(w) {
   online = true; local = false; spect.on = true; you = 0; them = 1; baseTheta = 0; theta = 0;
@@ -2267,7 +2268,7 @@ function greet() {
   const kept = prefs.get('rematch', ''); const rm = g.moment === 'back' ? null : rematchMoment(kept, level, Date.now(), prefs.get('rematch.said', null));
   if (rm) { const l = JSON.parse(kept); if (l.id != null) prefs.set('rematch.said', l.id); }
   if (g.moment !== 'start') prefs.set('greet.last', g.key);
-  const moment = rm || g.moment; greeted.log.push({ moment, key: g.key }); say(moment);
+  const moment = rm || g.moment; keep(greeted.log, { moment, key: g.key }); say(moment);
 }
 function say(moment) {
   if (online || local) return; // a friend speaks for themselves, and two of us need no third voice
@@ -2379,7 +2380,7 @@ $('#homeSettings').addEventListener('click', () => { settingsFrom = 'home'; pain
 $('#settingsBtn').addEventListener('click', () => { if (!busy) { settingsFrom = 'play'; paintSettings(); showScreen('settings'); } });
 $('#settingsBack').addEventListener('click', () => {
   const to = settingsBackTo({ online, from: settingsFrom, sameRules: state.variant === settings.game && JSON.stringify(state.rules) === JSON.stringify(settings.rules()), sameMode: local === (settings.mode === 'local'), moves: state.moves.length, special: !!watch.on || playingOut() || review.on || puzzle.on });
-  settingsLog.push(to);
+  keep(settingsLog, to);
   if (to === 'new') { for (const t of document.querySelectorAll('.toast')) t.remove(); newRound(); showScreen('play'); click(1.3, 0.08); } else showScreen(to);
 });
 $('#settingsRules').addEventListener('click', () => openRules());
@@ -3213,14 +3214,14 @@ function carryOpen(mode) { // 'paste': the field for a link; 'sure': a link alre
 }
 function carryClose() { carryAsk.hidden = true; carry.got = null; carryTick++; }
 async function carryRead(code, mode) {
-  const r = await unpack(code); carry.log.push(['read', r.ok ? 'ok' : r.why]);
+  const r = await unpack(code); keep(carry.log, ['read', r.ok ? 'ok' : r.why]);
   if (!r.ok) { carry.got = null; carryYes.disabled = true; carryAsk.classList.remove('sure'); carryWhat.textContent = whyWords(r.why); if (mode === 'link') toast(whyWords(r.why), 3200); click(0.7, 0.05); return false; }
   carry.got = r; carryOpen('sure'); carryShow(carrySum(r.data)); click(1.3, 0.06); buzz(10); return true;
 }
 $('#carrySend').addEventListener('click', async () => {
   let link;
   try { link = carryLink(publicBase(), await pack(gather(storageEntries(localStorage)))); } catch { toast('Could not make the link here', 2400); return; }
-  carry.sent++; carry.link = link; carry.log.push(['send', link.length]); click(1.2, 0.06); buzz(10);
+  carry.sent++; carry.link = link; keep(carry.log, ['send', link.length]); click(1.2, 0.06); buzz(10);
   try {
     if (navigator.share) { await navigator.share({ title: 'Ayo & Nchò', text: i18n.t(SEND_TEXT), url: link }); toast(sentToast('shared'), 2400); }
     else { await navigator.clipboard.writeText(link); toast(sentToast('copied'), 2600); }
@@ -3232,7 +3233,7 @@ $('#carryNo').addEventListener('click', () => { carryClose(); click(0.9, 0.05); 
 carryYes.addEventListener('click', () => {
   if (!carry.got) return;
   const here = gather(storageEntries(localStorage)); const writes = merge(here, carry.got.data); const s = carrySum(writes);
-  carryApply(localStorage, writes); carry.brought++; carry.log.push(['brought', Object.keys(writes).length]);
+  carryApply(localStorage, writes); carry.brought++; keep(carry.log, ['brought', Object.keys(writes).length]);
   carryYes.disabled = true; carryWhat.textContent = 'Bringing it across…'; click(1.5, 0.08); buzz([12, 40, 12]);
   try { sessionStorage.setItem('ayo.carried', JSON.stringify(s)); } catch {}
   setTimeout(() => location.replace(location.pathname + location.search), window.__carryHold ? 60000 : 700); // every part of the game reads its own again
@@ -3309,7 +3310,7 @@ const glw = makeGlWatch(); let glFresh = 0; const glEl = document.createElement(
 glEl.id = 'glLost'; glEl.setAttribute('role', 'status'); glEl.setAttribute('aria-live', 'polite'); glEl.hidden = true;
 glEl.innerHTML = '<div class="seeds"><i></i><i></i><i></i></div><b></b><small></small><button type="button" hidden></button>';
 stage.appendChild(glEl);
-glEl.querySelector('button').addEventListener('click', () => { glw.log.push({ t: 'reload' }); try { save(); sessionStorage.setItem('ayo.glback', '1'); } catch {} if (window.__glReload) window.__glReload(); else location.reload(); });
+glEl.querySelector('button').addEventListener('click', () => { keep(glw.log, { t: 'reload' }); try { save(); sessionStorage.setItem('ayo.glback', '1'); } catch {} if (window.__glReload) window.__glReload(); else location.reload(); });
 function glPaint(kind) {
   if (glEl.dataset.kind === (kind || '')) return; glEl.dataset.kind = kind || '';
   const w = glLineWords(kind); glEl.hidden = !w; glEl.classList.toggle('on', !!w); glEl.classList.toggle('stuck', kind === 'stuck'); if (!w) return;
@@ -3353,7 +3354,7 @@ function battSet() {
   const prev = batt.s, next = decideSaver({ level: batt.level, charging: batt.charging, pref: prefs.get('battery', 'auto'), param: params.get('battery'), was: prev.on });
   batt.s = next; const words = toastFor(prev, next, batt.charging);
   if (prev.on !== next.on) {
-    batt.plan = saverPlan(next.on, window.devicePixelRatio || 1); batt.log.push({ on: next.on, reason: next.reason });
+    batt.plan = saverPlan(next.on, window.devicePixelRatio || 1); keep(batt.log, { on: next.on, reason: next.reason });
     renderer.setPixelRatio(drawRatio()); resize(); rest.reset();
     PHYS = decidePhysics({ pref: prefs.get('physics', 'auto'), lite: quality.lite, param: params.get('physics'), saver: next.on }); // the next seed
     if (words) toast(words);
@@ -3382,8 +3383,8 @@ const backLog = [];
 function backSync() { if (!backNav) return; const ui = backUi(); backNav.sync(webStep(backStep(ui), ui)); }
 if (backNav) {
   addEventListener('popstate', (e) => {
-    const r = backNav.pop(e.state); if (r !== 'back') { backLog.push(r); return; }
-    const ui = backUi(); const step = webStep(backStep(ui), ui); backLog.push(step);
+    const r = backNav.pop(e.state); if (r !== 'back') { keep(backLog, r); return; }
+    const ui = backUi(); const step = webStep(backStep(ui), ui); keep(backLog, step);
     if (step === 'room') toast(ROOM_WORDS, 2600); else backTake(step);
     setTimeout(backSync, 0);
   });

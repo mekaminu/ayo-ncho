@@ -9,6 +9,7 @@
 // The decision is a pure function and the controller takes the page's navigator and a clock, so both are tested in node
 // (test/wake.test.js).
 
+import { keep } from './bounded.js';
 export const IDLE_MS = { solo: 3 * 60 * 1000, room: 10 * 60 * 1000 };
 
 // Should the screen be held on now? c: { on (the setting), board (a game is on the board: play or the puzzle),
@@ -44,12 +45,12 @@ export function makeWake({ nav, now = () => Date.now() } = {}) {
         pending = true; const asked = lastPoke;
         Promise.resolve().then(() => nav.wakeLock.request('screen')).then((s) => {
           pending = false;
-          if (!wanted) { try { s.release(); } catch {} log.push('drop'); return; } // let go while it was being given
-          sentinel = s; log.push('hold');
-          if (s && typeof s.addEventListener === 'function') s.addEventListener('release', () => { if (sentinel === s) { sentinel = null; log.push('lost'); } });
-        }).catch(() => { pending = false; refusedAt = asked; log.push('refused'); });
+          if (!wanted) { try { s.release(); } catch {} keep(log, 'drop'); return; } // let go while it was being given
+          sentinel = s; keep(log, 'hold');
+          if (s && typeof s.addEventListener === 'function') s.addEventListener('release', () => { if (sentinel === s) { sentinel = null; keep(log, 'lost'); } });
+        }).catch(() => { pending = false; refusedAt = asked; keep(log, 'refused'); });
       } else if (!wanted && sentinel) {
-        const s = sentinel; sentinel = null; log.push('let go');
+        const s = sentinel; sentinel = null; keep(log, 'let go');
         try { const r = s.release(); if (r && r.catch) r.catch(() => {}); } catch {}
       }
       return wanted;

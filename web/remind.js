@@ -14,6 +14,7 @@
 // puzzle. On the web link nothing can be scheduled with the page closed, so the switch there says "in the apps".
 // Pure, no DOM: tested in node (test/remind.test.js).
 
+import { keep } from './bounded.js';
 import { dailyPuzzle, todayKey } from '../engine/puzzle.js';
 
 export const DAYS_AHEAD = 7;
@@ -82,14 +83,14 @@ export function makeReminders(L, { now = () => new Date(), puzzleFor = dailyPuzz
   async function run(o) {
     if (!L) return { off: true };
     try {
-      if (!o.on) { const n = await cancelOurs(); st.log.push({ off: true, cancelled: n }); return { off: true, cancelled: n }; }
-      if (await perm(!!o.ask) !== 'granted') { await cancelOurs().catch(() => {}); st.log.push({ denied: true }); return { denied: true }; }
+      if (!o.on) { const n = await cancelOurs(); keep(st.log, { off: true, cancelled: n }); return { off: true, cancelled: n }; }
+      if (await perm(!!o.ask) !== 'granted') { await cancelOurs().catch(() => {}); keep(st.log, { denied: true }); return { denied: true }; }
       await cancelOurs();
       const plan = planReminders({ now: now(), hour: o.hour, variant: o.variant, playedToday: o.playedToday, puzzleFor });
       if (plan.length) await L.schedule({ notifications: plan.map((r) => toNotification({ ...r, title: t(r.title), body: t(r.body) })) }); // in the page's language when it is set
-      st.log.push({ scheduled: plan.length, first: plan[0] ? plan[0].key : null, hour: hourOf(o.hour) });
+      keep(st.log, { scheduled: plan.length, first: plan[0] ? plan[0].key : null, hour: hourOf(o.hour) });
       return { scheduled: plan.length, plan };
-    } catch (e) { st.log.push({ error: String(e && e.message || e) }); return { error: true }; }
+    } catch (e) { keep(st.log, { error: String(e && e.message || e) }); return { error: true }; }
   }
   // one at a time: a quick change of time then game must not interleave two plans
   const sync = (o = {}) => (st.busy = st.busy.then(() => run(o), () => run(o)));

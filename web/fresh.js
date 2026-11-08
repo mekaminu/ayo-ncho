@@ -7,6 +7,7 @@
 // or in the store apps (they carry their own files, and the meta says "dev" there, as it does on a plain file server).
 // A build the page has already reloaded for once is not offered again that visit (a stale cache can never make it loop).
 
+import { keep } from './bounded.js';
 export const FIRST_MS = 20 * 1000;          // the first look, a little after the page opens
 export const EVERY_MS = 30 * 60 * 1000;     // then every half hour while the page is in view
 export const GAP_MS = 5 * 60 * 1000;        // coming back looks again, but not more often than this
@@ -39,13 +40,13 @@ export function makeFresh({ mine, fetchVersion, store, reload, now = () => Date.
       const t = now();
       if (!force && t - f.lastCheck < GAP_MS) return f.ready;
       f.lastCheck = t; f.checks++;
-      try { const v = await fetchVersion(); if (v) f.latest = String(v); f.log.push('check:' + (v || 'none')); } catch { f.log.push('check:failed'); }
+      try { const v = await fetchVersion(); if (v) f.latest = String(v); keep(f.log, 'check:' + (v || 'none')); } catch { keep(f.log, 'check:failed'); }
       return f.ready;
     },
     update() {
       if (!f.ready) return false;
       try { store.set(TRIED_KEY, f.latest); } catch { /* private window: the guard is only for this visit anyway */ }
-      f.reloads++; f.log.push('reload:' + f.latest); reload(); return true;
+      f.reloads++; keep(f.log, 'reload:' + f.latest); reload(); return true;
     },
     // Coming back to the page after awayMs: update without a word if it is safe and the page was away long enough.
     back(awayMs, safe) {

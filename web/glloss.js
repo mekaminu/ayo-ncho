@@ -17,6 +17,7 @@
 // with a friend rejoins its room, as after any reload). Taps on the board do nothing while it is away, so no move is played
 // blind. `window.__ayo.gl` reports it; tools/render.py --glloss takes the board away with WEBGL_lose_context.
 
+import { keep } from './bounded.js';
 export const WAIT_MS = 600;    // away for less than this: nothing said
 export const STUCK_MS = 6000;  // not back after this much looking at it: offer to bring it back
 export const STEP_CAP_MS = 250; // the most one tick may count (a page hidden in between never runs the clock)
@@ -36,14 +37,14 @@ export function makeGlWatch({ wait = WAIT_MS, stuck = STUCK_MS, cap = STEP_CAP_M
     phase: 'ok', out: 0, at: null, losses: 0, restores: 0, shown: null, log: [],
     lost(now) {
       if (w.phase === 'lost') return false; // the browser says it twice sometimes
-      w.phase = 'lost'; w.out = 0; w.at = now; w.losses++; w.shown = null; w.log.push({ t: 'lost', at: now });
+      w.phase = 'lost'; w.out = 0; w.at = now; w.losses++; w.shown = null; keep(w.log, { t: 'lost', at: now });
       return true;
     },
     // → { said: true } when the line was up (so the game says "The board is back"), else { said: false }
     restored(now) {
       if (w.phase !== 'lost') return { said: false };
       const said = w.shown != null;
-      w.phase = 'ok'; w.restores++; w.log.push({ t: 'restored', away: Math.round(w.out), said }); w.out = 0; w.at = null; w.shown = null;
+      w.phase = 'ok'; w.restores++; keep(w.log, { t: 'restored', away: Math.round(w.out), said }); w.out = 0; w.at = null; w.shown = null;
       return { said };
     },
     // the clock runs only while the page is looked at, and one slow frame (or a page coming back from the background) counts
