@@ -65,6 +65,23 @@ export function rateMoves(state, level = "hard") {
     .sort((a, b) => b.value - a.value || a.pit - b.pit);
 }
 
+// Who is ahead (idea 8 Nov): Mama Ngozi's count of a position, from seat 0's side — what the brass bead on the board's centre
+// line shows. `v` is in seeds: the store difference her search (9 half-moves, no noise) expects with best play from here,
+// averaged with the same search one half-move shorter, so the count does not swing back and forth with whose reply the search
+// happens to end on. `decided` is +1 / -1 when she sees a forced win for seat 0 / seat 1 (the search reached the end of the
+// game), and the same at a finished game (with `over`); 0 otherwise, a draw included.
+export function leanOf(state) {
+  if (state.over) return { v: state.stores[0] - state.stores[1], decided: state.winner === 0 ? 1 : state.winner === 1 ? -1 : 0, over: true };
+  const moves = legalMoves(state); const sg = state.turn === 0 ? 1 : -1, me = state.turn;
+  if (!moves.length) return { v: state.stores[0] - state.stores[1], decided: 0 };
+  const best = (depth) => { let b = -Infinity; for (const m of moves) { const { state: n } = applyMove(state, m); b = Math.max(b, search(n, depth - 1, -Infinity, Infinity, me)); } return b; };
+  const deep = best(LEVELS.hard.depth);
+  if (Math.abs(deep) >= 1000) return { v: sg * Math.sign(deep), decided: sg * Math.sign(deep) };
+  const near = best(LEVELS.hard.depth - 1);
+  const v = Math.abs(near) >= 1000 ? deep : (deep + near) / 2;
+  return { v: Math.round(sg * v * 10) / 10 || 0, decided: 0 };
+}
+
 // The move the opponent plays in a game (the worker's answer to "your move"). The same as chooseMove, except at a level with
 // `vary` (Mama Ngozi): with no noise she would play the same move in the same position every time, so a game won against her
 // could be won again by copying it move for move, and two games that open alike stay alike. Here she picks at random among the

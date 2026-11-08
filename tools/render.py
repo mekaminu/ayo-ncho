@@ -14,6 +14,9 @@
 #        add --lefty to check Left hand (idea 7 Nov): on the Mac (1180x820) Settings → Feel → Hand → Left moves the buttons down the
 #                  left and the cards down the right, the board between them, every pit where a tap lands; a real move and the reply
 #                  (<out>, and <out>-fold.png on the Fold open, 832x690, touch); the tall phone keeps its buttons along the bottom
+#        add --lean (with --smoke) to check Who's ahead (idea 8 Nov): with it on the brass bead shows Mama Ngozi's count of the board as it
+#                  stands (the engine's leanOf), sits where the count puts it, its word matches; one more move and the word over the bead
+#                  (<out>-word.png); Settings' line says it (in French too); off and on again from Settings
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
 #        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
@@ -249,6 +252,7 @@ stepc = "--stepdown" in sys.argv
 ratec = "--askrate" in sys.argv
 lookc = "--look" in sys.argv
 familyc = "--family" in sys.argv
+leanc = "--lean" in sys.argv
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
@@ -2257,7 +2261,8 @@ with sync_playwright() as p:
     if startsc: pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard'); localStorage.setItem('ayo.starts', JSON.stringify({ hard: { first: 0, winner: 0 }, local: { first: 0, winner: 0 } })); }")  # you beat her last time; Player 1 won the last two-of-us game
     if wakec: pg.add_init_script("""(() => { const log = []; window.__wakeLog = log; Object.defineProperty(navigator, 'wakeLock', { configurable: true, value: { request(kind) { const ls = []; const s = { released: false, type: kind, addEventListener: (e, f) => { if (e === 'release') ls.push(f); }, release() { if (!s.released) { s.released = true; log.push('release'); ls.forEach((f) => f()); } return Promise.resolve(); } }; log.push('request:' + kind); return Promise.resolve(s); } } }); })()""")
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
-    if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")  # across the board from Mama Ngozi herself, so she says her word
+    if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")
+    if leanc: pg.add_init_script("if (!sessionStorage.getItem('leaned')) { sessionStorage.setItem('leaned', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lean', '1'); }")  # Who's ahead on from the start  # across the board from Mama Ngozi herself, so she says her word
     pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or winc or record or ratedc or local or masterc or last8 or racec or troughc or startsc or feedc or circ or givesc or slamc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
@@ -2994,6 +2999,39 @@ with sync_playwright() as p:
         assert before != after, "board did not change"
         print("smoke: before", before, "after", after, "scores", pg.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]"))
         assert pg.evaluate("getComputedStyle(document.querySelector('#shoutBtn')).display") == "none", "shouts are for friends online, not the computer"
+        if leanc:  # who is ahead (web/lean.js): the brass bead on the board's centre line leans by Mama Ngozi's count, its word for a moment
+            pg.wait_for_function("window.__ayo.lean.l && window.__ayo.lean.visible && window.__ayo.lean.op > 0.95 && Math.abs(window.__ayo.lean.at - window.__ayo.lean.goal) < 1e-6 && !window.__ayo.busy", timeout=60000)
+            L = pg.evaluate("window.__ayo.lean"); st = pg.evaluate("window.__ayo.state")
+            want = pg.evaluate("import('/engine/ai.js').then((m) => m.leanOf(window.__ayo.state))")
+            assert abs(L["l"]["v"] - want["v"]) < 1e-9 and L["l"]["decided"] == want["decided"], ("the bead shows her count of the board as it stands", L["l"], want)
+            assert abs(L["z"] - L["at"] * 0.36) < 1e-6, ("the bead sits where the count puts it", L)
+            assert L["asks"] >= 2, ("asked after every move", L["asks"])
+            if L["l"]["decided"]: assert L["words"].endswith("can win from here"), L
+            elif abs(L["l"]["v"]) < 0.5: assert L["words"] == "Even", L
+            else:
+                n = int(abs(L["l"]["v"]) + 0.5); opp = pg.evaluate("document.querySelector('#oppName').textContent").split(" · ")[0]
+                assert L["words"] == ("You +%d" % n if L["l"]["v"] > 0 else "%s +%d" % (opp, n)), (L["words"], n, opp)
+            assert (L["at"] > 0) == (L["l"]["v"] > 0) or abs(L["l"]["v"]) < 1e-9, ("it leans to whoever is ahead: your trough is the near end", L)
+            near = pg.evaluate("(() => { const a = window.__ayo.troughAt(0), b = window.__ayo.troughAt(1); return [a, b]; })()")
+            print("lean:", json.dumps({k: L[k] for k in ("words", "at", "asks")}), "count", L["l"], "· log", [e["words"] for e in L["log"]])
+            said = [e["words"] for e in L["log"]]
+            n0 = len(L["log"]); best = max(pg.evaluate("window.__ayo.legal"), key=lambda i: pg.evaluate("window.__ayo.state.pits[%d]" % i)); tap(pg, best)  # one more move, to catch the word as the bead moves
+            pg.wait_for_function("window.__ayo.lean.log.length > %d && !window.__ayo.busy" % n0, timeout=240000)
+            try: pg.wait_for_function("window.__ayo.lean.said !== null && Math.abs(window.__ayo.lean.at - window.__ayo.lean.goal) < 1e-6", timeout=4000)
+            except Exception: print("lean: the count did not change its word on that move")
+            L2 = pg.evaluate("window.__ayo.lean"); print("lean: after another move", L2["words"], "· said", L2["said"])
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out.replace(".png", "-word.png"), timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            pg.wait_for_function("!window.__ayo.busy && (window.__ayo.state.turn === 0 || window.__ayo.state.over) && !window.__ayo.lean.asking", timeout=240000); pg.wait_for_timeout(600)
+            pg.click("#settingsBtn"); pg.wait_for_selector("#settings:not([hidden])")
+            note = pg.evaluate("document.querySelector('#leanNow').textContent"); L3 = pg.evaluate("window.__ayo.lean"); assert note == " · now " + L3["words"], (note, L3["words"])
+            assert pg.evaluate("document.querySelector('[data-set=lean]').getAttribute('aria-checked')") == "true"
+            pg.click("[data-set=lang] [data-v=fr]"); pg.wait_for_timeout(200)
+            fr = pg.evaluate("document.querySelector('#leanNow').textContent"); print("lean: in French", fr); assert "en ce moment" in fr, fr
+            pg.click("[data-set=lang] [data-v=auto]")
+            pg.click("[data-set=lean]"); pg.click("#settingsBack"); pg.wait_for_function("!window.__ayo.lean.visible", timeout=10000)
+            assert not pg.evaluate("window.__ayo.lean.on"), "turned off in Settings, the bead and its inlay are gone"
+            pg.click("#settingsBtn"); pg.click("[data-set=lean]"); pg.click("#settingsBack"); pg.wait_for_function("window.__ayo.lean.visible && window.__ayo.lean.op > 0.95", timeout=10000)
+            print("lean: off and on again from Settings")
         if saidc:  # the turn, read out (web/sayturn.js): a hidden live line says each turn once it has played, and S says where the game stands
             pg.wait_for_function("window.__ayo.said().log.length >= 2 && window.__ayo.said().line", timeout=20000)
             sd = pg.evaluate("window.__ayo.said()"); st = pg.evaluate("window.__ayo.state"); opp = pg.evaluate("document.querySelector('#oppName').textContent").split(" · ")[0]

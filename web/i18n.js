@@ -232,6 +232,10 @@ export const FR = {
   'with the marks: after your first tap, an ember ring round each pit their best answer could take, and how many seeds, before you sow': 'avec les marques : après votre premier toucher, un anneau braise autour de chaque trou que sa meilleure réponse pourrait prendre, et combien de graines, avant de semer',
   "Mama Ngozi's take": 'L’avis de Mama Ngozi',
   'after your move against the computer, if a clearly better pit was there she says which one under the board; tap it to see that move play through': 'après votre coup contre l’ordinateur, si un trou nettement meilleur existait, elle dit lequel sous le plateau ; touchez pour voir ce coup se jouer',
+  "Who's ahead": 'Qui mène',
+  "Mama Ngozi's count after every move: a brass bead down the middle of the board leans towards whoever is ahead, seeds still in play counted too · not in a game with a friend": 'le compte de Mama Ngozi après chaque coup : une perle de laiton au milieu du plateau penche vers celui qui mène, graines encore en jeu comprises · pas dans une partie avec un ami',
+  'Even': 'Égalité',
+  'You can win from here': 'Vous pouvez gagner d’ici',
   'Keep the screen on': 'Garder l’écran allumé',
   'New phone': 'Nouveau téléphone',
   'Move to a new phone': 'Passer à un nouveau téléphone',
@@ -814,6 +818,10 @@ export const PATTERNS = [
   [/^Play again — (.+) is ready$/, (m) => `Rejouer — ${m[1]} est prêt`],
   [/^(Nchò|Ayo) · (\d+) moves?$/, (m) => `${m[1]} · ${m[2]} coup${m[2] === '1' ? '' : 's'}`],
   [/^(\d+) to win$/, (m) => `${m[1]} pour gagner`], // the race to 25 under a score (web/race.js)
+  [/^now (Even|You can win from here|.{1,24}? can win from here|.{1,24}? \+\d+)$/, (m) => `en ce moment ${need(m[1])}`], // Settings → Feel → Who's ahead, its line
+  [/^You \+(\d+)$/, (m) => `Vous +${m[1]}`], // who is ahead: the word over the bead (web/lean.js)
+  [/^((?!now )[^·—:]{1,24}?) \+(\d+)$/, (m) => `${who(m[1])} +${m[2]}`],
+  [/^((?!now )[^·—:]{1,24}?) can win from here$/, (m) => `${who(m[1])} peut gagner d’ici`],
   [/^(\d+) seeds?$/, (m) => `${m[1]} graine${m[1] === '1' ? '' : 's'}`],
   [/^now (lighter|full) \((.+?)\)(?: · (.+))?$/, (m) => `${m[1] === 'lighter' ? 'allégé' : 'complet'} en ce moment (${m[2]})` + (m[3] ? ' · ' + m[3] : '')],
   [/^now (saving|full) \((.+?)\)$/, (m) => `${m[1] === 'saving' ? 'en économie' : 'au complet'} en ce moment (${batteryReasonFr(m[2])})`],
