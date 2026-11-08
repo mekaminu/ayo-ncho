@@ -19,6 +19,7 @@ export const FR_ROOMS = nb({
   'One minute…': 'Une minute…',
 
   // the Rooms screen, the name card, the door
+  'Back to your game': 'Retour à votre partie', // web/backroom.js: the line on Home, before its words are known
   'Scan': 'Scanner', // Scan to join (web/qr.js)
   'Hide': 'Masquer',
   "Point their phone's camera here to join the room": 'Avec l’appareil photo d’un téléphone, ce code ouvre la salle',
@@ -243,6 +244,13 @@ export function roomPatterns({ who, item, need }) {
     [R(`${N} wants to play`), (m) => `${who(m[1])} veut jouer`],
     [R(`${N} wants to play again`), (m) => `${who(m[1])} veut rejouer`],
     [R(`Let them in and they take the far seat\\. (\\d+) more (?:is|are) waiting behind them\\.`), (m) => `Faites entrer cette personne et elle prend la place d’en face. ${m[1] === '1' ? 'Une autre attend' : `${m[1]} autres attendent`} derrière.`],
+    // back to your game (web/backroom.js): the line on Home while this phone keeps a seat in a game still in play
+    [R(`Back to your game in room ([A-Z]{4})`), (m) => `Retour à votre partie dans la salle ${m[1]}`],
+    [R(`Back to your game in room ([A-Z]{4}) · your move`), (m) => `Retour à votre partie dans la salle ${m[1]} · à vous`],
+    [R(`Back to your game in room ([A-Z]{4}) · their move`), (m) => `Retour à votre partie dans la salle ${m[1]} · à l’autre de jouer`],
+    [R(`Back to your game with (.+?) · your move`), (m) => `Retour à votre partie avec ${m[1]} · à vous`],
+    [R(`Back to your game with (.+?) · their move`), (m) => `Retour à votre partie avec ${m[1]} · à l’autre de jouer`],
+    [R(`Back to your game with (.+)`), (m) => `Retour à votre partie avec ${m[1]}`],
     [R(`${N} is at the door`), (m) => `${who(m[1])} est à la porte`],
     [R(`Point their phone's camera here to join room ([A-Z]{4})`), (m) => `Avec l’appareil photo d’un téléphone, ce code ouvre la salle ${m[1]}`], // Scan to join (web/qr.js)
     [R(`Scan with a phone's camera to join room ([A-Z]{4})`), (m) => `Scannez avec l’appareil photo d’un téléphone pour rejoindre la salle ${m[1]}`],

@@ -77,6 +77,7 @@ import { settingsBackTo, rulesWords } from './settingsback.js';
 const settingsLog = []; // where each Settings → Back went (the render check reads it)
 import { makeGlWatch, lineWords as glLineWords, WORDS as GL_WORDS } from './glloss.js';
 import { makeWarm, healthUrl, openingWords } from './warm.js';
+import { roomOffer, offerWords as backLineWords, keepSeat } from './backroom.js';
 import { makeFresh, buildOf, safeNow as freshSafe, fetchBuild, FIRST_MS as FRESH_FIRST, EVERY_MS as FRESH_EVERY } from './fresh.js';
 import { makeFrameMeter, MIN_FRAMES, slowVerdict, mayJudge, lastGameWords, lastGameRecord, parseRecord as parseFrames, SLOW_TOAST } from './frametime.js';
 import { makeTelemetry, memorySink, resultOf, teleNote } from './telemetry.js';
@@ -669,6 +670,10 @@ const fresh = makeFresh({ mine: inApp() ? null : buildOf(document), fetchVersion
 const freshCard = () => ['#gameover', '#nameCard', '#knockCard', '#backCard', '#callCard', '#rules'].some((id) => !$(id).hidden);
 const freshScreen = () => !$('#home').hidden ? 'home' : 'other';
 const freshOk = () => freshSafe({ screen: freshScreen(), online, lesson: lesson.on, card: freshCard() });
+// back to your game (web/backroom.js): a seat kept in a game still in play, left by closing the app rather than by Home
+function backOffer() { let saved = null; try { saved = JSON.parse(prefs.get('room', 'null')); } catch {} return roomOffer(saved, { online: online || spect.on }); }
+function paintBackLine() { const o = backOffer(), el = $('#backLine'); el.hidden = !o; if (o) { const w = backLineWords(o); $('#backWords').textContent = w; el.title = w; } return o; }
+$('#backLine').addEventListener('click', () => { const o = backOffer(); if (!o) return paintBackLine(); click(1.3, 0.08); buzz(10); startOnline(o.code); });
 function paintFresh() { const w = fresh.line(freshOk()); const el = $('#freshLine'); el.hidden = !w; if (w) $('#freshWords').textContent = w; }
 let freshHidden = document.hidden ? Date.now() : null;
 async function freshBack(awayMs) { await fresh.check(); if (!fresh.back(awayMs, freshOk())) paintFresh(); }
@@ -1263,7 +1268,7 @@ function startOnline(code, { stay = false } = {}) {
   let triedJoin = false, seated = false, knocking = false;
   on('joined', ({ seat, code, token, room }) => {
     const back = seated; seated = true; you = seat; them = 1 - seat; call.f.seat = seat; baseTheta = seat === 1 ? Math.PI : 0; if (!back) theta = baseTheta;
-    prefs.set('room', JSON.stringify({ code, token }));
+    prefs.set('room', JSON.stringify(keepSeat({ code, token, seat }))); // kept with the seat and when, so Home can offer the way back (web/backroom.js)
     if (location.search !== '?room=' + code) history.replaceState(null, '', inviteLink(code, location.pathname)); // the address becomes the invite link (a reload comes back to this seat)
     const kept = heldMv; syncRoom(room); heldMv = kept; $('#gameover').hidden = !state.over; if (state.over) gameOver();
     if (back && heldMv) setTimeout(releaseHeld, 0); // a move kept while the line was down goes now (or says why not)
@@ -1287,7 +1292,7 @@ function startOnline(code, { stay = false } = {}) {
   on('draw', (m) => { if (m.seat === you) awayNote('over', { result: 'draw', agreed: true }); moveQueue = moveQueue.then(() => showDraw(m)).catch((e) => console.error(e)); });
   on('takeback', (m) => { moveQueue = moveQueue.then(() => showTakeBack(m)).catch((e) => console.error(e)); });
   on('resync', () => { $('#oppSub').textContent = 'catching up…'; });
-  on('ticket', ({ code, token, ticket }) => { if (code && token) prefs.set('room', JSON.stringify({ code, token, ticket })); }); // kept with the seat, so even after a reload the room can be rebuilt if the server restarted
+  on('ticket', ({ code, token, ticket }) => { if (code && token) prefs.set('room', JSON.stringify(keepSeat({ code, token, ticket, seat: self.seat }))); }); // kept with the seat, so even after a reload the room can be rebuilt if the server restarted
   on('shout', ({ seat, id }) => showShout(seat, id));
   on('peek', ({ seat, pit, n }) => { if (seat !== them) return; Object.assign(peekIn, { pit, n, seat, t: performance.now() }); peekIn.log.push({ pit, n }); if (peekIn.log.length > 40) peekIn.log.shift(); peekPaint(); });
   on('call', (m) => callMessage(m));
@@ -2104,6 +2109,7 @@ function showScreen(which) { // 'home' | 'settings' | 'play' | 'rooms' | 'puzzle
   if (which === 'play') blinkLoop(); else { clearTimeout(blinkTimer); if (mood !== 'calm' && mood !== 'think') react('calm'); }
   if (which === 'play' && !busy && !state.over && state.turn === you && selected === null) showTurn(); else if (!board3d) paintFeed();
   wakeCheck(); // feed them: said once the board is in front of you, gone behind a screen
+  if (which === 'home') try { paintBackLine(); } catch { /* the first screen comes up before the room is set up */ }
   try { paintFresh(); } catch { /* the first screen comes up before the update check is set up */ } // a newer version: said on Home only
 }
 let idle = true; // the home screen slowly turns the board

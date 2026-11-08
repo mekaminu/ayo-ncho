@@ -17,6 +17,10 @@
 #        add --lean (with --smoke) to check Who's ahead (idea 8 Nov): with it on the brass bead shows Mama Ngozi's count of the board as it
 #                  stands (the engine's leanOf), sits where the count puts it, its word matches; one more move and the word over the bead
 #                  (<out>-word.png); Settings' line says it (in French too); off and on again from Settings
+#        add --backroom to check Back to your game (idea 8 Nov): the real server; Meka opens a room, Tete knocks and is let in, Meka's
+#                  page closes mid-game and the game opens again at its start: Home carries "Back to your game with Tete · your move"
+#                  (<out>), a tap takes the same seat back (the board, Tete across it), a move reaches Tete; Home on the board leaves the
+#                  room and the line is gone; in French too
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
 #        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
@@ -265,6 +269,7 @@ ratec = "--askrate" in sys.argv
 lookc = "--look" in sys.argv
 familyc = "--family" in sys.argv
 leanc = "--lean" in sys.argv
+backroomc = "--backroom" in sys.argv
 igboc = "--igbo" in sys.argv; yorubac = "--yoruba" in sys.argv; hausac = "--hausa" in sys.argv; countc = countc or igboc or yorubac or hausac
 IGBO1 = ["efu", "otu", "abụọ", "atọ", "anọ", "ise", "isii", "asaa", "asatọ", "itoolu"]
 YORUBA = ["òdo", "ọ̀kan", "èjì", "ẹ̀ta", "ẹ̀rin", "àrún", "ẹ̀fà", "èje", "ẹ̀jọ", "ẹ̀sán", "ẹ̀wá", "ọ̀kanlá", "èjìlá", "ẹ̀tàlá", "ẹ̀rìnlá", "ẹ̀ẹ́dógún", "ẹ̀rìndínlógún", "ẹ̀tàdínlógún", "èjìdínlógún", "ọ̀kàndínlógún", "ogún"]
@@ -279,7 +284,7 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8766), functools.partial(Quiet, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 node = None
-if online or legal or freshc or cdnc or qrc or warmc or familyc:  # the real server on its own port, so two pages can meet at one board
+if online or legal or freshc or cdnc or qrc or warmc or familyc or backroomc:  # the real server on its own port, so two pages can meet at one board
     def start_node():  # with a fixed ROOM_SECRET, so a restart mid-game can be checked (the rooms come back from the boards' tickets)
         n = subprocess.Popen(["node", os.path.join(root, "server", "index.js")], env={**os.environ, "PORT": "8767", "ROOM_SECRET": "render-check-secret"}, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         for _ in range(100):
@@ -341,6 +346,51 @@ if warmc:  # the server, woken early (idea 7 Nov): Home knocks on /healthz; a se
         w4 = fr.evaluate("document.querySelector('#roomStatus span').textContent"); print("warm: in French", repr(w4)); assert w4 == "le serveur du jeu se réveille…", w4
         for r in frheld: r.abort()
         fr.wait_for_timeout(300); b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
+if backroomc:  # Back to your game (idea 8 Nov): a seat kept in a game still in play is offered on Home when the game opens again
+    import atexit; atexit.register(lambda: node.terminate())
+    BASE = "http://127.0.0.1:8767/"
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        hctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2, has_touch=True, is_mobile=True)
+        hctx.add_init_script("localStorage.setItem('ayo.name', 'Meka'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done')")
+        host = hctx.new_page(); watch(host, errors, "host: ")
+        host.goto(BASE + "?capture=1&stay=home", wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
+        assert host.evaluate("document.querySelector('#backLine').hidden"), "a new phone has nothing to go back to"
+        host.click("#friendsBtn"); host.wait_for_function("window.__ayo.room && window.__ayo.room.code && document.querySelector('#roomStatus').dataset.state==='open'", timeout=20000)
+        code = host.evaluate("window.__ayo.room.code")
+        fctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+        fctx.add_init_script("localStorage.setItem('ayo.name', 'Tete'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done')")
+        friend = fctx.new_page(); watch(friend, errors, "friend: ")
+        friend.goto(BASE + "?capture=1&room=" + code, wait_until="load"); friend.wait_for_function("window.__done===true", timeout=180000)
+        host.wait_for_selector("#knockCard:not([hidden])", timeout=20000); host.click("#knockYes")
+        friend.wait_for_function("document.querySelector('#oppName').textContent === 'Meka'", timeout=20000)
+        host.wait_for_function("document.querySelector('#oppName').textContent === 'Tete'", timeout=20000); host.wait_for_timeout(600)
+        kept = json.loads(host.evaluate("localStorage.getItem('ayo.room')")); assert kept["code"] == code and kept["seat"] == 0 and kept["at"] > 0 and kept["ticket"]["names"] == ["Meka", "Tete"], kept
+        # the app is closed mid-game (no Home, no leave) and opened again at its start
+        host.close(); host = hctx.new_page(); watch(host, errors, "host again: ")
+        host.goto(BASE + "?capture=1&stay=home", wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
+        host.wait_for_selector("#backLine:not([hidden])", timeout=5000); host.wait_for_timeout(500)
+        w = host.evaluate("document.querySelector('#backWords').textContent"); print("backroom: Home says", repr(w)); assert w == "Back to your game with Tete · your move", w
+        box = host.evaluate("(() => { const r = document.querySelector('#backLine').getBoundingClientRect(); return [r.left, r.right, r.height]; })()"); assert box[0] >= 0 and box[1] <= 390 and box[2] >= 28, box
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=out, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false")
+        host.click("#backLine")
+        host.wait_for_function("document.body.classList.contains('playing') && document.querySelector('#oppName').textContent === 'Tete'", timeout=20000)
+        assert "?room=" + code in host.url, host.url
+        host.wait_for_function("window.__ayo.room && window.__ayo.room.seat === 0 && window.__ayo.room.status === 'open' && !window.__ayo.busy", timeout=20000)
+        host.wait_for_timeout(800); host.keyboard.press("1"); host.wait_for_timeout(250); host.keyboard.press("Enter")
+        friend.wait_for_function("window.__ayo.state && window.__ayo.state.moves && window.__ayo.state.moves.length === 1", timeout=30000)
+        print("backroom: back in the same seat, and the move reached Tete")
+        # Home on the board leaves the room on purpose: nothing to go back to
+        host.wait_for_timeout(2500); host.click("#homeBtn"); host.wait_for_load_state("load"); host.wait_for_function("window.__done===true", timeout=180000)
+        host.wait_for_timeout(400); assert host.evaluate("document.querySelector('#backLine').hidden"), "left on purpose"
+        # French, from a seat kept by the friend (their move: Meka's reply has not been played)
+        friend.close(); fr = fctx.new_page(); watch(fr, errors, "fr: "); fr.add_init_script("localStorage.setItem('ayo.lang', 'fr')")
+        fr.goto(BASE + "?capture=1&stay=home", wait_until="load"); fr.wait_for_function("window.__done===true", timeout=180000)
+        fr.wait_for_selector("#backLine:not([hidden])", timeout=5000)
+        fw = fr.evaluate("document.querySelector('#backWords').textContent"); print("backroom: in French", repr(fw)); assert fw == "Retour à votre partie avec Meka · à vous", fw
+        b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)
 if qrc:  # Scan to join (idea 7 Nov): the QR code on the room card is read by a real QR reader (OpenCV) off the screenshot
