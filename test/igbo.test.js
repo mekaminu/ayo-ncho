@@ -17,7 +17,7 @@ test("the numbers a board can hold, in Igbo", () => {
 });
 
 test("figures until Igbo is chosen; the word under the number and on the hint line", () => {
-  assert.equal(countPref(undefined), "figures"); assert.equal(countPref("igbo"), "igbo"); assert.equal(countPref("yoruba"), "figures");
+  assert.equal(countPref(undefined), "figures"); assert.equal(countPref("igbo"), "igbo"); assert.equal(countPref("yoruba"), "yoruba"); assert.equal(countPref("hausa"), "figures");
   assert.equal(countWord(5, false), ""); assert.equal(countWord(5, true), "ise"); assert.equal(countWord(-1, true), "");
   const state = { pits: [5, 0, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4], stores: [3, 0] };
   const w = countWords({ state, pit: 0, you: 0 });
