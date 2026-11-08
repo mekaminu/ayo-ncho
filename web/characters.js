@@ -70,7 +70,7 @@ export function faceFor(level, mood = 'calm') {
 }
 
 // Which face goes with each moment the opponent speaks at.
-export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think', waiting: 'calm', morning: 'happy', afternoon: 'happy', evening: 'happy', night: 'surprised', back: 'happy' };
+export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think', waiting: 'calm', morning: 'happy', afternoon: 'happy', evening: 'happy', night: 'surprised', back: 'happy', againWon: 'sulk', againWonBig: 'sulk', againLost: 'happy', againDrew: 'calm' };
 
 export const CHARACTERS = {
   easy: {
@@ -92,6 +92,11 @@ export const CHARACTERS = {
       evening: ["One game before my bath. Quick!"],
       night: ["Mummy says I should be asleep. Shh. Play!"],
       back: ["Finally! I practised the whole time you were gone."],
+      // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
+      againWon: ["Again! This time I'm really trying."],
+      againWonBig: ["That was practice. This one is real!"],
+      againLost: ["You want to lose again? OK!"],
+      againDrew: ["Nobody won! We have to play again."],
     },
     // your record against them: what they say when you are on a run (yours: you keep winning; theirs: they do)
     runs: { yours: { 3: 'Three in a row? I\'m telling Mama.', 5: 'Five! Are you magic?', more: (n) => `${n} in a row. I give up. No I don't.` },
@@ -116,6 +121,11 @@ export const CHARACTERS = {
       evening: ["Ẹ káalẹ́. One game, then homework."],
       night: ["At this hour? Very well. Quietly."],
       back: ["Ah, there you are. We will revise what we learnt."],
+      // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
+      againWon: ["Again? Good. Show me it was not luck."],
+      againWonBig: ["Top marks last time. Let us see it twice."],
+      againLost: ["Back for the lesson again? Sit down."],
+      againDrew: ["A draw. We will finish the sum this time."],
     },
     runs: { yours: { 3: 'Three in a row. You have been practising.', 5: 'Five! I am telling your mother — good news, this time.', more: (n) => `${n} in a row. Time I moved you up a class.` },
             theirs: { 3: 'Three for me. Count slower.', 5: 'Five. We will go over it again.', more: (n) => `${n}. Patience. Counting is a habit.` } },
@@ -139,6 +149,11 @@ export const CHARACTERS = {
       evening: ["Mgbede ọma. Evening seeds, after the traffic."],
       night: ["This hour? You can't sleep either, abi?"],
       back: ["Ehen! Where have you been? The board missed you."],
+      // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
+      againWon: ["Rematch. That last one was a warm-up, o."],
+      againWonBig: ["Cousin, don't tell anybody about that last one."],
+      againLost: ["Back for more? Suya is on you again."],
+      againDrew: ["Level. This one decides it."],
     },
     runs: { yours: { 3: 'Three straight? Who have you been practising with?', 5: 'Five in a row. OK, I\'m actually trying now.', more: (n) => `${n} in a row. Cousin, leave something for me.` },
             theirs: { 3: 'Three–zero. Suya is on you.', 5: 'Five. I\'m not even looking at the board.', more: (n) => `${n} and counting. Buy a bigger board.` } },
@@ -162,6 +177,11 @@ export const CHARACTERS = {
       evening: ["Mgbede ọma. The market is closed; the board is open."],
       night: ["Still awake? The seeds do not sleep either."],
       back: ["So, you remembered the board. Sit well."],
+      // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
+      againWon: ["Again. This time I am paying attention."],
+      againWonBig: ["You took my pride. Now I take it back."],
+      againLost: ["Back so soon? Good. Learn something."],
+      againDrew: ["Even. The board wants an answer."],
     },
     runs: { yours: { 3: 'Three in a row? Mama Ngozi is watching.', 5: 'Five. Now the market will talk.', more: (n) => `${n} in a row. The board is yours. For now.` },
             theirs: { 3: 'Three. Come back when the seeds listen to you.', 5: 'Five. Sit well; we are not finished.', more: (n) => `${n}. I am not counting. You are.` } },
@@ -185,6 +205,11 @@ export const CHARACTERS = {
       evening: ["Good evening. The best games are played after dark."],
       night: ["Late games. Mama Ngozi and I once played till dawn."],
       back: ["The board waited. So did I."],
+      // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
+      againWon: ["Again. I have seen how you think."],
+      againWonBig: ["Hm. Sit. I will not lend you so much this time."],
+      againLost: ["Back already? Good. Count further."],
+      againDrew: ["A draw settles nothing. Again."],
     },
     runs: { yours: { 3: 'Three. I will have to think now.', 5: 'Five. They will write songs. Short ones.', more: (n) => `${n} in a row. I am taking notes.` },
             theirs: { 3: 'Three. Patience, my child.', 5: 'Five. Sit with the board a while.', more: (n) => `${n}. The board is a slow teacher.` } },

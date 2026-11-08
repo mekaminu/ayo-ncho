@@ -12,7 +12,7 @@ export const talkPref = (v) => (TALKS.includes(v) ? v : 'all');
 export const talkNow = (saved, param) => talkPref(TALKS.includes(param) ? param : saved);
 
 // the moments a game opens with (web/greet.js) and closes with (game over: their usual line, a first win, a run)
-export const OPENING = ['start', 'morning', 'afternoon', 'evening', 'night', 'back'];
+export const OPENING = ['start', 'morning', 'afternoon', 'evening', 'night', 'back', 'againWon', 'againWonBig', 'againLost', 'againDrew'];
 export const CLOSING = ['win', 'lose', 'firstWin', 'run', 'end'];
 
 // does the bubble show for this moment? (anything not named — a capture, an undo, Mama Ngozi's take — is mid-game chat)

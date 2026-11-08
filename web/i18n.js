@@ -774,6 +774,27 @@ const SAYS = {
   "Good evening. The best games are played after dark.": "Bonsoir. Les meilleures parties se jouent à la nuit tombée.",
   "Late games. Mama Ngozi and I once played till dawn.": "Les parties tardives. Mama Ngozi et moi avons joué une fois jusqu’à l’aube.",
   "The board waited. So did I.": "Le plateau a attendu. Moi aussi.",
+  // a rematch straight after a game (web/rematch.js)
+  "Again! This time I'm really trying.": "Encore ! Cette fois, je fais vraiment de mon mieux.",
+  "That was practice. This one is real!": "C’était pour s’entraîner. Celle-ci compte !",
+  "You want to lose again? OK!": "Tu veux encore perdre ? D’accord !",
+  "Nobody won! We have to play again.": "Personne n’a gagné ! Il faut rejouer.",
+  "Again? Good. Show me it was not luck.": "Encore ? Bien. Montrez-moi que ce n’était pas de la chance.",
+  "Top marks last time. Let us see it twice.": "Excellente note la dernière fois. Voyons si cela se répète.",
+  "Back for the lesson again? Sit down.": "De retour pour la leçon ? Asseyez-vous.",
+  "A draw. We will finish the sum this time.": "Égalité. Cette fois, nous finirons le calcul.",
+  "Rematch. That last one was a warm-up, o.": "Revanche. La dernière, c’était l’échauffement, o.",
+  "Cousin, don't tell anybody about that last one.": "Cousin, ne raconte la dernière à personne.",
+  "Back for more? Suya is on you again.": "Tu en redemandes ? Les suya sont encore pour toi.",
+  "Level. This one decides it.": "Égalité. Celle-ci tranche.",
+  "Again. This time I am paying attention.": "Encore. Cette fois, je fais attention.",
+  "You took my pride. Now I take it back.": "Vous m’avez pris ma fierté. Je la reprends.",
+  "Back so soon? Good. Learn something.": "Déjà de retour ? Bien. Apprenez quelque chose.",
+  "Even. The board wants an answer.": "À égalité. Le plateau veut une réponse.",
+  "Again. I have seen how you think.": "Encore. J’ai vu comment vous pensez.",
+  "Hm. Sit. I will not lend you so much this time.": "Hm. Asseyez-vous. Cette fois, je ne vous prêterai pas autant.",
+  "Back already? Good. Count further.": "Vous revoilà déjà ? Bien. Comptez plus loin.",
+  "A draw settles nothing. Again.": "Une égalité ne règle rien. Encore.",
 };
 // the runs of 10, 15, 20… (each opponent's `more(n)`): {n} is the run
 const SAYS_N = [

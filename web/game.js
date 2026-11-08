@@ -10,6 +10,7 @@ import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { decideSaver, saverPlan, drawDue, toastFor, noteFor, watchBattery } from './battery.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES, dayKey } from './streak.js';
 import { greetMoment } from './greet.js';
+import { keep as keepRematch, rematchMoment } from './rematch.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { beatQuery, parseBeat, beatDay, beatAsk, beatResult, beatShowWords, beatWatchWords, beatShownEyebrow, beatLinkWords, beatShare } from './beat.js';
 import { dailyPuzzle, attempt, shareText as dayShareText, todayKey, levelWord } from '../engine/puzzle.js';
@@ -2259,8 +2260,12 @@ function greet() {
   const now = new Date(); const hour = params.has('hour') ? +params.get('hour') : now.getHours(); const today = dayKey(now);
   let days = streak.days; const aw = +params.get('away'); if (aw > 0) { const d = new Date(now); d.setDate(d.getDate() - aw); days = [...days.filter((k) => k < dayKey(d)), dayKey(d)]; }
   const g = greetMoment({ days, today, hour, last: prefs.get('greet.last', '') });
+  // the rematch, remembered (web/rematch.js): straight after a game against them, their word for how it went comes first —
+  // after coming back from days away, before the hour's greeting (which is kept as said, so the next game does not greet)
+  const kept = prefs.get('rematch', ''); const rm = g.moment === 'back' ? null : rematchMoment(kept, level, Date.now(), prefs.get('rematch.said', null));
+  if (rm) { const l = JSON.parse(kept); if (l.id != null) prefs.set('rematch.said', l.id); }
   if (g.moment !== 'start') prefs.set('greet.last', g.key);
-  greeted.log.push({ moment: g.moment, key: g.key }); say(g.moment);
+  const moment = rm || g.moment; greeted.log.push({ moment, key: g.key }); say(moment);
 }
 function say(moment) {
   if (online || local) return; // a friend speaks for themselves, and two of us need no third voice
@@ -2458,6 +2463,7 @@ function paintRecord(a, b) {
   if (local && !puzzle.on) { paintPair(box); return null; }
   if (online || puzzle.on) { box.hidden = true; return null; } // two of us keeps the score between the two names instead (paintPair)
   const r = recordGame(records, level, a, b, stats.started); records = r.data; if (r.counted) prefs.set('record', JSON.stringify(records));
+  if (r.counted) prefs.set('rematch', keepRematch(level, a, b, stats.started, Date.now())); // the next game against them answers this one
   const up = r.counted ? nextUp(level, r.moment, names) : null; // your first win over them: the next one up is offered
   // a gentler game, and the way back up (web/stepdown.js): three losses in a row offer the one a step down; beating them offers the way back
   const nx = offerAfter({ level, outcome: r.outcome, entry: r.entry, counted: r.counted, stepped, names, next: up, open: (lv) => levelOpen(lv, owned(), GOLD_PREVIEW) });
