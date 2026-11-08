@@ -35,9 +35,13 @@ def wait_turn(pg, n):  # your move again after n moves in all (yours and theirs)
 
 def sow(pg):  # your next move: the first pit you may play, tapped as a finger would (pick, then sow)
     n = pg.evaluate("window.__ayo.state.moves.length"); pit = pg.evaluate("window.__ayo.legal[0]")
-    x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit); pg.mouse.click(x, y); pg.wait_for_timeout(350)
-    if pg.evaluate("window.__ayo.state.moves.length === %d && !window.__ayo.busy" % n): pg.mouse.click(x, y)
+    x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit)
+    for k in range(6):  # pick, then sow; on a loaded machine a tap can come before the board is ready for it, so tap until it goes
+        if not pg.evaluate("window.__ayo.state.moves.length === %d && !window.__ayo.busy" % n): break
+        if k >= 2: TAPS["again"] += 1  # (8 Nov: one run waited four minutes for a move whose second tap was lost)
+        pg.mouse.click(x, y); pg.wait_for_timeout(350)
     wait_turn(pg, n + 2)
+TAPS = {"again": 0}
 
 def click(pg, sel):
     pg.wait_for_selector(sel + ":not([hidden])", timeout=30000)
@@ -112,7 +116,8 @@ def main():
             try: round_(pg, k)
             except Exception as e:
                 pg.screenshot(path=os.environ.get("SOAK_STUCK", "/tmp/soak-stuck.png"))
-                print(json.dumps(pg.evaluate("(async () => { const a = window.__ayo; const t0 = performance.now(); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); return { deal: a.deal, tweens: a.tweens, hurry: a.hurry, rest: a.rest, frame: Math.round(performance.now() - t0), hint: document.querySelector('#hint').textContent, sub: document.querySelector('#oppSub').textContent, mood: a.mood, last: a.state.moves.slice(-3) }; })()")))
+                print(json.dumps(pg.evaluate("(async () => { const a = window.__ayo; const t0 = performance.now(); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); return { deal: a.deal, tweens: a.tweens, hurry: a.hurry, rest: a.rest, frame: Math.round(performance.now() - t0), hint: document.querySelector('#hint').textContent, sub: document.querySelector('#oppSub').textContent, mood: a.mood, last: a.state.moves.slice(-3), caught: a.caught, frames: a.frames.calls }; })()")))
+                if errors: print("page errors:", *errors, sep="\n  ")  # (8 Nov: the one stuck run never said whether a frame had thrown)
                 print("stuck in round %d: %s" % (k, str(e).split("\n")[0]), json.dumps(pg.evaluate("({ moves: window.__ayo.state.moves.length, turn: window.__ayo.state.turn, over: window.__ayo.state.over, busy: window.__ayo.busy, home: !document.querySelector('#home').hidden, shown: [...document.querySelectorAll('section:not([hidden]), .card:not([hidden])')].map(e => e.id), play: document.querySelector('#playBtn').className })")))
                 raise SystemExit(1)
             r = dict(measure(pg, cdp), round=k, seconds=round(time.time() - t)); rows.append(r)
@@ -127,6 +132,7 @@ def main():
     lines += ["", "**%s**" % ("Nothing builds up." if verdict["ok"] else "Grows: " + "; ".join(verdict["grows"]))]
     for k, v in verdict["series"].items(): lines.append("- %s: %s" % (k, v))
     if errors: lines += ["", "Page errors: " + "; ".join(errors)]
+    if TAPS["again"]: lines += ["", "Taps tried again (a tap the board was not ready for): %d" % TAPS["again"]]
     open(out, "w").write("\n".join(lines) + "\n"); print("report:", os.path.relpath(out, root)); print("%.0f s" % (time.time() - t0))
     if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
     if not verdict["ok"]: print("grows:", *verdict["grows"], sep="\n  "); sys.exit(1)

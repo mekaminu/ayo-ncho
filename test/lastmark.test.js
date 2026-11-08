@@ -67,7 +67,7 @@ test("the page wires it to the explained move, the render loop, the labels and t
   const sw = readFileSync(new URL("../web/sw.js", import.meta.url), "utf8");
   assert.match(g, /import \{ lastMarkPit, lastMarkOp, withLast \} from '\.\/lastmark\.js'/);
   assert.match(g, /lastM\.t0 = performance\.now\(\)/, "set when their move is explained");
-  assert.match(g, /lastStep\(now\); sim\.step/, "stepped in the render loop");
+  assert.match(g, /lastStep\(now\); (try \{ )?sim\.step/, "stepped in the render loop");
   assert.match(g, /withLast\(pitLabel\(i, state\.pits\[i\]/, "the hidden pit buttons");
   assert.match(g, /withLast\(h\.words, pit, lastM\.pit\)/, "the mouse's words");
   assert.ok(g.indexOf("const lastM =") < g.indexOf("function paintPits"), "declared before anything paints the pits");
