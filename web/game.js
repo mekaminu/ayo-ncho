@@ -46,7 +46,7 @@ import { handPref, handNow, mirrored, wideRoom, handNote, handToast } from './ha
 import { talkPref, talkNow, speaks, talkNote, talkToast } from './chatter.js';
 import { retryOf, isRetry, retryOffer, retryButton, retryToast, retryEyebrow, retryLine, retryShare } from './retry.js';
 import { playoutOf, isPlayout, canPlayOut, playedOut, undoOk, undoReady, playoutButton, playoutToast, playoutEyebrow, playoutShare } from './playout.js';
-import { NAMES as LNAMES, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare, nearSeatAt, tableCards, tableStart, setNames as setLocalNames, readNames, keepNames, faceMark, pillLine } from './local.js';
+import { NAMES as LNAMES, named as localNamed, PLAY_SUB as LOCAL_SUB, seatOf, swingTheta, badgeFlip, turnWords as localTurn, overTitle as localTitle, continueLine as localContinue, undoTo as localUndo, shareText as localShare, nearSeatAt, tableCards, tableStart, setNames as setLocalNames, readNames, keepNames, faceMark, pillLine } from './local.js';
 import { buildBoard, buildTable, buildLights, seedMaterialFor, seedGeometryFor, SEED_SETS, pitCenters, storeCenters, surfaceY, PIT_R, PIT_D, STORE_RX, STORE_RZ, STORE_D, STORE_FLAT, BT, BW, BL, R as CORNER } from './board.js';
 import { pour, place, reach } from './slots.js';
 import { boardAudio, handful } from './sound.js';
@@ -62,6 +62,7 @@ import { parse as parseBests, gameBests, record as recordBests, bestsWords, best
 import { handSteps, handText, handShown, haulKind } from './handcount.js';
 import { parseStarts, recordStart, nextStart, startWords } from './starts.js';
 import { decodeGame, watchQuery, titleWords as watchTitle, moveWords as watchMove, endWords as watchEnd, linkWords as watchLink, canTakeOver, takeoverOf, isTakeover, takeoverChip, takeoverLabel, takeoverToast, takeoverEyebrow, takeoverShare } from './watch.js';
+import { parse as parsePair, pairOf, record as recordPair, entryOf as pairEntry, cardLine as pairLine, startLine as pairStart, standingParts as pairParts, wentUp as pairUp, played as pairPlayed } from './pair.js';
 import { parse as parseTally, record as recordTally, roomKey, entryOf as tallyOf, cardLine as tallyLine, startLine as tallyStart, standingParts, wentUp, played as tallyPlayed } from './tally.js';
 import { makeAway } from './away.js';
 import { hoverAt } from './hover.js';
@@ -581,6 +582,8 @@ let records = parseRecord(prefs.get('record', null));
 let bests = parseBests(prefs.get('bests', null)); let bestShown = { news: [], words: '', at: -1 };
 // the score at the table with a friend (web/tally.js): each room's wins by seat and draws, counted once per game of the room
 let tally = parseTally(prefs.get('tally', null)); let tableRoom = null;
+// the score between us (web/pair.js): two of us on one phone, once both names are typed, counted by the pair of names
+let pairs = parsePair(prefs.get('pairs', null)); const thePair = () => pairOf(LNAMES, [localNamed(0), localNamed(1)]);
 // who starts (web/starts.js): as at a real board the loser of the last game against this opponent (or between the two of you) moves first;
 // Settings → Rules → Who starts can make it always you or always them. A room's server already starts the loser.
 let starts = parseStarts(prefs.get('starts', null));
@@ -2452,7 +2455,8 @@ function gameOver() {
 // when the result is worth a word (your first win against them, a run of 3, 5, 10…) they say it, on the card and in the bubble
 function paintRecord(a, b) {
   const box = $('#goRecord'); $('#goNext').hidden = true; if (online && !puzzle.on) { paintTally(box); return null; }
-  if (online || puzzle.on || local) { box.hidden = true; return null; } // two of us keeps no record: the phone cannot tell who sat where
+  if (local && !puzzle.on) { paintPair(box); return null; }
+  if (online || puzzle.on) { box.hidden = true; return null; } // two of us keeps the score between the two names instead (paintPair)
   const r = recordGame(records, level, a, b, stats.started); records = r.data; if (r.counted) prefs.set('record', JSON.stringify(records));
   const up = r.counted ? nextUp(level, r.moment, names) : null; // your first win over them: the next one up is offered
   // a gentler game, and the way back up (web/stepdown.js): three losses in a row offer the one a step down; beating them offers the way back
@@ -2482,6 +2486,22 @@ function paintTally(box) {
   $('#goRecSay').hidden = true; box.classList.remove('word'); $('#goRecFace').innerHTML = initialFace(name).replace('width="44" height="44"', 'width="100%" height="100%"'); box.hidden = false;
   if (at < 0) return;
   tallyTimer = setTimeout(() => { const em = $('#goRecLine').querySelector('em.tally'); if (!em || $('#gameover').hidden) return; em.textContent = parts[at]; em.classList.remove('tick'); void em.offsetWidth; em.classList.add('tick'); click(up === 'mine' ? 1.7 : 1.1, 0.07); buzz(8); }, reduceMotion ? 0 : 700);
+}
+// the score between us (web/pair.js): two of us with both names typed — the card says who leads between them, and the count
+// that changed lands as it stood ("level 0–0") and turns to the new one ("Meka leads 1–0") with a knock, as at a friend's room
+function paintPair(box) {
+  clearTimeout(tallyTimer);
+  const pair = thePair(); if (!pair) { box.hidden = true; return; }
+  const r = recordPair(pairs, pair, stats.started, state.winner); pairs = r.data; if (r.counted) prefs.set('pairs', JSON.stringify(pairs));
+  const nm = [LNAMES[0], LNAMES[1]]; const text = pairLine(r.entry, nm); if (!text) { box.hidden = true; return; }
+  const up = pairUp(r.before, r.entry); const parts = text.split(' · '); const at = up === 'draw' ? 1 : up === null ? -1 : 0;
+  const esc = (t) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const was = up !== null && up !== 'draw' ? (pairPlayed(r.before) ? pairParts(r.before, nm)[0] : 'level 0–0') : null;
+  $('#goRecLine').innerHTML = parts.map((p, i) => i === at ? `<em class="tally">${esc(i === 0 && was && !reduceMotion ? was : p)}</em>` : esc(p)).join(' · ');
+  const lead = r.entry.w[0] === r.entry.w[1] ? (state.winner === 1 ? 1 : 0) : r.entry.w[0] > r.entry.w[1] ? 0 : 1; // the face is the leader's (the winner's when level)
+  $('#goRecSay').hidden = true; box.classList.remove('word'); $('#goRecFace').innerHTML = initialFace(nm[lead]).replace('width="44" height="44"', 'width="100%" height="100%"'); box.hidden = false;
+  if (at < 0) return;
+  tallyTimer = setTimeout(() => { const em = $('#goRecLine').querySelector('em.tally'); if (!em || $('#gameover').hidden) return; em.textContent = parts[at]; em.classList.remove('tick'); void em.offsetWidth; em.classList.add('tick'); click(up === 'draw' ? 1.1 : 1.7, 0.07); buzz(8); }, reduceMotion ? 0 : 700);
 }
 // how the game went (web/story.js): the lead move by move as a line drawn in on the card — brass above the middle while
 // the near player leads, ember below while the other side does — a brass dot on the move that won it, an ember ring on
@@ -2649,7 +2669,7 @@ function newRound() {
   if (!dealsIn(plan, { reduceMotion, clipping })) layoutFromState(state);
   refreshStatic(); $('#gameover').hidden = true; deselect(); save(); paintRules(); faceSeat();
   const dealt = dealsIn(plan, { reduceMotion, clipping }) ? dealIn(plan, state) : Promise.resolve();
-  if (local) setTimeout(() => toast(`${startWords(st, LNAMES, false)} · ${tableOn() ? tableStart() : 'pass the phone after each move'}`), 600);
+  if (local) { const pl = pairStart(pairEntry(pairs, thePair()), LNAMES); setTimeout(() => toast(pl ? `${pl[0].toUpperCase() + pl.slice(1)} · ${startWords(st, LNAMES, false)}${tableOn() ? ' · ' + tableStart() : ''}` : `${startWords(st, LNAMES, false)} · ${tableOn() ? tableStart() : 'pass the phone after each move'}`, pl ? 2600 : undefined), 600); } // the score between us leads the toast once a game between these two is counted
   else { setTimeout(greet, 600); if (st.first === them || st.why !== 'first') setTimeout(() => toast(startWords(st, ['You', names[level]])), 600); dealt.then(() => { if (deal.again) return; kickAi(); }); } // the computer opens when it is their start, once the board is set
   dealt.then(() => { if (deal.again) { deal.again = false; newRound(); } });
 }

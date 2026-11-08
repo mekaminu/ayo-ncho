@@ -270,6 +270,7 @@ lookc = "--look" in sys.argv
 familyc = "--family" in sys.argv
 leanc = "--lean" in sys.argv
 backroomc = "--backroom" in sys.argv
+pairc = "--pair" in sys.argv  # the score between us (idea 8 Nov): two of us with typed names, a game one move from Meka's win, Tete leading 2–1 before it
 igboc = "--igbo" in sys.argv; yorubac = "--yoruba" in sys.argv; hausac = "--hausa" in sys.argv; countc = countc or igboc or yorubac or hausac
 IGBO1 = ["efu", "otu", "abụọ", "atọ", "anọ", "ise", "isii", "asaa", "asatọ", "itoolu"]
 YORUBA = ["òdo", "ọ̀kan", "èjì", "ẹ̀ta", "ẹ̀rin", "àrún", "ẹ̀fà", "èje", "ẹ̀jọ", "ẹ̀sán", "ẹ̀wá", "ọ̀kanlá", "èjìlá", "ẹ̀tàlá", "ẹ̀rìnlá", "ẹ̀ẹ́dógún", "ẹ̀rìndínlógún", "ẹ̀tàdínlógún", "èjìdínlógún", "ọ̀kàndínlógún", "ogún"]
@@ -2334,6 +2335,11 @@ with sync_playwright() as p:
     pg.route("https://fonts.googleapis.com/**", lambda r: r.abort())
     if os.path.exists(three):
         pg.route("https://cdnjs.cloudflare.com/**", lambda r: r.fulfill(path=three, content_type="text/javascript"))
+    if pairc:  # two of us, Meka & Tete typed, Tete ahead 2–1 between them, and a saved game one move from Meka's win
+        pend = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "endgame.js"), "7", "ncho"]).decode())
+        psave = {"moves": pend["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "hard", "local": True, "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 6 * 60 * 1000}}
+        pkept = {"pairs": {"meka|tete": {"w": [1, 2], "d": 0, "seen": [1, 2, 3], "at": 1}}}
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.pairs', %s); localStorage.setItem('ayo.localNames', '[\"Meka\",\"Tete\"]'); localStorage.setItem('ayo.mode', 'local'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); }" % (json.dumps(json.dumps(psave)), json.dumps(json.dumps(pkept))))
     if winc:  # a saved game one move from beating Mama Ngozi
         end = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "endgame.js"), "7", "ncho"]).decode())
         wsave = {"moves": end["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "hard", "stats": {"biggest": 8, "captures": 3, "started": int(time.time() * 1000) - 6 * 60 * 1000}}
@@ -2384,7 +2390,7 @@ with sync_playwright() as p:
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")
     if leanc: pg.add_init_script("if (!sessionStorage.getItem('leaned')) { sessionStorage.setItem('leaned', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lean', '1'); }")  # Who's ahead on from the start  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or winc or record or ratedc or local or masterc or last8 or racec or troughc or startsc or feedc or circ or givesc or slamc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or winc or pairc or record or ratedc or local or masterc or last8 or racec or troughc or startsc or feedc or circ or givesc or slamc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -2977,6 +2983,25 @@ with sync_playwright() as p:
         pg.click("#pzHome"); pg.wait_for_selector("#home:not([hidden])", timeout=10000); assert not pg.evaluate("window.__ayo.lesson.on")
         assert pg.evaluate("window.__ayo.state.variant") == "ayo", "back home on the Ayo board"
         print("lesson (Ayo): Settings → Learn to play with Ayo chosen teaches Ayo: one lap, a capture of 2, the sweep back")
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
+    if pairc:  # the score between us: Meka's winning move, the card turns "Tete leads 2–1" to "level 2–2", the next game's toast says it
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy && window.__ayo.local", timeout=20000)
+        tap(pg, pend["pit"]); pg.wait_for_selector("#gameover:not([hidden])", timeout=240000)
+        assert pg.evaluate("window.__ayo.state.winner") == 0
+        assert not pg.evaluate("document.querySelector('#goRecord').hidden"), "the score between us shows on the card"
+        first = pg.evaluate("document.querySelector('#goRecLine').textContent"); print("pair: the card lands as", repr(first))
+        pg.wait_for_function("(() => { const e = document.querySelector('#goRecLine em.tally'); return e && e.classList.contains('tick'); })()", timeout=10000)
+        line = pg.evaluate("document.querySelector('#goRecLine').textContent"); print("pair: and turns to", repr(line)); assert line == "level 2–2 · 4 games between you", line
+        assert json.loads(pg.evaluate("localStorage.getItem('ayo.pairs')"))["pairs"]["meka|tete"]["w"] == [2, 2]
+        W = pg.evaluate("document.documentElement.scrollWidth"); assert W <= pg.evaluate("innerWidth"), ("the card scrolls sideways", W)
+        pg.wait_for_timeout(500); pg.screenshot(path=out, timeout=120000, animations="disabled")
+        pg.reload(wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
+        assert json.loads(pg.evaluate("localStorage.getItem('ayo.pairs')"))["pairs"]["meka|tete"]["w"] == [2, 2], "a reload counts nothing again"
+        pg.evaluate("document.querySelector('#rematch') && document.querySelector('#rematch').click()") if not pg.evaluate("document.querySelector('#gameover').hidden") else play_btn(pg)
+        pg.wait_for_function("[...document.querySelectorAll('.toast')].some(t => t.textContent.startsWith('Game 5 · level 2–2'))", timeout=20000)
+        print("pair: next game's toast:", pg.evaluate("[...document.querySelectorAll('.toast')].map(t=>t.textContent).join(' | ')"))
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)

@@ -275,6 +275,7 @@ export function roomPatterns({ who, item, need }) {
     [R(`${N} leads (\\d+)–(\\d+)`), (m) => `${who(m[1])} mène ${m[2]}–${m[3]}`],
     [R(`(\\d+) drawn`), (m) => m[1] === '1' ? '1 nulle' : `${m[1]} nulles`],
     [R(`(\\d+) games? at this board`), (m) => m[1] === '1' ? '1 partie à ce plateau' : `${m[1]} parties à ce plateau`],
+    [R(`(\\d+) games? between you`), (m) => m[1] === '1' ? '1 partie entre vous' : `${m[1]} parties entre vous`], // the score between us (web/pair.js)
     [R(`([Gg])ame (\\d+)`), (m) => `${m[1] === 'G' ? 'Partie' : 'partie'} ${m[2]}`],
     [R(`weighing their pit (\\d+)`), (m) => `hésite sur le trou ${m[1]} d’en face`],
     // a move kept for the line (web/heldmove.js)
