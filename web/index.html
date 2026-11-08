@@ -379,6 +379,8 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .box{background:var(--card);border:1px solid rgba(243,233,215,.1);border-radius:16px;overflow:hidden}
 .row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-top:1px solid rgba(243,233,215,.08)}
 .row:first-child{border-top:0}
+/* a row whose choices leave its words too little room (Count in has four, and Larger words widen every choice) puts the choices on their own line under the words, at the right as before, instead of squeezing the words to a word a line */
+.row:has(> .seg){flex-wrap:wrap;row-gap:8px}.row:has(> .seg) > .t{flex:1 1 calc(96px*var(--ts))}.row:has(> .seg) > .seg{margin-left:auto}
 .row .t{display:flex;flex-direction:column;gap:2px;min-width:0}
 .row .t b{font-size:calc(14px*var(--ts));font-weight:600}.row .t span{font-size:calc(11px*var(--ts));color:var(--muted)}.row .t em{font-style:normal;color:var(--brass)}
 .swatches{display:flex;gap:8px}
@@ -851,7 +853,7 @@ html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
     <div class="group"><span class="eyebrow">Language</span>
       <div class="box">
         <div class="row"><div class="t"><b>Language</b><span id="langNow">follows the phone's language · English now</span></div><div class="seg" data-set="lang"><button class="segbtn" data-v="auto">Auto</button><button class="segbtn" data-v="en" lang="en">English</button><button class="segbtn" data-v="fr" lang="fr">Français</button></div></div>
-        <div class="row"><div class="t"><b>Count in</b><span id="countNow">hold a pit or a trough to count it · in figures</span></div><div class="seg" data-set="count"><button class="segbtn" data-v="figures">Figures</button><button class="segbtn" data-v="igbo" lang="ig">Igbo</button><button class="segbtn" data-v="yoruba" lang="yo">Yoruba</button></div></div>
+        <div class="row"><div class="t"><b>Count in</b><span id="countNow">hold a pit or a trough to count it · in figures</span></div><div class="seg" data-set="count"><button class="segbtn" data-v="figures">Figures</button><button class="segbtn" data-v="igbo" lang="ig">Igbo</button><button class="segbtn" data-v="yoruba" lang="yo">Yoruba</button><button class="segbtn" data-v="hausa" lang="ha">Hausa</button></div></div>
         <div class="row"><div class="t"><b>Word size</b><span id="sizeNow">the hints, the lines under the board, the cards and Settings · as drawn</span></div><div class="seg" data-set="textsize"><button class="segbtn" data-v="normal">Normal</button><button class="segbtn" data-v="large">Large</button><button class="segbtn" data-v="larger">Larger</button></div></div>
       </div>
     </div>

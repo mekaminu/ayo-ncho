@@ -68,7 +68,7 @@ function pageWords(html) {
   const dec = (s) => s.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ");
   return [...out].map((s) => dec(s).replace(/\s+/g, " ").trim()).filter((s) => /\p{L}/u.test(s));
 }
-const NOT_WORDS = new Set(["Ayo & Nchò", "Nchò", "Ayo", "Meka", "Tete", "G", "Gold", "Adaeze", "Auntie Bisi", "Nnamdi", "Mama Ngozi", "Papa Ike", "A B _ _", "Igbo", "Yoruba"]);
+const NOT_WORDS = new Set(["Ayo & Nchò", "Nchò", "Ayo", "Meka", "Tete", "G", "Gold", "Adaeze", "Auntie Bisi", "Nnamdi", "Mama Ngozi", "Papa Ike", "A B _ _", "Igbo", "Yoruba", "Hausa"]);
 const FILLED_IN = [ // placeholders the game replaces as it paints (they reach French through the patterns, or in later slices)
   /^Nnamdi · Medium$/, /^vs Nnamdi · Medium$/, /^Daily puzzle · /, /^playing as /, /^8 of 8/, /^Mahogany · Job's tears$/, /^Nchò · 14 moves$/,
   /^0 seeds$/, /^You led for good/, /^you lead 4–2/, /^“Three in a row/, /^for beating Nnamdi/, /^Ready for Nnamdi/, /^Tete /, /^follows the phone's language/,

@@ -6,7 +6,7 @@
 // for a player who does not speak it. Pure: no DOM.
 
 export const COUNT_KEY = 'count';
-export const COUNT_PREFS = ['figures', 'igbo', 'yoruba'];
+export const COUNT_PREFS = ['figures', 'igbo', 'yoruba', 'hausa'];
 export const countPref = (v) => (COUNT_PREFS.includes(v) ? v : 'figures');
 
 const ONES = ['efu', 'otu', 'abụọ', 'atọ', 'anọ', 'ise', 'isii', 'asaa', 'asatọ', 'itoolu'];
@@ -33,17 +33,32 @@ const YORUBA = ['òdo', 'ọ̀kan', 'èjì', 'ẹ̀ta', 'ẹ̀rin', 'àrún', '�
 // n in Yoruba, 0–50; null outside that
 export function yoruba(n) { return Number.isInteger(n) && n >= 0 && n < YORUBA.length ? YORUBA[n] : null; }
 
-// which tongue a count is said in: 'igbo', 'yoruba' or null (figures). `on` true (the first build's form) means Igbo.
-const tongue = (on) => (on === true ? 'igbo' : on === 'igbo' || on === 'yoruba' ? on : null);
+// Count in Hausa (idea 8 Nov): Hausa is the most spoken tongue in Nigeria, so the same count can be said in Hausa. Hausa counts
+// in tens like Igbo: goma (10), goma sha ɗaya (11, "ten and one" with sha), ashirin (20), ashirin da ɗaya (21, with da), talatin
+// (30), arbaʼin (40), hamsin (50); sifili for nothing. Written in the standard (boko) spelling with its hooked ɗ.
+const HAUSA1 = ['sifili', 'ɗaya', 'biyu', 'uku', 'huɗu', 'biyar', 'shida', 'bakwai', 'takwas', 'tara'];
+const HAUSA10 = { 1: 'goma', 2: 'ashirin', 3: 'talatin', 4: 'arbaʼin', 5: 'hamsin' };
+// n in Hausa, 0–59; null outside that
+export function hausa(n) {
+  if (!Number.isInteger(n) || n < 0 || n > 59) return null;
+  if (n < 10) return HAUSA1[n];
+  const t = HAUSA10[Math.floor(n / 10)], o = n % 10;
+  return o ? `${t} ${n < 20 ? 'sha' : 'da'} ${HAUSA1[o]}` : t;
+}
+
+// which tongue a count is said in: 'igbo', 'yoruba', 'hausa' or null (figures). `on` true (the first build's form) means Igbo.
+const TONGUES = { igbo: 'ig', yoruba: 'yo', hausa: 'ha' };
+const tongue = (on) => (on === true ? 'igbo' : Object.prototype.hasOwnProperty.call(TONGUES, on) ? on : null);
 // the HTML lang of the word under the number
-export const countLang = (on) => ({ igbo: 'ig', yoruba: 'yo' })[tongue(on)] || '';
+export const countLang = (on) => TONGUES[tongue(on)] || '';
 // n said in the chosen tongue, or null
-export function said(n, on) { const t = tongue(on); return t === 'igbo' ? igbo(n) : t === 'yoruba' ? yoruba(n) : null; }
+export function said(n, on) { const t = tongue(on); return t === 'igbo' ? igbo(n) : t === 'yoruba' ? yoruba(n) : t === 'hausa' ? hausa(n) : null; }
 
 // every word igbo() and yoruba() can say, so the French page keeps them as they are (web/i18n.js)
 export const IGBO_WORDS = new Set(Array.from({ length: 100 }, (_, n) => igbo(n)));
 export const YORUBA_WORDS = new Set(YORUBA);
-export const COUNT_WORDS = new Set([...IGBO_WORDS, ...YORUBA_WORDS]);
+export const HAUSA_WORDS = new Set(Array.from({ length: 60 }, (_, n) => hausa(n)));
+export const COUNT_WORDS = new Set([...IGBO_WORDS, ...YORUBA_WORDS, ...HAUSA_WORDS]);
 
 // the word under the brass number while a count runs ('' when counting in figures, or before the first seed)
 export function countWord(n, on) { return n >= 0 ? said(n, on) || '' : ''; }
@@ -55,9 +70,11 @@ export function withIgbo(words, n, on) { const w = said(n, on); return w && word
 export function countNote(pref) {
   const p = countPref(pref);
   return p === 'igbo' ? 'hold a pit or a trough to count it · otu, abụọ, atọ, anọ…'
-    : p === 'yoruba' ? 'hold a pit or a trough to count it · ọ̀kan, èjì, ẹ̀ta, ẹ̀rin…' : 'hold a pit or a trough to count it · in figures';
+    : p === 'yoruba' ? 'hold a pit or a trough to count it · ọ̀kan, èjì, ẹ̀ta, ẹ̀rin…'
+    : p === 'hausa' ? 'hold a pit or a trough to count it · ɗaya, biyu, uku, huɗu…' : 'hold a pit or a trough to count it · in figures';
 }
 export function countToast(pref) {
   const p = countPref(pref);
-  return p === 'igbo' ? 'Counting in Igbo · otu, abụọ, atọ…' : p === 'yoruba' ? 'Counting in Yoruba · ọ̀kan, èjì, ẹ̀ta…' : 'Counting in figures';
+  return p === 'igbo' ? 'Counting in Igbo · otu, abụọ, atọ…' : p === 'yoruba' ? 'Counting in Yoruba · ọ̀kan, èjì, ẹ̀ta…'
+    : p === 'hausa' ? 'Counting in Hausa · ɗaya, biyu, uku…' : 'Counting in figures';
 }

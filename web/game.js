@@ -446,7 +446,7 @@ const counting = { el: null, pit: null, run: 0, words: null, base: null, log: []
 { const el = document.createElement('span'); el.className = 'cword'; el.hidden = true; el.lang = 'ig'; badgeLayer.appendChild(el); counting.word = el; } // count in Igbo: the word under the number (web/igbo.js)
 const countNow = () => countPref(params0().get('count') || prefs.get('count', 'figures'));
 const igboOn = () => countNow() === 'igbo';
-const tongueNow = () => (countNow() === 'figures' ? null : countNow()); // count in Igbo or Yoruba (web/igbo.js)
+const tongueNow = () => (countNow() === 'figures' ? null : countNow()); // count in Igbo, Yoruba or Hausa (web/igbo.js)
 function setHand(k, seedsHeld, n, glint = false) {
   const H = hands[k]; const on = handShown(prefs.get('badges', '1') === '1', clipping) && n > 0 && seedsHeld && seedsHeld.length;
   H.seeds = on ? seedsHeld : null; H.el.hidden = !on; if (hands.log.length < 400) hands.log.push(k + ':' + (on ? handText(n, k) : '-')); if (!on) return;

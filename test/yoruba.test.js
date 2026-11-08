@@ -44,7 +44,7 @@ test("French keeps the Yoruba words as they are", () => {
 
 test("the Yoruba choice is in Settings → Language → Count in, and the board says the word in the chosen tongue", () => {
   const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
-  assert.match(html, /data-v="igbo" lang="ig">Igbo<\/button><button class="segbtn" data-v="yoruba" lang="yo">Yoruba<\/button><\/div>/);
+  assert.match(html, /data-v="igbo" lang="ig">Igbo<\/button><button class="segbtn" data-v="yoruba" lang="yo">Yoruba<\/button>/);
   const game = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
   assert.match(game, /counting\.word\.lang = countLang\(/);
   assert.match(game, /countWord\(k \+ 1, ig\)/);

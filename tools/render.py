@@ -73,6 +73,8 @@
 #                  the near side ("Meka took N in one turn. Can you?", <out>-ask.png); a miss says "Short of Meka" and offers Show
 #                  Meka's move, which plays it through; Now you, then the answer: "Level with Meka" (<out>); nothing kept as a daily
 #                  puzzle; Share sends the same link on; Home's saved game makes its own link of your best turn
+#        add --hausa (with --smoke) for count in Hausa (idea 8 Nov): the same check with Count in → Hausa ("shida" under the
+#                  number, lang ha, and the hint line ending with it)
 #        add --yoruba (with --smoke) for count in Yoruba (idea 8 Nov): the same check with Count in → Yoruba ("ẹ̀fà" under the
 #                  number, lang yo, and the hint line ending with it)
 #        add --igbo (with --smoke) to check count in Igbo (idea 8 Nov): the --count check with Settings → Language → Count in →
@@ -263,9 +265,11 @@ ratec = "--askrate" in sys.argv
 lookc = "--look" in sys.argv
 familyc = "--family" in sys.argv
 leanc = "--lean" in sys.argv
-igboc = "--igbo" in sys.argv; yorubac = "--yoruba" in sys.argv; countc = countc or igboc or yorubac
+igboc = "--igbo" in sys.argv; yorubac = "--yoruba" in sys.argv; hausac = "--hausa" in sys.argv; countc = countc or igboc or yorubac or hausac
 IGBO1 = ["efu", "otu", "abụọ", "atọ", "anọ", "ise", "isii", "asaa", "asatọ", "itoolu"]
 YORUBA = ["òdo", "ọ̀kan", "èjì", "ẹ̀ta", "ẹ̀rin", "àrún", "ẹ̀fà", "èje", "ẹ̀jọ", "ẹ̀sán", "ẹ̀wá", "ọ̀kanlá", "èjìlá", "ẹ̀tàlá", "ẹ̀rìnlá", "ẹ̀ẹ́dógún", "ẹ̀rìndínlógún", "ẹ̀tàdínlógún", "èjìdínlógún", "ọ̀kàndínlógún", "ogún"]
+HAUSA1 = ["sifili", "ɗaya", "biyu", "uku", "huɗu", "biyar", "shida", "bakwai", "takwas", "tara"]
+def hausa(n): return HAUSA1[n] if n < 10 else {1: "goma", 2: "ashirin", 3: "talatin", 4: "arbaʼin", 5: "hamsin"}[n // 10] + ((" sha " if n < 20 else " da ") + HAUSA1[n % 10] if n % 10 else "")
 def igbo(n): return IGBO1[n] if n < 10 else ("iri" if n // 10 == 1 else "iri " + IGBO1[n // 10]) + ((" na " + IGBO1[n % 10]) if n % 10 else "")
 page = next((a.split("=", 1)[1] if "=" in a else "happy" for a in sys.argv if a.startswith("--page")), None)
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -2273,6 +2277,7 @@ with sync_playwright() as p:
     pg = b.new_page(viewport={"width": 1180, "height": 820} if wide else {"width": 390, "height": 844}, device_scale_factor=2 if not (wide or home) else 1, has_touch=countc or troughc)
     if igboc: pg.add_init_script("localStorage.setItem('ayo.count', 'igbo')")
     if yorubac: pg.add_init_script("localStorage.setItem('ayo.count', 'yoruba')")
+    if hausac: pg.add_init_script("localStorage.setItem('ayo.count', 'hausa')")
     errors = []
     pg.on("pageerror", lambda e: errors.append(str(e)))
     pg.on("console", lambda m: errors.append(m.text) if m.type == "error" and "Failed to load resource" not in m.text else None)
@@ -3444,6 +3449,7 @@ with sync_playwright() as p:
             pg.wait_for_function("window.__ayo.count.done", timeout=8000); c = A(); assert c["text"] == str(n), c
             if igboc: assert c["igbo"] and c["word"] == igbo(n) and hint().endswith(" · " + igbo(n)), ("counted in Igbo", c, hint(), igbo(n))
             elif yorubac: assert c["tongue"] == "yoruba" and c["lang"] == "yo" and n < len(YORUBA) and c["word"] == YORUBA[n] and hint().endswith(" · " + YORUBA[n]), ("counted in Yoruba", c, hint())
+            elif hausac: assert c["tongue"] == "hausa" and c["lang"] == "ha" and c["word"] == hausa(n) and hint().endswith(" · " + hausa(n)), ("counted in Hausa", c, hint())
             else: assert c["word"] is None, c
             print("count:", c["words"], "· counted to", c["text"])
             pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
