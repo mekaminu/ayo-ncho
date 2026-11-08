@@ -59,6 +59,7 @@
 #        add --hover (with --smoke, best with --wide) to check the mouse on the Mac: over a pit you can play the cursor is a hand, a faint
 #                  brass ring lands on its rim and the hint line says "pit 3 · 5 seeds — click to see where they go" (screenshot <out>);
 #                  over their pit it says "their pit 2 · …" with no ring; over the wood a grab hand; off the board everything goes back
+#        add --nudge to miss today's puzzle once and take Mama Ngozi's nudge: two pits lit (rings and brass badges), the line under the board, then the answer solves it "with a nudge" (<out>, <out>-solved.png)
 #        add --redo (with --smoke) to Undo and then put it back: the chip under the board plays your move and the same reply again (<out> shows the chip)
 #        add --undo (with --smoke) to check Undo against the computer: the seeds of your move and the reply fly back (<out> is mid-flight),
 #                  the hint line says "Taking back your move and Mama Ngozi's reply", and the board ends exactly at the engine's position before
@@ -476,6 +477,7 @@ if watchc:  # watch the whole game (idea 6 Nov): a game sent as a link plays bac
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)
 beatc = "--beat" in sys.argv
+nudgec = "--nudge" in sys.argv; puzzle = puzzle or nudgec
 if beatc:  # beat my turn (idea 8 Nov): a friend's best turn as a one-move puzzle
     js = """Promise.all([import('./web/beat.js'), import('./web/clip.js'), import('./engine/ayo.js')]).then(([B, C, E]) => {
       let seed = 5; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
@@ -2803,6 +2805,26 @@ with sync_playwright() as p:
         assert pg.evaluate("document.querySelector('#pzGot').textContent") == str(got)
         assert pg.evaluate("window.__ayo.puzzle.daily.days[window.__ayo.puzzle.key + ':ncho'].tries") == 1
         assert pg.evaluate("document.querySelector('#pzShow').hidden"), "Show me waits for a second miss"
+        if nudgec:  # a nudge (idea 8 Nov): after one miss Mama Ngozi lights two pits, the answer one of them; a solve after it says so
+            assert not pg.evaluate("document.querySelector('#pzNudge').hidden"), "a nudge is offered after one miss"
+            pg.click("#pzNudge"); pg.wait_for_function("!window.__ayo.puzzle.played && document.querySelector('#pzCard').hidden", timeout=5000); pg.wait_for_timeout(1400)
+            lit = pg.evaluate("[...document.querySelectorAll('.badge')].map((b,i)=>b.classList.contains('nudge')?i:-1).filter(i=>i>=0)")
+            rings = pg.evaluate("window.__ayo.marks.steps"); hint = pg.evaluate("document.querySelector('#hint').textContent"); print("nudge: pits", lit, "rings", rings, "·", hint)
+            assert len(lit) == 2 and pz["answer"] in lit and lit[0] < lit[1], lit
+            assert sorted(rings) == lit, ("the two brass rings on the board", rings)
+            assert hint.startswith("Mama Ngozi: one of these two — "), hint
+            assert pg.evaluate("window.__ayo.puzzle.daily.days[window.__ayo.puzzle.key + ':ncho'].nudged") is True
+            assert sum(pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent)")) == 48 - sum(pg.evaluate("window.__ayo.state.stores")), "the position was put back"
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+            tap(pg, pz["answer"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+            badge = pg.evaluate("document.querySelector('#pzBadge').textContent"); print("nudge: solved ->", badge)
+            assert badge == "Solved · with a nudge", badge
+            assert pg.evaluate("document.querySelectorAll('.badge.nudge').length") == 0 and pg.evaluate("window.__ayo.marks.steps").__len__() == 0, "the nudge leaves the board once played"
+            assert pg.evaluate("document.querySelector('#pzNudge').hidden"), "no second nudge after a solve"
+            out2 = out[:-4] + "-solved.png"; pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out2, timeout=120000, animations="disabled")
+            b.close()
+            if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+            srv.shutdown(); print("wrote", out, "and", out2); sys.exit(0)
         pg.click("#pzAgain"); pg.wait_for_function("!window.__ayo.puzzle.played", timeout=5000)
         assert pg.evaluate("document.querySelector('#pzCard').hidden"), "Try again should hide the card"
         assert pg.evaluate("[...document.querySelectorAll('.badge')].map(b=>+b.textContent).reduce((a,b)=>a+b,0)") == 48 - sum(pg.evaluate("window.__ayo.state.stores")), "the position was not put back"

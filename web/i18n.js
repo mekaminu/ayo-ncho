@@ -162,6 +162,12 @@ export const FR = {
   'Now you': 'À vous maintenant',
   'Remind me each day at 19:00': 'Me le rappeler chaque jour à 19:00',
   'Show me the move': 'Montrez-moi le coup',
+  // a nudge (web/nudge.js): two pits lit, one line about the right one
+  'A nudge': 'Un coup de pouce',
+  'with a nudge': 'avec un coup de pouce',
+  'the right one picks up again where it lands': 'le bon reprend les graines là où il s’arrête',
+  'the right one takes from more than one pit': 'le bon prend dans plus d’un trou',
+  'count where each one’s last seed lands': 'comptez où tombe la dernière graine de chacun',
   'One seed in each pit.': 'Une graine dans chaque trou.',
   'Next': 'Suivant',
   'Back to home': 'Retour à l’accueil',
@@ -828,6 +834,7 @@ export const PATTERNS = [
   [/^Can you beat my best turn\? I took (\d+) in one:$/, (m) => `Ferez-vous mieux que mon meilleur tour ? J’en ai pris ${m[1]} d’un coup :`],
   [/^Show (.+)'s move$/, (m) => `Voir le coup de ${who(m[1])}`],
   [/^(.+): watch this one…$/, (m) => `${who(m[1])} : regardez bien celui-ci…`],
+  [/^([^·—:]+?): one of these two$/, (m) => `${who(m[1])} : c’est l’un de ces deux`],
   [/^Ayo & Nchò — (.+)'s best turn, one move: I (?:took (\d+) where .+ took (\d+)|matched .+'s (\d+)|took (\d+) of .+'s (\d+))\. Your go:$/, (m) => `Ayo & Nchò — le meilleur tour de ${who(m[1])}, en un coup : ${m[2] ? `j’en ai pris ${m[2]} là où ${who(m[1])} en a pris ${m[3]}` : m[4] ? `j’ai égalé ses ${m[4]}` : `j’en ai pris ${m[5]} sur ses ${m[6]}`}. À vous :`],
   // try again from where it turned (web/retry.js)
   [/^Try again from move (\d+)$/, (m) => `Rejouer depuis le coup ${m[1]}`],

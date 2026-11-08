@@ -67,6 +67,9 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 @media (prefers-reduced-motion:reduce){#glLost .seeds i{animation:none}}
 .badge{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:calc(11px*var(--ts));font-weight:600;color:var(--brass);background:rgba(13,9,6,.72);border-radius:10px;padding:1px 6px;line-height:15px;margin:-8px 0 0 -9px;transition:opacity .2s}
 .badge.zero{opacity:.35}
+.badge.nudge{opacity:1;color:#1a120b;background:var(--brass);box-shadow:0 0 0 2px rgba(255,220,160,.5),0 0 12px rgba(230,183,111,.6);animation:nudge 1.6s ease-in-out infinite} /* a nudge: one of these two */
+@keyframes nudge{50%{box-shadow:0 0 0 3px rgba(255,220,160,.25),0 0 18px rgba(230,183,111,.8)}}
+@media (prefers-reduced-motion:reduce){.badge.nudge{animation:none}}
 .badge.barred{opacity:.45;color:var(--fg);text-decoration:line-through;text-decoration-color:rgba(230,183,111,.6)} /* feed them: a pit the feed rule bars */
 .handc{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);font-size:calc(13px*var(--ts));font-weight:700;line-height:18px;min-width:18px;text-align:center;margin:-22px 0 0 -11px;padding:1px 6px;border-radius:11px;color:#1a120b;background:var(--brass);box-shadow:0 1px 4px rgba(0,0,0,.45),0 0 0 1px rgba(255,220,160,.5);font-variant-numeric:tabular-nums} /* the hand counts: the seeds still in the sowing hand */
 .handc.haul{margin:-12px 0 0 30px;background:#c46a3a;color:#fff3e4;box-shadow:0 1px 4px rgba(0,0,0,.45),0 0 0 1px rgba(255,190,150,.5)} /* the capture hand: copper, beside the heap (over the far trough, above it would sit on the names) */
@@ -760,6 +763,7 @@ html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
       <div class="two"><button class="btn" id="pzShare" type="button"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M12 15V3M8 7l4-4 4 4"/></svg>Share</button><button class="btn ghost" id="pzAgain" type="button">Try again</button></div>
       <button class="btn ghost pzOut" id="pzOut" type="button" hidden><span class="face s" id="pzOutFace"></span><span id="pzOutWords">Play it out vs Nnamdi</span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
       <button class="btn quiet pzRemind" id="pzRemind" type="button" hidden><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg><span id="pzRemindWords">Remind me each day at 19:00</span></button>
+      <button class="btn quiet pzShow" id="pzNudge" type="button" hidden><span class="face s" data-face="hard"></span>A nudge</button>
       <button class="btn quiet pzShow" id="pzShow" type="button" hidden><span class="face s" data-face="hard"></span>Show me the move</button>
     </div>
     <!-- the first game's lesson (web/lesson.js) plays in this frame: what just happened, and Next -->

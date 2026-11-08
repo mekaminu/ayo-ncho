@@ -20,7 +20,7 @@ export function entry(data, key, variant) { return data.days[entryKey(key, varia
 export function record(data, key, variant, got, target) {
   const d = { days: { ...data.days }, solved: data.solved.slice() };
   const k = entryKey(key, variant); const was = d.days[k];
-  const e = { got: Math.max(got, was ? was.got : 0), target, tries: (was ? was.tries : 0) + 1, solved: !!(was && was.solved) || got >= target, ...(was && was.shown ? { shown: true } : {}) };
+  const e = { got: Math.max(got, was ? was.got : 0), target, tries: (was ? was.tries : 0) + 1, solved: !!(was && was.solved) || got >= target, ...(was && was.shown ? { shown: true } : {}), ...(was && was.nudged ? { nudged: true } : {}) };
   d.days[k] = e;
   const firstSolve = e.solved && !d.solved.includes(key);
   if (firstSolve) { d.solved.push(key); d.solved.sort(); }

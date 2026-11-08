@@ -12,7 +12,8 @@ import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES, dayKey
 import { greetMoment } from './greet.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
 import { beatQuery, parseBeat, beatDay, beatAsk, beatResult, beatShowWords, beatWatchWords, beatShownEyebrow, beatLinkWords, beatShare } from './beat.js';
-import { dailyPuzzle, attempt, shareText, todayKey, levelWord } from '../engine/puzzle.js';
+import { dailyPuzzle, attempt, shareText as dayShareText, todayKey, levelWord } from '../engine/puzzle.js';
+import { canNudge, nudgeOf, nudgeLine, markNudged, solvedBadge, nudgeShare } from './nudge.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, dayLine, levelSeeds, canShow, markShown } from './daily.js';
 import { weekStrip, weekLine, weekLabel, letterOf, solvedIn, weekShare } from './week.js';
 import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink, watchLink as roomWatchLink, parseWatch, watchersLine } from './online.js';
@@ -97,6 +98,8 @@ import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, m
 import { oneTapOn, pressAction } from './onetap.js';
 import { afterUndo as redoAfterUndo, ready as redoReady, step as redoStep, afterMove as redoAfterMove, gameKey, chipWords as redoWords, CHIP as REDO_CHIP, TITLE as REDO_TITLE, HINT as REDO_HINT } from './redo.js';
 import { makeGuard as makeKeepGuard, ARM_MS as KEEP_MS, playAsks, askWords as keepAsk } from './keepgame.js';
+// the day's share line, with "· with a nudge" on a solve that had one (web/nudge.js)
+const shareText = (p, got) => nudgeShare(dayShareText(p, got), dailyEntry(daily, p.key, p.variant));
 const warm = makeWarm({ url: healthUrl(publicBase()), fetch: (u, o) => fetch(u, o), online: () => navigator.onLine !== false });
 
 const $ = (s) => document.querySelector(s);
@@ -478,8 +481,10 @@ function paintPits() { // labels and reach from the position: only your own pits
   if (pitLayer.firstChild !== pitBtns[order[0]]) order.forEach((i) => pitLayer.appendChild(pitBtns[i])); // a screen reader reads them in this order
   badges.forEach((b, i) => { const k = pitKey(i, you); if (k) b.dataset.key = k; else delete b.dataset.key; }); // once a key is pressed, the count badge on your pits shows its key too
   order.forEach((i) => { const b = pitBtns[i]; b.setAttribute('aria-label', withLast(pitLabel(i, state.pits[i], { you, selected, legal: mine ? legal : null }), i, lastM.pit)); b.disabled = !pitEnabled(i, state.pits[i], { you, mine }); b.setAttribute('aria-pressed', String(selected === i)); });
-  paintLast8(); paintCircling(); paintFeed();
+  paintLast8(); paintCircling(); paintFeed(); paintNudgeBadges();
 }
+// a nudge (web/nudge.js): the two pits' count badges in brass while the puzzle waits for your move
+function paintNudgeBadges() { let n = null; try { n = puzzle.on && !puzzle.played && !busy ? puzzle.nudge : null; } catch { return; } badges.forEach((b, i) => b.classList.toggle('nudge', !!(n && n.pits.includes(i)))); }
 // ---------- the last 8 (Nchò): once 8 seeds or fewer are left on the board, whoever captures next takes them all ----------
 // web/last8.js counts and words it; the engine does the sweep. While it holds, a brass line sits under the board and the count badges of the
 // pits still holding seeds glow brass; the move that brings the board down to 8 makes the seeds left hop and glint, with a chime and a word
@@ -1461,7 +1466,7 @@ function showTurn() {
   if (watch.on) { paintWatch(); return; } // watching a game sent as a link: its own words, nothing to press
   if (spect.on) { paintSpect(); paintPits(); return; } // following a friend's game from a watch link: nothing to press
   if (online) { showTurnOnline(); paintPits(); return; }
-  if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : pickHint('puzzle'); $('#undo').disabled = true; $('#hintBtn').disabled = true; paintPits(); return; }
+  if (puzzle.on) { $('#hint').textContent = puzzle.played ? '' : puzzle.nudge && selected === null && !lesson.on ? nudgeLine(puzzle.nudge, CHARACTERS.hard.name) : pickHint('puzzle'); $('#undo').disabled = true; $('#hintBtn').disabled = true; paintPits(); return; }
   const mine = state.turn === you && !state.over;
   if (tc) { $('#turn').textContent = tc.near.turn; $('#oppSub').textContent = tc.far.sub; } // across the table: each card stays with its player
   else if (local) { const w = localTurn(state); $('#turn').textContent = mine || state.over ? w.turn : '…'; $('#oppSub').textContent = mine ? w.sub : state.over ? '' : 'passing the phone…'; }
@@ -1548,7 +1553,10 @@ function slamNote() {
 function clearPath() {
   pathToken++; path = null; answer = null; pathGlow = false; riskGlow = false; const M = board.marks;
   for (const m of [...M.steps, ...M.dots, ...M.caps, ...M.gifts, ...M.slams, ...M.risk, M.end]) { m.visible = false; m.material.opacity = 0; m.scale.set(1, 1, 1); m.rotation.z = 0; if (m.userData.bar) m.userData.bar.scale.set(1, 1, 1); }
+  nudgeRings();
 }
+// a nudge's two brass rings stay on the board under any path marks until the move is played
+function nudgeRings(k = 1) { let n = null; try { n = puzzle.on && !puzzle.played ? puzzle.nudge : null; } catch { return; } if (!n) return; const M = board.marks; for (const pit of n.pits) { const r = M.steps[pit]; r.visible = true; r.material.opacity = 0.75 * k; } }
 // fade every mark that is showing, over `ms`, unless something lands new ones first
 function fadeMarks(token, ms = 700) {
   pathGlow = false; riskGlow = false; const M = board.marks, all = [...M.steps, ...M.dots, ...M.caps, ...M.gifts, ...M.slams, ...M.risk, M.end].filter((m) => m.visible).map((m) => [m, m.material.opacity]);
@@ -1828,6 +1836,7 @@ function paintPuzzleCard() { // the Home card: today's ask and where you stand
 function openPuzzle() { // Home → the card: the board shows today's position, your pits nearest you, and waits for one move
   if (online) return; // your game is already saved move by move; Back to home brings it back
   const p = todaysPuzzle(); puzzle.p = p; puzzle.beat = null; puzzle.on = true; puzzle.played = false; puzzle.got = 0; seat(0);
+  { const e = dailyEntry(daily, p.key, p.variant); puzzle.nudge = e && e.nudged && !e.solved && !e.shown ? nudgeOf(p) : null; } // a nudge given today stays on the board
   state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); hintedAt = -1;
   $('#pzDay').textContent = dayLine(p); paintLevel($('#pzLevel'), p, true); $('#pzRules').textContent = `${p.variant === 'ncho' ? 'Nchò' : 'Ayo'} rules`; $('#pzAsk').textContent = `Capture ${p.target} in one turn`; beatFrame(false);
   $('#pzHow').textContent = p.variant === 'ncho' ? 'One move. Your pits are on the right. Relay sowing counts.' : 'One move. Your pits are on the right. 2s and 3s behind your last seed count too.';
@@ -1842,7 +1851,7 @@ function beatFrame(on) { // the parts of the puzzle's card that are the daily pu
 }
 function openBeat(p) {
   if (online) return;
-  puzzle.p = p; puzzle.beat = p; puzzle.on = true; puzzle.played = false; puzzle.got = 0; puzzle.misses = 0; seat(0);
+  puzzle.p = p; puzzle.beat = p; puzzle.on = true; puzzle.played = false; puzzle.got = 0; puzzle.misses = 0; puzzle.nudge = null; seat(0);
   state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); hintedAt = -1;
   $('#pzDay').textContent = beatDay(p); paintLevel($('#pzLevel'), p, false); $('#pzRules').textContent = `${p.variant === 'ncho' ? 'Nchò' : 'Ayo'} rules`; $('#pzAsk').textContent = beatAsk(p);
   $('#pzHow').textContent = p.variant === 'ncho' ? 'One move. Your pits are on the right. Relay sowing counts.' : 'One move. Your pits are on the right. 2s and 3s behind your last seed count too.';
@@ -1855,7 +1864,7 @@ function paintBeatResult(got) {
   const n = Math.min(Math.max(p.target, got), 16); const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', r.line);
   for (let i = 0; i < n; i++) { const s = document.createElement('span'); s.textContent = i < got ? '●' : '○'; if (i >= got) s.className = 'o'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
   $('#pzWeek').hidden = true; $('#pzNext').hidden = true; $('#pzRemind').hidden = true; $('#pzOut').hidden = true;
-  $('#pzAgain').textContent = r.hit ? 'Play it again' : 'Try again'; $('#pzShow').hidden = r.hit || !puzzle.misses; beatFrame(true);
+  $('#pzAgain').textContent = r.hit ? 'Play it again' : 'Try again'; $('#pzShow').hidden = r.hit || !puzzle.misses; $('#pzNudge').hidden = true; beatFrame(true);
   $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
   if (got > p.target) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); setTimeout(() => click(3, 0.15), 360); buzz([20, 40, 20, 40, 20]); }
   else if (r.hit) { click(1.5, 0.15); setTimeout(() => click(2, 0.15), 120); setTimeout(() => click(2.5, 0.15), 240); buzz([20, 40, 20]); }
@@ -1872,13 +1881,15 @@ async function puzzlePlay(pit) { // one move: the engine's events on the board, 
 }
 function paintPuzzleResult(got, e, firstSolve) {
   const p = puzzle.p; const hit = got >= p.target;
-  $('#pzEyebrow').textContent = 'You captured'; $('#pzGot').textContent = got; $('#pzTarget').textContent = p.target; $('#pzBadge').textContent = resultLabel(got, p.target); $('#pzBadge').className = hit ? 'pzBadge' : 'pzBadge miss';
+  $('#pzEyebrow').textContent = 'You captured'; $('#pzGot').textContent = got; $('#pzTarget').textContent = p.target; $('#pzBadge').textContent = hit ? solvedBadge(e) : resultLabel(got, p.target); $('#pzBadge').className = hit ? 'pzBadge' : 'pzBadge miss';
   const n = Math.min(Math.max(p.target, got), 16); const row = $('#pzRow'); row.innerHTML = ''; row.setAttribute('aria-label', `${got} of ${p.target} seeds`);
   for (let i = 0; i < n; i++) { const s = document.createElement('span'); s.textContent = i < got ? '●' : '○'; if (i >= got) s.className = 'o'; s.style.animationDelay = `${i * 45}ms`; row.appendChild(s); }
   $('#pzBest').textContent = `${e.got} of ${p.target}`; $('#pzRun').textContent = runLine(solvedRun(daily, p.key));
   paintWeek(firstSolve);
   $('#pzAgain').textContent = hit ? 'Play it again' : 'Try again';
   $('#pzShow').hidden = !canShow(e); // after two misses Mama Ngozi offers to show the move
+  $('#pzNudge').hidden = !(canNudge(e) && nudgeOf(p)); // after one, she can narrow it to two pits first
+  if (hit) puzzle.nudge = null;
   paintPlayOut();
   paintRemindOffer(); paintNext();
   $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
@@ -1939,7 +1950,7 @@ async function puzzleShow() { // Show me: the position comes back, the answer pi
   if (busy || !puzzle.on) return; const p = puzzle.p; const bt = puzzle.beat; const e = bt ? null : dailyEntry(daily, p.key, p.variant); if (!bt && !canShow(e)) return;
   busy = true; puzzle.played = true; puzzle.mine = false; $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); $('#pzOut').hidden = true;
   state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStaticFrom(state);
-  if (!bt) { daily = markShown(daily, p.key, p.variant); prefs.set('daily', JSON.stringify(daily)); }
+  if (!bt) { daily = markShown(daily, p.key, p.variant); prefs.set('daily', JSON.stringify(daily)); } puzzle.nudge = null; $('#pzNudge').hidden = true;
   await wait(350); select(p.answer); $('#hint').textContent = bt ? beatWatchWords(bt) : `${CHARACTERS.hard.name}: watch this one…`; await wait(reduceMotion ? 300 : 1100);
   const r = attempt(p, p.answer); const prevStores = state.stores; state = r.state; board.ring.visible = false; board.glow.visible = false; clearPath(); selected = null;
   await animate(r.events, prevStores, Math.max(PACE, 190)); // a touch slower than a game, so the relay can be followed
@@ -1958,6 +1969,16 @@ async function puzzleShow() { // Show me: the position comes back, the answer pi
   paintWeek(false);
   $('#pzAgain').textContent = 'Now you'; $('#pzShow').hidden = true; paintNext(); $('#pzCard').hidden = false; $('#puzzle').classList.add('open'); showTurn();
   toast(`${CHARACTERS.hard.name} showed you — now play it yourself`); click(1.2, 0.06);
+}
+async function puzzleNudge() { // A nudge (web/nudge.js): the position comes back and two of your pits light — the answer and the most tempting wrong one
+  if (busy || !puzzle.on || puzzle.beat || lesson.on) return; const p = puzzle.p; const e = dailyEntry(daily, p.key, p.variant); const n = nudgeOf(p); if (!canNudge(e) || !n) return;
+  daily = markNudged(daily, p.key, p.variant); prefs.set('daily', JSON.stringify(daily)); $('#pzNudge').hidden = true;
+  puzzleAgain(); puzzle.nudge = n; showTurn(); const token = pathToken; const M = board.marks; click(1.3, 0.06);
+  for (const pit of n.pits) { // each ring drops onto its pit in turn, with a soft knock, then stays
+    if (token !== pathToken) return; const r = M.steps[pit]; r.visible = true;
+    if (reduceMotion) r.material.opacity = 0.75; else await tween(300, (t) => { if (token !== pathToken) return; r.material.opacity = 0.75 * t; const sc = 1.4 - 0.4 * t; r.scale.set(sc, sc, 1); }, easeOut);
+    click(1.7, 0.04); buzz(10); await wait(120);
+  }
 }
 // The next puzzle (web/nextday.js): a line on the result card saying how long until the new day's position, ticking on the
 // minute; at midnight with the card up it turns brass, glints, and a tap sets up the new day. The Home card turns with the day.
@@ -1983,7 +2004,7 @@ function dayTick() { // once a minute, and on coming back to the page: the card'
 setTimeout(dayTick, 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) dayTick(); });
 function puzzleAgain() { if (busy) return; const p = puzzle.p; puzzle.played = false; puzzle.mine = false; puzzle.got = 0; state = { ...p.state, pits: p.state.pits.slice(), stores: p.state.stores.slice() }; layoutFromState(state); refreshStatic(); deselect(); $('#pzCard').hidden = true; $('#puzzle').classList.remove('open'); click(1.2, 0.05); }
 function closePuzzle() { // Back to home: the board goes back to your game (or a fresh one)
-  if (busy) return; puzzle.on = false; puzzle.played = false; $('#pzCard').hidden = true; if (puzzle.beat) { puzzle.beat = null; beatFrame(false); }
+  if (busy) return; puzzle.on = false; puzzle.played = false; puzzle.nudge = null; $('#pzCard').hidden = true; if (puzzle.beat) { puzzle.beat = null; beatFrame(false); }
   if (!resume()) { state = newGame(settings.game, settings.rules()); redoLine = null; } layoutFromState(state); refreshStatic(); deselect(); paintRules(); showScreen('home');
 }
 async function sharePuzzle() {
@@ -1995,6 +2016,7 @@ async function sharePuzzle() {
 $('#puzzleCard').addEventListener('click', () => { openPuzzle(); click(1.3, 0.08); });
 $('#pzAgain').addEventListener('click', puzzleAgain);
 $('#pzShow').addEventListener('click', () => { puzzleShow(); click(1.3, 0.06); });
+$('#pzNudge').addEventListener('click', () => { puzzleNudge(); });
 $('#pzHome').addEventListener('click', () => { if (lesson.on) endLesson(false); else closePuzzle(); click(1, 0.05); });
 $('#pzShare').addEventListener('click', () => { sharePuzzle(); click(1.3, 0.06); });
 $('#pzOut').addEventListener('click', () => { playOut(); click(1.3, 0.08); });
