@@ -52,6 +52,7 @@ export const FR = {
   'Stop here and play on from this position': 'S’arrêter ici et continuer depuis cette position',
   play: 'jouer',
   'That game link could not be read': 'Impossible de lire le lien de cette partie',
+  'That turn link could not be read': 'Impossible de lire le lien de ce tour',
   // the board's toolbar and cards
   'Ayo board': 'Plateau d’Ayo',
   'The pits — keys 1 to 6 pick yours near to far, Enter sows, U undoes, H hints, Escape puts a pit back, S says the score, arrow keys turn the board': 'Les trous — les touches 1 à 6 choisissent les vôtres du plus proche au plus loin, Entrée sème, U annule, H donne un indice, Échap repose le trou, S dit le score, les flèches tournent le plateau',
@@ -815,6 +816,19 @@ export const PATTERNS = [
   [/^Play it out vs (.+)$/, (m) => `Jouer la suite contre ${who(m[1])}`], // play it out from the daily puzzle (web/playout.js)
   [/^Playing it out from today's puzzle — (.+)'s move$/, (m) => `La partie continue depuis l’énigme du jour — à ${who(m[1])} de jouer`],
   [/^Ayo & Nchò — played out from today's puzzle, I (beat|drew with|lost to) (.+?) (\d+)–(\d+)\.$/, (m) => `Ayo & Nchò — en jouant la suite de l’énigme du jour, ${{ beat: 'j’ai battu', 'drew with': 'j’ai fait match nul avec', 'lost to': 'j’ai perdu contre' }[m[1]]} ${who(m[2])} ${m[3]}–${m[4]}.`],
+  // beat my turn (web/beat.js)
+  [/^(.+) took (\d+) in one turn\. Can you\?$/, (m) => `${who(m[1])} en a pris ${m[2]} en un tour. Et vous ?`],
+  [/^From (.+)'s game · (Nchò|Ayo)$/, (m) => `D’une partie de ${who(m[1])} · ${m[2]}`],
+  [/^You beat (.+)$/, (m) => `Vous battez ${who(m[1])}`],
+  [/^Level with (.+)$/, (m) => `À égalité avec ${who(m[1])}`],
+  [/^Short of (.+)$/, (m) => `Moins que ${who(m[1])}`],
+  [/^(\d+) where (.+) took (\d+)$/, (m) => `${m[1]}, là où ${who(m[2])} en a pris ${m[3]}`],
+  [/^(\d+), the same as (.+)$/, (m) => `${m[1]}, autant que ${who(m[2])}`],
+  [/^(\d+) of (.+)'s (\d+)$/, (m) => `${m[1]} sur les ${m[3]} de ${who(m[2])}`],
+  [/^Can you beat my best turn\? I took (\d+) in one:$/, (m) => `Ferez-vous mieux que mon meilleur tour ? J’en ai pris ${m[1]} d’un coup :`],
+  [/^Show (.+)'s move$/, (m) => `Voir le coup de ${who(m[1])}`],
+  [/^(.+): watch this one…$/, (m) => `${who(m[1])} : regardez bien celui-ci…`],
+  [/^Ayo & Nchò — (.+)'s best turn, one move: I (?:took (\d+) where .+ took (\d+)|matched .+'s (\d+)|took (\d+) of .+'s (\d+))\. Your go:$/, (m) => `Ayo & Nchò — le meilleur tour de ${who(m[1])}, en un coup : ${m[2] ? `j’en ai pris ${m[2]} là où ${who(m[1])} en a pris ${m[3]}` : m[4] ? `j’ai égalé ses ${m[4]}` : `j’en ai pris ${m[5]} sur ses ${m[6]}`}. À vous :`],
   // try again from where it turned (web/retry.js)
   [/^Try again from move (\d+)$/, (m) => `Rejouer depuis le coup ${m[1]}`],
   [/^Back to move (\d+), where it turned$/, (m) => `Retour au coup ${m[1]}, là où la partie a basculé`],

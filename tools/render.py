@@ -68,6 +68,10 @@
 #        add --trough to check counting a trough by touch: a saved game near the finish (the --race one), a real finger rests on each
 #                  trough, its seeds are counted to the engine's score and the line says "your trough · 22 seeds · 3 more to win"
 #                  (screenshot <out>, the near trough); lifting plays nothing; the French line too
+#        --beat: beat my turn (idea 8 Nov): a best turn played from the far seat, sent as a link, opens on the puzzle's screen from
+#                  the near side ("Meka took N in one turn. Can you?", <out>-ask.png); a miss says "Short of Meka" and offers Show
+#                  Meka's move, which plays it through; Now you, then the answer: "Level with Meka" (<out>); nothing kept as a daily
+#                  puzzle; Share sends the same link on; Home's saved game makes its own link of your best turn
 #        add --yoruba (with --smoke) for count in Yoruba (idea 8 Nov): the same check with Count in → Yoruba ("ẹ̀fà" under the
 #                  number, lang yo, and the hint line ending with it)
 #        add --igbo (with --smoke) to check count in Igbo (idea 8 Nov): the --count check with Settings → Language → Count in →
@@ -468,6 +472,55 @@ if watchc:  # watch the whole game (idea 6 Nov): a game sent as a link plays bac
         pg.wait_for_function("[...document.querySelectorAll('.toast')].some(x => x.textContent.includes('That game link could not be read'))", timeout=120000)
         t = pg.evaluate("[...document.querySelectorAll('.toast')].map(x => x.textContent).join(' | ')"); assert not pg.evaluate("document.querySelector('#home').hidden") and "That game link could not be read" in t and not pg.evaluate("window.__watch.on"), t
         print("watch: a broken link is refused —", t)
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
+beatc = "--beat" in sys.argv
+if beatc:  # beat my turn (idea 8 Nov): a friend's best turn as a one-move puzzle
+    js = """Promise.all([import('./web/beat.js'), import('./web/clip.js'), import('./engine/ayo.js')]).then(([B, C, E]) => {
+      let seed = 5; const rnd = () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
+      for (;;) { let s = E.newGame('ncho'); const moves = [];
+        while (!s.over) { const ms = E.legalMoves(s); const m = ms[Math.floor(rnd() * ms.length)]; moves.push(m); s = E.applyMove(s, m).state; }
+        const t = C.bestTurn(moves, 'ncho', s.rules, 1); if (!t || t.seeds < 6) continue;
+        if (moves.length < 40) continue; const own = moves.slice(0, 30); const t0 = C.bestTurn(own, 'ncho', s.rules, 0); if (!t0 || t0.seeds < 2) continue;
+        const q = B.beatQuery({ variant: 'ncho', rules: s.rules, first: 0, moves }, t, 'Meka'); const p = new URLSearchParams(q.slice(1)); const P = B.parseBeat(p.get('beat'), p.get('n'));
+        console.log(JSON.stringify({ q, target: t.seeds, answer: P.answer, pits: P.state.pits, own, ownSeeds: t0.seeds })); break; } });"""
+    G = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", js], cwd=root).decode())
+    print("beat: Meka's best turn from the far seat took", G["target"], "— the answer from the near side is pit", G["answer"])
+    with sync_playwright() as p:
+        b = p.chromium.launch(args=ARGS); errors = []
+        pg = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=2).new_page(); watch(pg, errors, "beat: ")
+        pg.add_init_script("if (!sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done'); localStorage.setItem('ayo.speed', 'fast'); localStorage.setItem('ayo.game', JSON.stringify({ moves: %s, variant: 'ncho', rules: { capture: 4, relay: true, last8: true }, level: 'medium', stats: { biggest: 0, captures: 0 }, local: false })); } window.__shared = []; Object.defineProperty(navigator, 'share', { value: async (d) => { window.__shared.push(d.text); } });" % json.dumps(G["own"]))
+        pg.goto("http://127.0.0.1:8766/web/index.html" + G["q"] + "&capture=1&lite=1", wait_until="load"); pg.wait_for_function("window.__done===true", timeout=120000)
+        pg.wait_for_function("window.__ayo.puzzle && window.__ayo.puzzle.on", timeout=30000)
+        txt = lambda sel: pg.evaluate("document.querySelector(%s).textContent" % json.dumps(sel))
+        assert pg.evaluate("window.__ayo.puzzle.key") == "beat" and pg.evaluate("window.__ayo.state.pits") == G["pits"], "the position from the near side"
+        assert txt("#pzAsk") == "Meka took %d in one turn. Can you?" % G["target"] and txt("#pzDay") == "From Meka's game · Nchò", (txt("#pzAsk"), txt("#pzDay"))
+        assert pg.evaluate("window.__ayo.seat") == 0
+        pg.wait_for_timeout(800); pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out.replace(".png", "-ask.png"), timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        wrong = min(pg.evaluate("window.__ayo.legal"), key=lambda q: pg.evaluate("window.__ayo.tryPit(%d)" % q))
+        if pg.evaluate("window.__ayo.tryPit(%d)" % wrong) < G["target"]:
+            tap(pg, wrong); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+            assert txt("#pzBadge") == "Short of Meka", txt("#pzBadge")
+            assert pg.evaluate("document.querySelector('#pzBest').closest('.mini').hidden && document.querySelector('#pzWeek').hidden && document.querySelector('#pzNext').hidden && document.querySelector('#pzOut').hidden"), "the daily puzzle's own parts step aside"
+            assert not pg.evaluate("document.querySelector('#pzShow').hidden") and txt("#pzShow").strip() == "Show Meka's move", txt("#pzShow")
+            print("beat: a miss —", txt("#pzBadge"), "·", pg.evaluate("document.querySelector('#pzRow').getAttribute('aria-label')"))
+            pg.click("#pzShow"); pg.wait_for_function("window.__ayo.busy", timeout=5000); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+            assert txt("#pzBadge") == "Shown" and txt("#pzEyebrow") == "Meka's move captures" and txt("#pzGot") == str(G["target"]) and txt("#pzAgain") == "Now you"
+            print("beat: Meka's move shown, it took", txt("#pzGot"))
+            pg.click("#pzAgain"); pg.wait_for_function("!window.__ayo.puzzle.played", timeout=5000)
+        tap(pg, G["answer"]); pg.wait_for_function("!window.__ayo.busy && window.__ayo.puzzle.played", timeout=240000); pg.wait_for_selector("#pzCard:not([hidden])", timeout=10000)
+        assert pg.evaluate("window.__ayo.puzzle.got") == G["target"] and txt("#pzBadge") == "Level with Meka", txt("#pzBadge")
+        assert pg.evaluate("localStorage.getItem('ayo.daily')") in (None, "null", "{}") or "beat" not in pg.evaluate("localStorage.getItem('ayo.daily')"), "never kept as a daily puzzle"
+        print("beat:", txt("#pzBadge"), txt("#pzGot"), "/", txt("#pzTarget"))
+        pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=out, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.click("#pzShare"); pg.wait_for_function("window.__shared.length > 0", timeout=5000); sh = pg.evaluate("window.__shared[0]")
+        assert sh.startswith("Ayo & Nchò — Meka's best turn, one move: I matched Meka's %d. Your go:" % G["target"]) and (sh.endswith(G["q"]) or "?beat=" not in sh), sh  # the link rides only on https and in the apps
+        print("beat: the share sends it on —", sh)
+        pg.click("#pzHome"); pg.wait_for_selector("#home:not([hidden])", timeout=5000)
+        assert not pg.evaluate("window.__ayo.puzzle.on") and txt("#pzShow").strip() == "Show me the move" and txt("#puzzleAsk").startswith("Capture ")
+        bl = pg.evaluate("window.__ayo.beatLink()"); assert bl and bl["seeds"] == G["ownSeeds"] and bl["query"].startswith("?beat=n41"), bl
+        print("beat: Home's saved game makes its own link —", bl["seeds"], "seeds,", bl["query"])
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)
