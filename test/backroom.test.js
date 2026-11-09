@@ -80,3 +80,58 @@ test("the board keeps the seat with when and which, and Home paints the line", (
   assert.match(html, /id="backLine" type="button" hidden/);
   const k = keepSeat({ code: "KMTP", token: "t", seat: 2, at: 5 }); assert.deepEqual(k, { code: "KMTP", token: "t", at: 5 }, "a seat that is not one is left out");
 });
+
+// Every game with a friend kept (idea 9 Nov): every seat this phone holds is kept, and Home offers the games still in play.
+import { readSeats, keepIn, dropFrom, roomOffers, SEATS_MAX, SHOWN } from "../web/backroom.js";
+
+function two() { // Meka in a game with Tete (Tete to move) and, opened later, one with Chidi (Meka to move)
+  const rooms = new Rooms({ secret: SECRET });
+  const a = rooms.create({ variant: "ncho", name: "Meka" }); const at = rooms.join(a.code, { name: "Tete" });
+  rooms.move(a.code, a.token, legalMoves(rooms.get(a.code).game)[0]);
+  const c = rooms.create({ variant: "ayo", name: "Chidi" }); const cm = rooms.join(c.code, { name: "Meka" });
+  rooms.move(c.code, c.token, legalMoves(rooms.get(c.code).game)[0]);
+  return { rooms, a, at, c, cm, ta: ticketOf(rooms.snapshot(a.code)), tc: ticketOf(rooms.snapshot(c.code)) };
+}
+
+test("opening a second game keeps the first: Home offers both, yours to move first", () => {
+  const g = two();
+  let list = keepIn([], keepSeat({ code: g.a.code, token: g.a.token, seat: 0, ticket: g.ta, at: NOW - 600_000 }));
+  list = keepIn(list, keepSeat({ code: g.c.code, token: g.cm.token, seat: 1, ticket: g.tc, at: NOW - 900_000 }));
+  assert.deepEqual(list.map((s) => s.code), [g.c.code, g.a.code], "the newest kept goes first in the list");
+  const os = roomOffers(readSeats(JSON.parse(JSON.stringify(list))), { now: NOW });
+  assert.deepEqual(os.map((o) => [o.code, o.name, o.mine]), [[g.c.code, "Chidi", true], [g.a.code, "Tete", false]]);
+  assert.deepEqual(os.map(offerWords), ["Back to your game with Chidi · your move", "Back to your game with Tete · their move"]);
+  assert.deepEqual(roomOffers(list, { now: NOW, online: true }), [], "nothing while at a board");
+  // leaving Chidi's room on purpose forgets only that seat
+  assert.deepEqual(roomOffers(dropFrom(list, g.c.code), { now: NOW }).map((o) => o.name), ["Tete"]);
+});
+
+test("a seat kept by the build before the list joins it; one seat a room, the newest; a rejoin without a ticket keeps the ticket", () => {
+  const g = two();
+  const old = keepSeat({ code: g.a.code, token: g.a.token, seat: 0, ticket: g.ta, at: NOW - 60_000 });
+  assert.deepEqual(readSeats(null, old).map((s) => s.code), [g.a.code], "prefs 'room' alone");
+  const newer = { ...old, at: NOW };
+  assert.equal(readSeats([old], newer).length, 1); assert.equal(readSeats([old], newer)[0].at, NOW);
+  const back = keepIn([old], keepSeat({ code: g.a.code, token: g.a.token, seat: 0, at: NOW }));
+  assert.equal(back.length, 1); assert.deepEqual(back[0].ticket, g.ta, "Home can still say whose move it is");
+  const other = keepIn([old], keepSeat({ code: g.a.code, token: "another-seat", seat: 1, at: NOW }));
+  assert.equal(other[0].ticket, undefined, "a different seat never borrows a ticket");
+});
+
+test("the list stays short and anything spoiled is dropped", () => {
+  let list = [];
+  for (let i = 0; i < SEATS_MAX + 3; i++) list = keepIn(list, keepSeat({ code: "ABC" + "DEFGHIJK"[i], token: "t" + i, at: NOW + i }));
+  assert.equal(list.length, SEATS_MAX); assert.equal(list[0].code, "ABCJ");
+  assert.ok(roomOffers(list, { now: NOW + 10 }).length <= SHOWN);
+  for (const bad of [null, "x", 3, {}, [null, 4, "s", { code: "ab", token: "t" }, { code: "ABCD" }]]) assert.deepEqual(readSeats(bad), []);
+  assert.deepEqual(keepIn([], { code: "nope" }), []);
+});
+
+test("the board keeps every seat and Home paints two lines", () => {
+  const src = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
+  assert.match(src, /function keepSeatHere\(seat\)/); assert.match(src, /forgetSeat\(roomWanted\); return net\.join/);
+  assert.doesNotMatch(src, /prefs\.set\('room', 'null'\); (?:return|openRoom)/, "every leave forgets through forgetSeat");
+  const html = readFileSync(new URL("../web/index.html", import.meta.url), "utf8");
+  assert.match(html, /id="backLine2" type="button" hidden/); assert.match(html, /id="backWords2"/);
+  const carry = readFileSync(new URL("../web/carry.js", import.meta.url), "utf8"); assert.match(carry, /'seats'/, "seats stay on this phone");
+});

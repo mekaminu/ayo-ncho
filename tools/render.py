@@ -390,9 +390,27 @@ if backroomc:  # Back to your game (idea 8 Nov): a seat kept in a game still in 
         # the app is closed mid-game (no Home, no leave) and opened again at its start
         host.close(); host = hctx.new_page(); watch(host, errors, "host again: ")
         host.goto(BASE + "?capture=1&stay=home", wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
-        host.wait_for_selector("#backLine:not([hidden])", timeout=5000); host.wait_for_timeout(500)
+        host.wait_for_function("!document.querySelector('#backLine').hidden", timeout=15000); host.wait_for_timeout(500)
         w = host.evaluate("document.querySelector('#backWords').textContent"); print("backroom: Home says", repr(w)); assert w == "Back to your game with Tete · your move", w
         box = host.evaluate("(() => { const r = document.querySelector('#backLine').getBoundingClientRect(); return [r.left, r.right, r.height]; })()"); assert box[0] >= 0 and box[1] <= 390 and box[2] >= 28, box
+        host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=out, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false")
+        # Every game with a friend kept (idea 9 Nov): a cousin's invite opened now keeps Tete's game too
+        cctx = b.new_context(viewport={"width": 390, "height": 844}, device_scale_factor=1)
+        cctx.add_init_script("localStorage.setItem('ayo.name', 'Chidi'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lesson', 'done')")
+        cousin = cctx.new_page(); watch(cousin, errors, "cousin: ")
+        cousin.goto(BASE + "?capture=1&stay=home", wait_until="load"); cousin.wait_for_function("window.__done===true", timeout=180000)
+        cousin.click("#friendsBtn"); cousin.wait_for_function("window.__ayo.room && window.__ayo.room.code && document.querySelector('#roomStatus').dataset.state==='open'", timeout=20000)
+        ccode = cousin.evaluate("window.__ayo.room.code")
+        host.goto(BASE + "?capture=1&room=" + ccode, wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
+        cousin.wait_for_selector("#knockCard:not([hidden])", timeout=20000); cousin.click("#knockYes")
+        host.wait_for_function("document.querySelector('#oppName').textContent === 'Chidi'", timeout=20000); host.wait_for_timeout(800)
+        host.close(); host = hctx.new_page(); watch(host, errors, "host, two games: ")
+        host.goto(BASE + "?capture=1&stay=home", wait_until="load"); host.wait_for_function("window.__done===true", timeout=180000)
+        host.wait_for_function("!document.querySelector('#backLine2').hidden", timeout=15000); host.wait_for_timeout(500)
+        ws = host.evaluate("[document.querySelector('#backWords').textContent, document.querySelector('#backWords2').textContent]"); print("kept: Home says", ws)
+        assert ws == ["Back to your game with Tete · your move", "Back to your game with Chidi · their move"], ws
+        for sel in ("#backLine", "#backLine2"):
+            r = host.evaluate("(s => { const r = document.querySelector(s).getBoundingClientRect(); return [r.left, r.right, r.height]; })('%s')" % sel); assert r[0] >= 0 and r[1] <= 390 and r[2] >= 28, (sel, r)
         host.evaluate("window.__freeze=true"); host.wait_for_timeout(300); host.screenshot(path=out, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false")
         host.click("#backLine")
         host.wait_for_function("document.body.classList.contains('playing') && document.querySelector('#oppName').textContent === 'Tete'", timeout=20000)
@@ -403,11 +421,13 @@ if backroomc:  # Back to your game (idea 8 Nov): a seat kept in a game still in 
         print("backroom: back in the same seat, and the move reached Tete")
         # Home on the board leaves the room on purpose: nothing to go back to
         host.wait_for_timeout(2500); host.click("#homeBtn"); host.wait_for_load_state("load"); host.wait_for_function("window.__done===true", timeout=180000)
-        host.wait_for_timeout(400); assert host.evaluate("document.querySelector('#backLine').hidden"), "left on purpose"
+        host.wait_for_timeout(400); assert host.evaluate("document.querySelector('#backLine2').hidden"), "left on purpose"
+        lw = host.evaluate("document.querySelector('#backWords').textContent"); assert lw == "Back to your game with Chidi · their move", lw
+        print("kept: Home on Tete's board forgot only Tete's seat; Chidi's game is still offered")
         # French, from a seat kept by the friend (their move: Meka's reply has not been played)
         friend.close(); fr = fctx.new_page(); watch(fr, errors, "fr: "); fr.add_init_script("localStorage.setItem('ayo.lang', 'fr')")
         fr.goto(BASE + "?capture=1&stay=home", wait_until="load"); fr.wait_for_function("window.__done===true", timeout=180000)
-        fr.wait_for_selector("#backLine:not([hidden])", timeout=5000)
+        fr.wait_for_function("!document.querySelector('#backLine').hidden", timeout=15000)
         fw = fr.evaluate("document.querySelector('#backWords').textContent"); print("backroom: in French", repr(fw)); assert fw == "Retour à votre partie avec Meka · à vous", fw
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)

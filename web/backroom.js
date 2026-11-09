@@ -53,3 +53,42 @@ export function offerWords(o) {
   const who = o.name ? `Back to your game with ${o.name}` : `Back to your game in room ${o.code}`;
   return o.mine === true ? `${who} · your move` : o.mine === false ? `${who} · their move` : who;
 }
+
+// Every game with a friend kept (idea 9 Nov): the phone kept one seat (prefs 'room'), so opening a cousin's invite while a game
+// with your sister was still on wrote over her seat — Home could only ever offer the newest game, and the sister waited at a
+// board nobody would come back to. Now every seat lives in a short list (prefs 'seats', newest first, SEATS_MAX at most), the
+// one at the board is still prefs 'room' (a reload's rejoin reads it as before), and Home offers up to SHOWN games still in
+// play — yours to move first, then the newest. Leaving a room on purpose forgets only that room's seat.
+export const SEATS_MAX = 4;
+export const SHOWN = 2;
+const seatShaped = (s) => !!s && typeof s === 'object' && typeof s.code === 'string' && CODE.test(s.code) && typeof s.token === 'string' && !!s.token;
+
+// the list, from what storage holds: anything that is not a seat is dropped, one seat a room (the newest), newest first; a seat
+// kept by a build before the list (prefs 'room' only) joins it
+export function readSeats(list, current = null) {
+  const all = (Array.isArray(list) ? list : []).concat(current ? [current] : []).filter(seatShaped);
+  const by = new Map();
+  for (const s of all) { const had = by.get(s.code); if (!had || (Number(s.at) || 0) > (Number(had.at) || 0)) by.set(s.code, s); }
+  return [...by.values()].sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0)).slice(0, SEATS_MAX);
+}
+
+// a seat kept (joined, or a new ticket): it replaces that room's seat and goes to the front; the same seat without a ticket
+// keeps the ticket it had, so Home can still say whose move it is before the next ticket comes
+export function keepIn(list, seat) {
+  if (!seatShaped(seat)) return readSeats(list);
+  const had = readSeats(list).find((s) => s.code === seat.code);
+  const s = !seat.ticket && had && had.token === seat.token && had.ticket ? { ...seat, ticket: had.ticket } : seat;
+  return [s].concat(readSeats(list).filter((x) => x.code !== seat.code)).slice(0, SEATS_MAX);
+}
+
+// a room left on purpose (or whose seat the server no longer knows): only that seat goes
+export function dropFrom(list, code) { return readSeats(list).filter((s) => s.code !== code); }
+
+// what Home offers: every kept seat in a game still in play, yours to move first, then the newest; SHOWN at most
+export function roomOffers(list, { now = Date.now(), online = false, max = SHOWN } = {}) {
+  if (online) return [];
+  const out = [];
+  for (const s of readSeats(list)) { const o = roomOffer(s, { now }); if (o) out.push({ ...o, at: s.at }); }
+  const rank = (o) => (o.mine === true ? 0 : o.mine === null ? 1 : 2);
+  return out.sort((a, b) => rank(a) - rank(b) || b.at - a.at).slice(0, max);
+}

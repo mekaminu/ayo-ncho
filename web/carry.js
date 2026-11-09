@@ -11,7 +11,7 @@
 export const KEY = 'carry';
 export const PREFIX = 'ayo.';
 // never carried: what was bought (only the store can say), a room's seat, and what this phone measured of itself
-export const KEEP_OUT = new Set(['owned', 'room', 'fresh.tried', 'quality', 'quality.measured', 'frames.last', 'full', 'tele.first', 'glback']);
+export const KEEP_OUT = new Set(['owned', 'room', 'seats', 'fresh.tried', 'quality', 'quality.measured', 'frames.last', 'full', 'tele.first', 'glback']);
 const NAME = /^[a-zA-Z0-9._-]{1,40}$/;
 export const MAX_VALUE = 20000; // one entry (the saved game is the largest, a few kB)
 export const MAX_CODE = 60000; // a link WhatsApp and the share sheets still carry whole
