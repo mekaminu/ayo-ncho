@@ -20,6 +20,8 @@
 // {t:"room"} (a watch view) whenever who is at the board or watching changes; nothing they send can touch the game. Both boards' rooms
 // list the watchers by name. Eight at most per game ({t:"error", code:"crowd"}); a wrong key is "notfound", like a room that is gone.
 // /privacy, /terms and /support are the pages the stores ask for (server/legal.js).
+// Locked doors (server/headers.js): the page goes out with a fresh nonce on its scripts and a Content-Security-Policy naming it;
+// every response says nosniff, a same-origin referrer and the Permissions-Policy, and HSTS over HTTPS.
 // GET /version says which build of the game this server carries (a hash of web/ and engine/), and the page is served with the
 // same hash in its <meta name="ayo-build">, so a page left open can tell a newer game is out (web/fresh.js).
 // GET /vendor/three.module.min.js is the 3D library (three 0.170.0 from node_modules, the same file cdnjs serves): the page loads it
@@ -38,6 +40,7 @@ import { Rooms, RoomError, normaliseCode, lineText, moveMessage, resignMessage, 
 import { mountLegal } from "./legal.js";
 import { pageWithPreview } from "./preview.js";
 import { compressedStatic, sendText } from "./compress.js";
+import { baseHeaders, lockPage } from "./headers.js";
 import { Pace, Doorman, addressOf, GUARD } from "./guard.js";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -62,11 +65,13 @@ export const THREE_FILE = path.join(__dirname, "..", "node_modules", "three", "b
 
 export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECRET }), sweepEvery = 60 * 1000, env = process.env, guard = {}, now = Date.now } = {}) {
   const app = express();
+  app.disable("x-powered-by");
+  app.use(baseHeaders); // nosniff, referrer, permissions, HSTS over HTTPS (server/headers.js)
   mountLegal(app, env);
   const build = buildId(), page = pageWithBuild(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), build);
   app.get("/version", (_req, res) => { res.set("Cache-Control", "no-store"); res.json({ v: build }); });
   const haveLocal = fs.existsSync(THREE_FILE);
-  app.get(["/", "/index.html"], (req, res) => { res.set("Cache-Control", "no-cache"); sendText(req, res, pageWithPreview(page, req, rooms)); });
+  app.get(["/", "/index.html"], (req, res) => { res.set("Cache-Control", "no-cache"); sendText(req, res, pageWithPreview(page, req, rooms), undefined, (html) => { const l = lockPage(html, req); return { body: l.html, headers: { "Content-Security-Policy": l.policy } }; }); });
   // the game's files go out squeezed (server/compress.js); images and anything not text fall through to express.static
   const three = compressedStatic(path.dirname(THREE_FILE), { file: THREE_FILE, maxAge: 7 * 24 * 3600, headers: { "Access-Control-Allow-Origin": "*" } });
   app.get("/vendor/three.module.min.js", (req, res, next) => { if (!haveLocal) return res.status(404).end(); three(req, res, next); });

@@ -7,6 +7,7 @@
 // The seller's name and the support email are not kept in the repo: the server reads them from SELLER_NAME and SUPPORT_EMAIL
 // (set in Render → Environment), and says plainly that they are coming until they are set.
 
+import { LEGAL_POLICY } from "./headers.js";
 import { privacyFr, termsFr, supportFr, frSpaces, footerFr, NAV_FR, TITLES_FR, PLACEHOLDER_FR } from "./legal-fr.js";
 
 export const UPDATED = "4 November 2026";
@@ -261,6 +262,7 @@ export function mountLegal(app, env = process.env) {
       res.set("Vary", "Accept-Language");
       const lang = pageLang(req.query, req.get("accept-language"));
       res.set("Content-Language", lang);
+      res.set("Content-Security-Policy", LEGAL_POLICY); // no script at all (server/headers.js)
       res.type("html").send(legalPage(name, env, lang));
     });
   }

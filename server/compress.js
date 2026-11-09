@@ -40,12 +40,19 @@ export function squeeze(buf, enc, quick = false) {
 const etagOf = (buf) => '"' + createHash("sha1").update(buf).digest("base64url").slice(0, 22) + '"';
 const fresh = (req, etag) => String(req.headers["if-none-match"] || "").split(",").some((t) => t.trim().replace(/^W\//, "") === etag);
 
-// a text body sent squeezed when the phone takes it (the page, written per request)
-export function sendText(req, res, body, type = "text/html; charset=utf-8") {
-  const buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
+// a text body sent squeezed when the phone takes it (the page, written per request). finish(body) → { body, headers }, if given,
+// writes the body as it is sent once it is known the phone needs it (the page's nonce and its policy, server/headers.js): the
+// ETag is the body's before finish, so a page the phone already has is still a 304, and the 304 carries none of finish's headers
+export function sendText(req, res, body, type = "text/html; charset=utf-8", finish = null) {
+  let buf = Buffer.isBuffer(body) ? body : Buffer.from(String(body));
   res.set("Content-Type", type); res.vary("Accept-Encoding");
   const etag = etagOf(buf); res.set("ETag", etag);
   if (fresh(req, etag)) return res.status(304).end();
+  if (finish) {
+    const f = finish(buf.toString("utf8"));
+    for (const [k, v] of Object.entries(f.headers || {})) res.set(k, v);
+    buf = Buffer.from(String(f.body));
+  }
   const enc = buf.length >= MIN_BYTES ? pickEncoding(req.headers["accept-encoding"]) : null;
   if (!enc) return res.send(buf);
   res.set("Content-Encoding", enc);

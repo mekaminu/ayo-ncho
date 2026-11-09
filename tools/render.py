@@ -22,6 +22,8 @@
 #                  (<out>), a tap takes the same seat back (the board, Tete across it), a move reaches Tete; Home on the board leaves the
 #                  room and the line is gone; in French too
 #        python3 tools/render.py out.png --smoke    -> start a real game, tap a pit twice, wait for the opponent, check the board changed
+#        every page is served locked, as the real server sends it (a nonce on its scripts and the Content-Security-Policy, server/headers.js),
+#        so a "Refused to …" from the browser fails the check; add --open to serve the page bare
 #        add --clip (with --smoke) to also record the best-turn clip in the browser and check a video came out
 #        add --wide for the Fold-open / Mac layout (1180x820); --home screenshots the Home screen (whole page); --lite / --full force the lighter or the full board (auto otherwise)
 #        add --nophysics to play with the seed physics off (seeds fly straight to their pit, as on the weakest phones) and check the setting took
@@ -284,6 +286,30 @@ root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 three = os.path.join(root, "node_modules", "three", "build", "three.module.js")
 class Quiet(http.server.SimpleHTTPRequestHandler):
     def log_message(self, *a): pass
+if "--open" not in sys.argv:  # locked doors (idea 9 Nov): the page goes out as the real server sends it — a nonce on its scripts and
+    # the Content-Security-Policy naming it (server/headers.js), nosniff on everything — so every check fails on a "Refused to …"
+    # from the browser (a console error) wherever the policy would stop something the game does; --open serves the page bare
+    LOCKED = json.loads(subprocess.check_output(["node", "--input-type=module", "-e", "import { lockPage } from './server/headers.js'; import fs from 'node:fs'; const l = lockPage(fs.readFileSync('web/index.html', 'utf8'), { headers: { host: '127.0.0.1:8766' }, secure: false }); console.log(JSON.stringify(l))"], cwd=root).decode())
+    class Quiet(Quiet):
+        def end_headers(self):
+            self.send_header("X-Content-Type-Options", "nosniff")
+            if self.path.split("?")[0] in ("/web/", "/web/index.html"): self.send_header("Content-Security-Policy", LOCKED["policy"])
+            super().end_headers()
+        def do_GET(self):
+            if self.path.split("?")[0] in ("/web/", "/web/index.html"):
+                body = LOCKED["html"].encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body); return
+            super().do_GET()
+    # Playwright's wait_for_function compiles its predicate inside the page with eval, which the policy refuses (as it should);
+    # evaluate goes round the policy, so the wait polls with evaluate instead
+    from playwright.sync_api import Page as _P, Frame as _F, TimeoutError as _TE
+    def _poll(self, expression, arg=None, timeout=30000, polling=None):
+        end = time.time() + (timeout or 30000) / 1000.0
+        while True:
+            v = self.evaluate(expression, arg) if arg is not None else self.evaluate(expression)
+            if v: return v
+            if time.time() > end: raise _TE("wait_for_function (polled, the page locked): timeout %dms exceeded waiting for %s" % (timeout, expression[:120]))
+            time.sleep(0.05)
+    _P.wait_for_function = _poll; _F.wait_for_function = _poll
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8766), functools.partial(Quiet, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 node = None
