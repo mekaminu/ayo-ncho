@@ -1,0 +1,36 @@
+name: firefox
+# Firefox's own engine (idea 9 Nov): Firefox on Android and on a Mac draw the page with Gecko, an engine of its own (not Chrome's
+# Blink, not Safari's WebKit), so a friend on Firefox could meet trouble neither of the other checks would see. This opens the game
+# and an invite link in Playwright's Firefox, dressed as Firefox on Android (the folded Fold's width, a touch screen) and as Firefox
+# on a Mac, plays a real move, and writes what it saw to this run's summary with pictures kept as the artifact "firefox-check".
+# Like the Safari check it reports and does not hold up the game: a Firefox-only failure shows here as a red job while main stays
+# green. Runs on pushes that touch the game, and by hand (Run workflow). Firefox cannot be downloaded into the build container.
+on:
+  push:
+    branches: [main]
+    paths: ["web/**", "engine/**", "server/**", "tools/webkit-check.py", ".github/workflows/firefox.yml"]
+  workflow_dispatch:
+jobs:
+  gecko:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        dress: ["Firefox on Android", "Firefox on a Mac"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm ci || npm install
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install playwright==1.63.0 && python -m playwright install --with-deps firefox
+      - run: mkdir -p out && python tools/webkit-check.py "out/${{ matrix.dress == 'Firefox on Android' && 'android' || 'mac' }}" --browser firefox --device "${{ matrix.dress }}"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firefox-check-${{ matrix.dress == 'Firefox on Android' && 'android' || 'mac' }}
+          path: out/
+          retention-days: 14

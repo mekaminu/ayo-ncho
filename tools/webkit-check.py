@@ -8,7 +8,8 @@
 # to <out>.md (also to the GitHub run's summary) and a picture of each page, and exits 1 if any page did not start or threw.
 # WebKit cannot be downloaded into the build container, so this runs in GitHub Actions (.github/workflows/safari.yml) on every push
 # that touches the game, and by hand there (Run workflow). Locally: python3 tools/webkit-check.py out --browser chromium (a dry run).
-# Usage: python3 tools/webkit-check.py docs/webkit [--browser webkit|chromium] [--device "iPhone 15"]
+# Usage: python3 tools/webkit-check.py docs/webkit [--browser webkit|firefox|chromium] [--device "iPhone 15" | "Firefox on Android" | "Firefox on a Mac"]
+# Firefox (idea 9 Nov): the same check in Firefox's engine, Gecko, dressed as Firefox on Android and on a Mac (.github/workflows/firefox.yml).
 import sys, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import pollwait; pollwait.install()  # the real server's page is locked (server/headers.js): waits poll with evaluate
@@ -39,14 +40,24 @@ STATE = """() => { const f = document.querySelector('#bootFail'); const c = docu
     hint: (document.querySelector('#hint') || {}).textContent || '', home: !!document.querySelector('#home') && !document.querySelector('#home').hidden }; }"""
 
 SNAP = "JSON.stringify({ moves: window.__ayo.state.moves.length, turn: window.__ayo.state.turn, busy: window.__ayo.busy, selected: window.__ayo.selected, hurry: window.__ayo.hurry.playing, tweens: window.__ayo.tweens, hint: document.querySelector('#hint').textContent, opp: (document.querySelector('#oppSub') || {}).textContent, home: !document.querySelector('#home').hidden, over: !document.querySelector('#gameover').hidden })"
+# Firefox's own engine (idea 9 Nov): the phones and Macs Playwright has no ready dress for. Firefox on Android (Gecko, its own
+# engine, unlike every browser on an iPhone) at the folded Fold's width with a touch screen; Firefox on a Mac at a laptop's size.
+OWN = {
+    "Firefox on Android": {"viewport": {"width": 390, "height": 844}, "device_scale_factor": 2.5, "has_touch": True,
+                           "user_agent": "Mozilla/5.0 (Android 14; Mobile; rv:144.0) Gecko/144.0 Firefox/144.0"},
+    "Firefox on a Mac": {"viewport": {"width": 1440, "height": 900}, "device_scale_factor": 2, "has_touch": False,
+                         "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0"},
+}
+ENGINE = {"webkit": "Safari's engine", "firefox": "Firefox's engine", "chromium": "Chrome's engine"}.get(browser, browser)
 report = []; bad = []
 def section(title, lines): report.append("### " + title); report.extend(lines); report.append("")
 
 with sync_playwright() as p:
     bt = getattr(p, browser)
     b = bt.launch()
-    dev = dict(p.devices[device]) if device in p.devices else {"viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True}
+    dev = dict(OWN[device]) if device in OWN else dict(p.devices[device]) if device in p.devices else {"viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True}
     if browser != "webkit": dev = {k: v for k, v in dev.items() if k != "default_browser_type"}
+    if browser == "firefox": dev.pop("is_mobile", None)  # Playwright's Firefox has no phone mode; the touch screen, the size and the browser's own name are what the game reads
     print("browser:", browser, b.version, "· device:", device)
     def visit(name, path, play=False):
         ctx = b.new_context(**{k: v for k, v in dev.items() if k != "default_browser_type"})
@@ -68,7 +79,7 @@ with sync_playwright() as p:
                     pg.click("#playBtn", timeout=10000)
                 pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy && window.__ayo.legal.length && window.__ayo.state.turn === 0", timeout=60000)
                 n0 = pg.evaluate("window.__ayo.state.moves.length"); pit = pg.evaluate("window.__ayo.legal[0]")
-                x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit); how = "a finger"
+                x, y = pg.evaluate("window.__ayo.pitAt(%d)" % pit); how = "a finger" if dev.get("has_touch") else "the mouse"
                 def press():
                     if how == "a finger": pg.touchscreen.tap(x, y)
                     else: pg.mouse.click(x, y)
@@ -116,7 +127,7 @@ with sync_playwright() as p:
     b.close()
 node.terminate()
 
-head = ["## Safari's engine check (%s, dressed as an %s)" % (browser, device), "", ("**All good** — the board started on every page and no page threw." if not bad else "**Trouble:**")]
+head = ["## %s check (%s, dressed as %s)" % (ENGINE, browser, device), "", ("**All good** — the board started on every page and no page threw." if not bad else "**Trouble:**")]
 head += ["- " + x for x in bad]; head.append("")
 md = "\n".join(head + report)
 with open(out + ".md", "w") as f: f.write(md)
