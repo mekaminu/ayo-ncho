@@ -19,7 +19,7 @@
 // the moves through the engine, and the friend's token works again as before. The secret is ROOM_SECRET (Render makes it once,
 // from render.yaml); without one a random secret is made at start, which only lasts as long as the process.
 import { randomUUID, randomBytes, createHmac, timingSafeEqual } from "node:crypto";
-import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, agreeDraw, RULES } from "../engine/ayo.js";
+import { newGame, applyMove, legalMoves, replay, resign, takeBack, mayTakeBack, agreeDraw, RULES, isVariant, cleanRules } from "../engine/ayo.js";
 import { isShout, mayShout } from "../web/shouts.js";
 import { callMessage, passGate } from "../web/call.js";
 import { cleanTag } from "../web/block.js";
@@ -38,10 +38,12 @@ export function makeCode(random = Math.random, length = CODE_LENGTH) {
   for (let i = 0; i < length; i++) s += CODE_ALPHABET[Math.floor(random() * CODE_ALPHABET.length) % CODE_ALPHABET.length];
   return s;
 }
+// Text from the line: a string as it is, a number as its figures, anything else (an object with its own toString, an array) as nothing.
+export const lineText = (x) => (typeof x === "string" ? x : typeof x === "number" && Number.isFinite(x) ? String(x) : "");
 export function normaliseCode(code) {
-  return String(code || "").toUpperCase().replace(/[^A-Z]/g, "").slice(0, CODE_LENGTH);
+  return lineText(code).toUpperCase().replace(/[^A-Z]/g, "").slice(0, CODE_LENGTH);
 }
-const cleanName = (name, fallback) => { const s = String(name || "").replace(/\s+/g, " ").trim().slice(0, 24); return s || fallback; };
+const cleanName = (name, fallback) => { const s = lineText(name).replace(/\s+/g, " ").trim().slice(0, 24); return s || fallback; };
 
 export const SIG_LENGTH = 12;    // base64url characters of the seal: 72 bits, checked only by the server, one guess per message
 export const MAX_TICKET_MOVES = 2000;
@@ -82,12 +84,13 @@ export class Rooms {
   // The host opens a room and takes seat 0. The friend's seat stays empty until join().
   create({ variant = "ncho", rules = {}, name, tag } = {}) {
     if (this.rooms.size >= this.maxRooms) fail("full", "too many rooms open right now, try again in a minute");
-    if (!RULES[variant]) fail("variant", "unknown game");
+    if (!isVariant(variant)) fail("variant", "unknown game");
+    rules = cleanRules(variant, rules);
     let code; let tries = 0;
     do { code = makeCode(this.random); if (++tries > 500) fail("full", "no room codes left"); } while (this.rooms.has(code));
     const t = this.now(); const rid = randomBytes(9).toString("base64url");
     const room = {
-      code, rid, variant, rules: { ...RULES[variant], ...rules },
+      code, rid, variant, rules: { ...rules },
       seats: [{ token: this.tokenFor(code, rid, 0), name: cleanName(name, "Host"), tag: cleanTag(tag), online: true, wantsRematch: false }, null],
       knocks: [], // people at the door, oldest first: {id, name, tag, at}
       watchers: [], // family round the board, oldest first: {id, name, at} — they follow the game and never play
@@ -163,7 +166,7 @@ export class Rooms {
     room.watchers.splice(i, 1); return true;
   }
   keyMatches(room, key) {
-    const want = Buffer.from(this.watchKey(room.code, room.rid)), got = Buffer.from(String(key || ""));
+    const want = Buffer.from(this.watchKey(room.code, room.rid)), got = Buffer.from(lineText(key));
     return want.length === got.length && timingSafeEqual(want, got);
   }
   // What a watcher may see: the game, the names and who is at the board, any question asked across it, and who else is watching.
@@ -203,7 +206,7 @@ export class Rooms {
     const gone = () => fail("notfound", "no room with that code");
     const t = ticket;
     if (!t || typeof t !== "object" || typeof t.sig !== "string" || t.sig.length !== SIG_LENGTH || typeof t.rid !== "string" || !/^[A-Za-z0-9_-]{8,40}$/.test(t.rid)) gone();
-    if (!RULES[t.variant] || !t.rules || typeof t.rules !== "object" || Array.isArray(t.rules)) gone();
+    if (!isVariant(t.variant) || !t.rules || typeof t.rules !== "object" || Array.isArray(t.rules)) gone();
     if (!Number.isInteger(t.games) || t.games < 0 || ![0, 1].includes(t.first) || ![null, 0, 1].includes(t.resigned ?? null) || ![undefined, false, true].includes(t.drawn)) gone();
     if (!Array.isArray(t.names) || t.names.length !== 2 || typeof t.names[0] !== "string" || !(t.names[1] === null || typeof t.names[1] === "string")) gone();
     if (!Array.isArray(t.moves) || t.moves.length > MAX_TICKET_MOVES || !t.moves.every((m) => Number.isInteger(m) && m >= 0 && m < 12)) gone();
@@ -264,7 +267,7 @@ export class Rooms {
     const g = room.game;
     if (g.over) fail("over", "the game is over");
     if (g.turn !== seat) fail("turn", "not your move");
-    pit = Number(pit);
+    pit = typeof pit === "number" || typeof pit === "string" ? Number(pit) : NaN; // an object with its own valueOf is no pit
     if (!Number.isInteger(pit) || !legalMoves(g).includes(pit)) {
       const own = Number.isInteger(pit) && pit >= seat * 6 && pit < seat * 6 + 6 && g.pits[pit] > 0;
       fail("illegal", own ? "you must give the other side seeds" : "that pit cannot be played");

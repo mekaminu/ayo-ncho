@@ -34,7 +34,7 @@ import http from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
-import { Rooms, RoomError, normaliseCode, moveMessage, resignMessage, backMessage, drawMessage } from "./rooms.js";
+import { Rooms, RoomError, normaliseCode, lineText, moveMessage, resignMessage, backMessage, drawMessage } from "./rooms.js";
 import { mountLegal } from "./legal.js";
 import { pageWithPreview } from "./preview.js";
 import { compressedStatic, sendText } from "./compress.js";
@@ -128,13 +128,13 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   const answerDoor = (ws, m) => {
     if (!ws.room) throw new RoomError("unseated", "join a room first");
     if (m.in) {
-      const id = String(m.id || ""); const guest = knockers.get(id);
+      const id = lineText(m.id); const guest = knockers.get(id);
       if (!guest || guest.readyState !== guest.OPEN) { rooms.withdraw(ws.room, id); knockers.delete(id); broadcast(ws.room, { t: "room", room: rooms.snapshot(ws.room) }); throw new RoomError("noknock", "they have gone from the door"); }
       const r = rooms.admit(ws.room, ws.token, id); knockers.delete(id);
       for (const x of r.turnedAway) { const s = knockers.get(x.id); knockers.delete(x.id); if (s) { s.knock = null; send(s, { t: "error", code: "taken", msg: "that room already has two players", re: "join" }); } }
       seatSocket(guest, r); // the guest is seated; the host's board gets the room with the new player
     } else {
-      const r = rooms.refuse(ws.room, ws.token, String(m.id || ""));
+      const r = rooms.refuse(ws.room, ws.token, lineText(m.id));
       const guest = knockers.get(r.id); knockers.delete(r.id);
       if (guest) { guest.knock = null; send(guest, { t: "error", code: "notlet", msg: "not let in this time", re: "join" }); }
       broadcast(ws.room, { t: "room", room: rooms.snapshot(ws.room) });
@@ -173,7 +173,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
           case "drawanswer": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.answerDraw(ws.room, ws.token, !!m.yes); return broadcast(ws.room, drawMessage(r)); }
           case "backanswer": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.answerBack(ws.room, ws.token, !!m.yes); return broadcast(ws.room, backMessage(r)); }
           case "sync": { if (ws.watch && !ws.room) return send(ws, { t: "room", room: rooms.watchView(ws.watch.code), resync: true }); if (!ws.room) throw new RoomError("unseated", "join a room first"); return send(ws, { t: "room", room: rooms.snapshot(ws.room), resync: true }); }
-          case "call": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.call(ws.room, ws.token, String(m.kind || ""), m.data); for (const s of sockets.get(ws.room) || []) if (s.seat === r.to) send(s, { t: "call", seat: r.seat, kind: r.kind, data: r.data }); return; }
+          case "call": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.call(ws.room, ws.token, lineText(m.kind), m.data); for (const s of sockets.get(ws.room) || []) if (s.seat === r.to) send(s, { t: "call", seat: r.seat, kind: r.kind, data: r.data }); return; }
           case "peek": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.peek(ws.room, ws.token, m.pit); for (const s of sockets.get(ws.room) || []) if (s.seat === r.to) send(s, { t: "peek", seat: r.seat, pit: r.pit, n: r.n }); return; }
           case "shout": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.shout(ws.room, ws.token, m.id); return broadcast(ws.room, { t: "shout", ...r }); }
           case "rematch": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.rematch(ws.room, ws.token, typeof m.game === "string" ? m.game : undefined); return broadcast(ws.room, { t: "room", room: r.room, started: r.started }); }
@@ -181,6 +181,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
         }
       } catch (e) {
         if (e instanceof RoomError) return send(ws, { t: "error", code: e.code, msg: e.message, re: m.t });
+        if (process.env.FUZZ_DEBUG) console.error("UNEXPECTED" /* tools/fuzz-protocol.js: which message, and where it broke */, JSON.stringify(m).slice(0, 400), e.stack.split("\n").slice(0, 4).join(" / "));
         send(ws, { t: "error", code: "server", msg: "something went wrong", re: m.t });
       }
     });

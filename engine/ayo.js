@@ -29,6 +29,18 @@ export const RULES = {
   ncho: { capture: 4, relay: true, last8: true },   // capture on 4 (to the side's owner; last seed on their side to the sower), relay sowing, last 8 to the next capturer
   ayo:  { capture: 23, relay: false, last8: false }, // capture on 2 or 3 by the last seed, sweeping back; grand slam; single lap
 };
+// Only real games over the line (idea 9 Nov): the switches a game may have and the values each may take. A message written by hand
+// (not by the board) could ask for "constructor" as the game or rules that do not exist; the server keeps what is real and gives
+// anything else the game's own rule, so a friend's board is only ever asked to play a game it knows.
+export const RULE_VALUES = { capture: [4, 23], relay: [true, false], last8: [true, false] };
+export function isVariant(v) { return typeof v === "string" && VARIANTS.includes(v); }
+export function cleanRules(variant, overrides) {
+  const base = RULES[isVariant(variant) ? variant : "ncho"];
+  const o = overrides && typeof overrides === "object" && !Array.isArray(overrides) ? overrides : {};
+  const out = {};
+  for (const k of Object.keys(RULE_VALUES)) out[k] = Object.hasOwn(o, k) && RULE_VALUES[k].includes(o[k]) ? o[k] : base[k];
+  return out;
+}
 // `first`: the seat that moves first (0 unless said; at a real board the loser of the last game starts).
 export function newGame(variant = "ncho", overrides = {}, first = 0) {
   return {
