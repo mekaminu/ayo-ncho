@@ -45,7 +45,9 @@ SNAP = "JSON.stringify({ moves: window.__ayo.state.moves.length, turn: window.__
 OWN = {
     "Firefox on Android": {"viewport": {"width": 390, "height": 844}, "device_scale_factor": 2.5, "has_touch": True,
                            "user_agent": "Mozilla/5.0 (Android 14; Mobile; rv:144.0) Gecko/144.0 Firefox/144.0"},
-    "Firefox on a Mac": {"viewport": {"width": 1440, "height": 900}, "device_scale_factor": 2, "has_touch": False,
+    # the Mac at 1x: the runner draws with the CPU, and a 2880x1800 board took so long a frame that the click's press and release
+    # arrived a count's length apart (a held press counts the pit instead of playing it) — a real Mac's GPU never does that
+    "Firefox on a Mac": {"viewport": {"width": 1440, "height": 900}, "device_scale_factor": 1, "has_touch": False,
                          "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:144.0) Gecko/20100101 Firefox/144.0"},
 }
 ENGINE = {"webkit": "Safari's engine", "firefox": "Firefox's engine", "chromium": "Chrome's engine"}.get(browser, browser)
