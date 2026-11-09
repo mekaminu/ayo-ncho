@@ -853,6 +853,8 @@ const pl = (n, one, many) => `${n} ${n === '1' ? one : many}`;
 const OPPS = 'Adaeze|Auntie Bisi|Nnamdi|Mama Ngozi|Papa Ike';
 const at = (g) => (g === 'Ayo' ? 'à l’Ayo' : 'au Nchò');
 // the battery saver's reasons (web/battery.js)
+// Settings → Feel → Seed physics, why (web/quality.js decidePhysics, web/still.js physicsNote)
+const physicsReasonFr = (r) => ({ 'your phone asks for less motion': 'votre téléphone demande moins de mouvement', 'the lighter board is on': 'le plateau allégé est activé', 'the battery is low': 'la batterie est faible' })[r] || batteryReasonFr(r);
 const batteryReasonFr = (r) => { const m = /^battery at (\d+)%$/.exec(r); if (m) return `batterie à ${m[1]} %`; return { charging: 'en charge', 'chosen in Settings': 'choisi dans les Réglages', 'asked for in the address': 'demandé dans l’adresse', 'this browser cannot tell': 'ce navigateur ne le dit pas' }[r] || r; };
 const who = (s) => FR[s] || s; // a name stays a name; "Player 2" becomes "Joueur 2"
 const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
@@ -904,7 +906,7 @@ export const PATTERNS = [
   [/^(\d+) seeds?$/, (m) => `${m[1]} graine${m[1] === '1' ? '' : 's'}`],
   [/^now (lighter|full) \((.+?)\)(?: · (.+))?$/, (m) => `${m[1] === 'lighter' ? 'allégé' : 'complet'} en ce moment (${m[2]})` + (m[3] ? ' · ' + m[3] : '')],
   [/^now (saving|full) \((.+?)\)$/, (m) => `${m[1] === 'saving' ? 'en économie' : 'au complet'} en ce moment (${batteryReasonFr(m[2])})`],
-  [/^now (on|off) \((.+?)\)$/, (m) => `${m[1] === 'on' ? 'activée' : 'désactivée'} en ce moment (${m[2]})`],
+  [/^now (on|off) \((.+?)\)$/, (m) => `${m[1] === 'on' ? 'activée' : 'désactivée'} en ce moment (${physicsReasonFr(m[2])})`],
   [/^River stones — at (\d+) days played$/, (m) => `Galets — après ${m[1]} jours de jeu`],
   [/^River stones come with (\d+) days played — (\d+) so far$/, (m) => `Les galets viennent après ${m[1]} jours de jeu — ${m[2]} pour l’instant`],
   [/^(.+) — in the store$/, (m) => `${who(m[1])} — dans la boutique`],
