@@ -107,6 +107,8 @@ import { afterUndo as redoAfterUndo, ready as redoReady, step as redoStep, after
 import { makeGuard as makeKeepGuard, ARM_MS as KEEP_MS, playAsks, askWords as keepAsk } from './keepgame.js';
 import { runTweens as stepTweens, frameLoop, caught as loopCaught, rethrow } from './keepgoing.js'; // never stuck on "thinking…" (8 Nov): the frame loop always goes on
 import { tabWatch, mayWrite as tabMayWrite, followNow as tabFollowNow, followWords as tabFollowWords, GAME_KEY as TAB_GAME_KEY } from './twotabs.js'; // two tabs, one game (idea 9 Nov)
+import { startOldCss } from './oldcss.js'; // older phones (idea 9 Nov): the :has rules kept as classes where the browser has no :has
+try { startOldCss(); } catch {} // before anything is drawn; nothing at all on a browser that knows :has
 import { keep } from './bounded.js'; // a long evening (idea 8 Nov): the page's own records keep their last few entries
 // the day's share line, with "· with a nudge" on a solve that had one (web/nudge.js)
 const shareText = (p, got) => nudgeShare(dayShareText(p, got), dailyEntry(daily, p.key, p.variant));
@@ -3099,7 +3101,7 @@ function endCount() { counting.run++; counting.pit = null; counting.el.hidden = 
 const cv = new THREE.Vector3();
 function placeCount() {
   if (counting.pit === null) return; const [x, z] = bowlOf(counting.pit).c;
-  cv.set(x, BT + 0.02, z).project(camera); counting.el.style.transform = counting.word.style.transform = `translate(${(cv.x * 0.5 + 0.5) * view.w}px, ${(-cv.y * 0.5 + 0.5) * view.h}px)`;
+  cv.set(x, BT + 0.02, z).project(camera); { const at = `translate(${(cv.x * 0.5 + 0.5) * view.w}px, ${(-cv.y * 0.5 + 0.5) * view.h}px)`; counting.el.style.transform = at; counting.word.style.transform = at + ' translateX(-50%)'; } // the word centred in the transform itself, not the translate property (Chrome 104, Samsung Internet 20)
 }
 // may a pit be pressed right now? (your move, the board showing, nothing in flight, a friend across the board if online)
 function canPress() { return !(spect.on || busy || state.over || state.turn !== you || body.classList.contains('screen') || (puzzle.on && puzzle.played) || (online && !friend)); }

@@ -56,6 +56,9 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 #words:has(> :not([hidden])) ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 200px)} /* the first-game tip steps up above the words */
 #words:has(#lastMove:not([hidden])):has(#take:not([hidden])) ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 252px)}
+/* the same two on a phone without :has (iOS 15.0–15.3, Chrome before 105: web/oldcss.js keeps the classes) — their own rules, never in one list with a :has, which an older browser would drop whole */
+#words.wordsUp ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 200px)}
+#words.wordsUp2 ~ #tip{bottom:calc(env(safe-area-inset-bottom,0px) + 252px)}
 #badges{position:fixed;inset:0;pointer-events:none}
 /* the board comes back (web/glloss.js): while the phone has taken the GPU away the canvas steps aside (the page's wood colour shows, never a white or black flash), the badges and pit buttons go with it, and a quiet line waits where the board was */
 .gllost canvas,.gllost #badges,.gllost #pits{visibility:hidden}
@@ -79,7 +82,7 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 .handc.tick{animation:hcTick .18s ease-out}.handc.again{animation:hcAgain .45s ease-out}
 .handc.lean{margin:-26px 0 0 -11px;white-space:nowrap;font-size:calc(12px*var(--ts));font-weight:600;padding:1px 8px;transition:opacity .4s}.handc.lean.tick{animation:hcAgain .45s ease-out}.handc.lean.fade{opacity:0} /* who is ahead: the bead's word, for a moment after it moves */
 .handc.count{margin:-24px 0 0 -11px;font-size:calc(15px*var(--ts));line-height:20px;min-width:22px;transition:opacity .25s}.handc.count.done{animation:hcAgain .45s ease-out}.handc.count.fade{opacity:0} /* count a pit by touch: the number over the pit a finger rests on */
-.cword{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);margin:2px 0 0 0;white-space:nowrap;pointer-events:none;font-size:calc(12px*var(--ts));font-weight:600;font-style:italic;line-height:16px;padding:0 6px;border-radius:8px;color:var(--brass);background:rgba(20,12,6,.72);translate:-50% 0;transition:opacity .25s}.cword.done{color:#ffe2a8}.cword.fade{opacity:0} /* count in Igbo: the word under the brass number */
+.cword{position:absolute;left:0;top:0;transform:translate(-9999px,-9999px);margin:2px 0 0 0;white-space:nowrap;pointer-events:none;font-size:calc(12px*var(--ts));font-weight:600;font-style:italic;line-height:16px;padding:0 6px;border-radius:8px;color:var(--brass);background:rgba(20,12,6,.72);transition:opacity .25s}.cword.done{color:#ffe2a8}.cword.fade{opacity:0} /* count in Igbo: the word under the brass number */
 @keyframes hcTick{from{scale:1.18}to{scale:1}}@keyframes hcAgain{0%{scale:1.4;box-shadow:0 0 0 2px #fff3d0,0 0 16px rgba(255,214,140,.9)}100%{scale:1}}
 .badge.last{color:#1a120b;background:var(--brass);box-shadow:0 0 0 1px rgba(255,220,160,.6),0 0 10px rgba(230,183,111,.55)} /* the last 8: the pits still holding seeds */
 #last8,#circling{display:flex;align-items:center;gap:7px;width:max-content;max-width:min(92vw,560px);box-sizing:border-box;background:rgba(13,9,6,.72);border:1px solid rgba(230,183,111,.7);color:var(--fg);border-radius:999px;padding:5px 12px;font:500 calc(12px*var(--ts)) Inter,system-ui,sans-serif;line-height:1.35;pointer-events:none}
@@ -216,7 +219,8 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 .pzBadge{font-size:calc(13px*var(--ts));font-weight:600;color:var(--brass);background:rgba(230,183,111,.14);border:1px solid rgba(230,183,111,.4);border-radius:999px;padding:6px 12px;white-space:nowrap}
 .pzBadge.miss{color:var(--muted);background:var(--soft);border-color:var(--line)}
 .pzRow{display:flex;flex-wrap:wrap;gap:4px;font-size:calc(18px*var(--ts));letter-spacing:2px;color:var(--brass);line-height:1}
-.pzRow:has(span:nth-child(11)){font-size:calc(14px*var(--ts));gap:3px;letter-spacing:0} /* a big target (up to 16 seeds) keeps to one row on the Fold folded */
+.pzRow:has(span:nth-child(11)){font-size:calc(14px*var(--ts));gap:3px;letter-spacing:0}
+.pzRow.pzLong{font-size:calc(14px*var(--ts));gap:3px;letter-spacing:0} /* the same without :has (web/oldcss.js) */ /* a big target (up to 16 seeds) keeps to one row on the Fold folded */
 .pzRow span{animation:seedIn .35s cubic-bezier(.3,1.4,.5,1) backwards}
 .pzRow span.o{color:rgba(230,183,111,.45)}
 @keyframes seedIn{from{opacity:0;transform:translateY(6px) scale(.6)}to{opacity:1;transform:none}}
@@ -316,7 +320,7 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 .lsWords{margin:0;font-size:calc(15px*var(--ts));line-height:1.45}
 .lesson #pzAsk{font-size:26px}
 html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 84px);z-index:3} /* the path words under the board, clear of the lit pit; the card covers them once it rises */
-.lesson #puzzle.open ~ #hint, .lesson:has(#puzzle.open) #hint{opacity:0}
+.lesson #puzzle.open ~ #hint{opacity:0}.lesson:has(#puzzle.open) #hint{opacity:0}.lesson.pzOpen #hint{opacity:0}
 .goNext{color:var(--brass);border-color:rgba(230,183,111,.45);animation:pop .3s ease-out .45s backwards}
 
 /* With friends (the Rooms screen): the same overlay as Home, a little darker at the top for the title */
@@ -383,6 +387,7 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .row:first-child{border-top:0}
 /* a row whose choices leave its words too little room (Count in has four, and Larger words widen every choice) puts the choices on their own line under the words, at the right as before, instead of squeezing the words to a word a line */
 .row:has(> .seg){flex-wrap:wrap;row-gap:8px}.row:has(> .seg) > .t{flex:1 1 calc(96px*var(--ts))}.row:has(> .seg) > .seg{margin-left:auto}
+.row.hasSeg{flex-wrap:wrap;row-gap:8px}.row.hasSeg > .t{flex:1 1 calc(96px*var(--ts))}.row.hasSeg > .seg{margin-left:auto} /* the same without :has (web/oldcss.js) */
 .row .t{display:flex;flex-direction:column;gap:2px;min-width:0}
 .row .t b{font-size:calc(14px*var(--ts));font-weight:600}.row .t span{font-size:calc(11px*var(--ts));color:var(--muted)}.row .t em{font-style:normal;color:var(--brass)}
 .swatches{display:flex;gap:8px}
@@ -408,7 +413,7 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .choose{font:600 calc(12px*var(--ts)) Inter,system-ui,sans-serif;color:var(--muted);background:none;border:1px solid var(--line);border-radius:999px;padding:6px 12px;cursor:pointer}
 .legal{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:-6px}
 .legal a{font:500 calc(12px*var(--ts)) Inter,system-ui,sans-serif;color:var(--muted);text-decoration:none;padding:8px 10px;border-radius:999px}
-.legal a:hover,.legal a:focus-visible{color:var(--brass)}.legal a+a::before{content:"·";margin:0 10px 0 -8px;color:var(--line)}
+.legal a:hover{color:var(--brass)}.legal a:focus-visible{color:var(--brass)}.legal a+a::before{content:"·";margin:0 10px 0 -8px;color:var(--line)}
 .choose[aria-pressed="true"]{color:#1a0f07;background:var(--brass);border-color:var(--brass)}
 
 /* Game over */

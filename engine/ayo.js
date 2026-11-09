@@ -34,11 +34,12 @@ export const RULES = {
 // anything else the game's own rule, so a friend's board is only ever asked to play a game it knows.
 export const RULE_VALUES = { capture: [4, 23], relay: [true, false], last8: [true, false] };
 export function isVariant(v) { return typeof v === "string" && VARIANTS.includes(v); }
+// (hasOwnProperty.call, not Object.hasOwn: that needs Safari 15.4, and the iPhone app opens from iOS 15.0 — see test/oldphones.test.js)
 export function cleanRules(variant, overrides) {
   const base = RULES[isVariant(variant) ? variant : "ncho"];
   const o = overrides && typeof overrides === "object" && !Array.isArray(overrides) ? overrides : {};
   const out = {};
-  for (const k of Object.keys(RULE_VALUES)) out[k] = Object.hasOwn(o, k) && RULE_VALUES[k].includes(o[k]) ? o[k] : base[k];
+  for (const k of Object.keys(RULE_VALUES)) out[k] = Object.prototype.hasOwnProperty.call(o, k) && RULE_VALUES[k].includes(o[k]) ? o[k] : base[k];
   return out;
 }
 // `first`: the seat that moves first (0 unless said; at a real board the loser of the last game starts).
