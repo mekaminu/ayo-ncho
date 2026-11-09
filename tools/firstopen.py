@@ -9,6 +9,7 @@
 #        --budget: fail (exit 1) when the first open downloads more than BUDGET_KB or takes longer than BUDGET_S
 import json, os, subprocess, sys, time, urllib.request
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import pollwait; pollwait.install()  # the real server's page is locked (server/headers.js): waits poll with evaluate
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 args = [a for a in sys.argv[1:] if not a.startswith("--")]
 out = args[0] if args else os.path.join(root, "docs", "launch", "firstopen.md")

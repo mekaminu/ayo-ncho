@@ -40,3 +40,5 @@ Checks:
   (an `<img onerror>`, a `srcdoc` frame with a script, a script with a guessed key) cannot run; a fresh key on every load;
   the privacy page loads with no script.
 - Safari's own engine: the `safari` workflow plays the game on the real server, so WebKit sees the policy on every push.
+- Playwright's `wait_for_function` compiles its wait inside the page with eval, which the policy refuses (its first run here
+  said "did not start" for that reason alone), so the checks that open a locked page poll with evaluate (tools/pollwait.py).

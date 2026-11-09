@@ -299,17 +299,7 @@ if "--open" not in sys.argv:  # locked doors (idea 9 Nov): the page goes out as 
             if self.path.split("?")[0] in ("/web/", "/web/index.html"):
                 body = LOCKED["html"].encode(); self.send_response(200); self.send_header("Content-Type", "text/html; charset=utf-8"); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body); return
             super().do_GET()
-    # Playwright's wait_for_function compiles its predicate inside the page with eval, which the policy refuses (as it should);
-    # evaluate goes round the policy, so the wait polls with evaluate instead
-    from playwright.sync_api import Page as _P, Frame as _F, TimeoutError as _TE
-    def _poll(self, expression, arg=None, timeout=30000, polling=None):
-        end = time.time() + (timeout or 30000) / 1000.0
-        while True:
-            v = self.evaluate(expression, arg) if arg is not None else self.evaluate(expression)
-            if v: return v
-            if time.time() > end: raise _TE("wait_for_function (polled, the page locked): timeout %dms exceeded waiting for %s" % (timeout, expression[:120]))
-            time.sleep(0.05)
-    _P.wait_for_function = _poll; _F.wait_for_function = _poll
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import pollwait; pollwait.install()  # waits poll with evaluate: the policy (rightly) refuses Playwright's eval'd ones
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", 8766), functools.partial(Quiet, directory=root))
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 node = None

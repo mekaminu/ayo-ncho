@@ -11,6 +11,7 @@
 # Usage: python3 tools/webkit-check.py docs/webkit [--browser webkit|chromium] [--device "iPhone 15"]
 import sys, os, json, time, subprocess, urllib.request
 from playwright.sync_api import sync_playwright
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__))); import pollwait; pollwait.install()  # the real server's page is locked (server/headers.js): waits poll with evaluate
 
 out = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("--") else "webkit-check"
 def arg(name, default):
