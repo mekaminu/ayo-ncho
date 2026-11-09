@@ -453,6 +453,8 @@ export const FR = {
   'Redrawing the board…': 'On redessine le plateau…',
   'No camera here — voice only': 'Pas de caméra ici — voix seule',
   'Clip saved to your downloads': 'Clip enregistré dans vos téléchargements',
+  'Picked up from your other tab': 'Reprise depuis votre autre onglet',
+  'That game ended in your other tab': 'Cette partie s’est terminée dans votre autre onglet',
   'Caught up with the board': 'Le plateau est à jour',
   'Back at the board': 'De retour au plateau',
   'A purchase came through — thank you': 'Un achat est arrivé — merci',

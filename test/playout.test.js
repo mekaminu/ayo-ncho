@@ -92,8 +92,8 @@ test("the page: the card's button, a play-out never saved or counted, and it is 
   const js = readFileSync(new URL("../web/game.js", import.meta.url), "utf8");
   const sw = readFileSync(new URL("../web/sw.js", import.meta.url), "utf8");
   assert.match(html, /id="pzOut"[^>]*hidden/);
-  assert.match(js, /function save\(\) \{ if \(online \|\| playingOut\(\)\) return; prefs\.set\('game'/, "save skips a play-out (and still saves otherwise)");
-  assert.match(js, /if \(!online && !out\) prefs\.set\('game', 'null'\)/, "its game over leaves your saved game alone");
+  assert.match(js, /function save\(\) \{ if \(online \|\| playingOut\(\)\) return;[^\n]*prefs\.set\('game'/, "save skips a play-out (and still saves otherwise)");
+  assert.match(js, /if \(!online && !out && tabMayWrite\([^\n]*?\) \{ prefs\.set\('game', 'null'\)/, "its game over leaves your saved game alone");
   assert.match(js, /if \(!online && !puzzle\.on && !out\) \{ starts = recordStart/);
   assert.match(js, /if \(!endPlayout\(\)\) save\(\); showScreen\('home'\)/);
   assert.match(js, /function newRound\(\) \{\n  playout = null;/);
