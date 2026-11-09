@@ -54,7 +54,10 @@ def section(title, lines): report.append("### " + title); report.extend(lines); 
 
 with sync_playwright() as p:
     bt = getattr(p, browser)
-    b = bt.launch()
+    # Firefox on a runner with no graphics card: headless Gecko gives no WebGL at all, so the workflow runs it headed on a virtual
+    # screen (xvfb-run, HEADED=1) and these prefs let it draw with the CPU (Mesa's llvmpipe), as a phone's GPU would
+    ff = {"firefox_user_prefs": {"webgl.force-enabled": True, "webgl.disabled": False, "layers.acceleration.force-enabled": True}} if browser == "firefox" else {}
+    b = bt.launch(headless=os.environ.get("HEADED") != "1", **ff)
     dev = dict(OWN[device]) if device in OWN else dict(p.devices[device]) if device in p.devices else {"viewport": {"width": 390, "height": 844}, "is_mobile": True, "has_touch": True}
     if browser != "webkit": dev = {k: v for k, v in dev.items() if k != "default_browser_type"}
     if browser == "firefox": dev.pop("is_mobile", None)  # Playwright's Firefox has no phone mode; the touch screen, the size and the browser's own name are what the game reads
