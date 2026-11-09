@@ -978,6 +978,7 @@ export const PATTERNS = [
   [/^(\d+) moves?$/, (m) => pl(m[1], 'coup', 'coups')],
   [/^(Easy|Steady|Medium|Hard|Master)$/, (m) => lv(m[1])],
   [/^([^·—:]+?) gave up$/, (m) => `${who(m[1])} a abandonné`],
+  [/^([^·—:]+?) (?:was|were) away after move (\d+)$/, (m) => (m[1] === 'you' ? 'vous n’étiez plus là' : `${who(m[1])} n’était plus là`) + ` après le coup ${m[2]}`], // a friend gone from the board (web/claim.js)
   [/^([^·—:]+?) gave up after move (\d+)$/, (m) => (m[1] === 'you' ? 'vous avez abandonné' : `${who(m[1])} a abandonné`) + ` après le coup ${m[2]}`],
   [/^([^·—:]+?) led from the start$/, (m) => (m[1] === 'You' ? 'Vous avez mené' : `${who(m[1])} a mené`) + ' dès le début'],
   [/^([^·—:]+?) led for good from move (\d+)$/, (m) => (m[1] === 'You' ? 'Vous avez mené' : `${who(m[1])} a mené`) + ` pour de bon dès le coup ${m[2]}`],

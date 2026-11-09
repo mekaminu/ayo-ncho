@@ -25,12 +25,14 @@ import { callMessage, passGate } from "../web/call.js";
 import { cleanTag } from "../web/block.js";
 import { isPeek, mayPeek, passPeek } from "../web/peek.js";
 import { afterAsk, wishOf } from "../web/nextgame.js";
+import { CLAIM_MS } from "../web/claim.js";
 
 export const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ"; // no I or O: they read like 1 and 0 when a code is shouted across a room
 export const CODE_LENGTH = 4;
 export const SEAT_HOLD_MS = 10 * 60 * 1000;      // an empty room waits ten minutes for the friend before it is swept
 export const IDLE_MS = 6 * 60 * 60 * 1000;      // a game nobody has touched for six hours is swept
 export const MAX_WATCHERS = 8;                   // family round the board: at most eight people following one game
+export { CLAIM_MS }; // a friend gone from the board this long (their line closed, not back) lets the other seat take the game (Rooms.claim)
 export const WATCH_KEY_LENGTH = 16;              // base64url characters of the watch key: 96 bits, made from the secret, the code and the room's id
 
 export function makeCode(random = Math.random, length = CODE_LENGTH) {
@@ -195,7 +197,7 @@ export class Rooms {
     const room = this.get(code);
     const seat = this.seatOf(room, token);
     if (!restored && ticket && room.restored) upgraded = this.upgrade(room, ticket);
-    room.seats[seat].online = true; room.touchedAt = this.now();
+    room.seats[seat].online = true; room.seats[seat].awaySince = null; room.touchedAt = this.now();
     const t = cleanTag(tag); if (t) room.seats[seat].tag = t;
     return { code: room.code, token, seat, room: this.snapshot(code), restored, upgraded };
   }
@@ -231,7 +233,7 @@ export class Rooms {
     const t = this.now();
     const room = {
       code, rid: f.rid, variant: f.variant, rules: { ...f.rules },
-      seats: f.names.map((name, i) => (name === null ? null : { token: this.tokenFor(code, f.rid, i), name, online: false, wantsRematch: false })),
+      seats: f.names.map((name, i) => (name === null ? null : { token: this.tokenFor(code, f.rid, i), name, online: false, awaySince: t, wantsRematch: false })),
       knocks: [], watchers: [], game, games: f.games, ask: null, drawAsk: null,
       createdAt: t, touchedAt: t, restored: true,
     };
@@ -247,7 +249,7 @@ export class Rooms {
     const newer = f.games > room.games || (f.games === room.games && extends_ && (f.moves.length > cur.moves.length || (f.resigned !== null && (cur.resigned ?? null) === null) || (f.drawn && !cur.agreed)));
     if (!newer) return false;
     room.game = game; room.games = f.games; room.ask = null; room.drawAsk = null;
-    if (!room.seats[1] && f.names[1] !== null) room.seats[1] = { token: this.tokenFor(room.code, room.rid, 1), name: f.names[1], online: false, wantsRematch: false };
+    if (!room.seats[1] && f.names[1] !== null) room.seats[1] = { token: this.tokenFor(room.code, room.rid, 1), name: f.names[1], online: false, awaySince: this.now(), wantsRematch: false };
     return true;
   }
 
@@ -255,7 +257,10 @@ export class Rooms {
   setOnline(code, token, online) {
     const room = this.rooms.get(normaliseCode(code)); if (!room) return null;
     const seat = room.seats.findIndex((s) => s && s.token === token); if (seat < 0) return null;
-    room.seats[seat].online = !!online; room.touchedAt = this.now();
+    const s = room.seats[seat];
+    if (!online && s.online) s.awaySince = this.now(); // when the line went, for "away 4 min" and the claim (CLAIM_MS)
+    if (online) s.awaySince = null;
+    s.online = !!online; room.touchedAt = this.now();
     return seat;
   }
 
@@ -289,6 +294,25 @@ export class Rooms {
     const { state } = resign(room.game, seat);
     room.game = state; room.touchedAt = this.now(); room.ask = null; room.drawAsk = null; room.restored = false;
     return { seat, state: publicState(state), sig: this.seal(room) };
+  }
+
+  // A friend gone from the board (idea 9 Nov): a game with a friend whose line has been closed for CLAIM_MS — the phone put away,
+  // the tab closed, the signal gone for good — waited for ever, the seat held and the other player stuck with it. Now the seat
+  // still at the board may take the game: it ends as if the one away had given up (engine/ayo.js `resign`, sealed the same way,
+  // so a rebuilt room agrees), and `away` marks it so both boards say why. Never while the friend is at the board, never sooner.
+  claim(code, token) {
+    const room = this.get(code);
+    const seat = this.seatOf(room, token);
+    const other = 1 - seat, them = room.seats[other];
+    if (!them) fail("waiting", "your friend has not joined yet");
+    if (room.game.over) fail("over", "the game is over");
+    if (them.online) fail("here", "your friend is at the board");
+    const gone = this.now() - (them.awaySince ?? this.now());
+    if (gone < CLAIM_MS) fail("notyet", "give your friend a few minutes to come back");
+    const { state } = resign(room.game, other);
+    state.away = true;
+    room.game = state; room.touchedAt = this.now(); room.ask = null; room.drawAsk = null; room.restored = false;
+    return { seat: other, by: seat, state: publicState(state), sig: this.seal(room), away: true };
   }
 
   // "Offer a draw": either seat may offer, on either player's move, once per move played; the friend agrees (the game ends level
@@ -412,7 +436,7 @@ export class Rooms {
     const room = this.get(code);
     return {
       code: room.code, variant: room.variant, rules: { ...room.rules }, games: room.games,
-      players: room.seats.map((s, i) => s ? { seat: i, name: s.name, ...(s.tag ? { tag: s.tag } : {}), online: s.online, wantsRematch: s.wantsRematch, ...(s.wantsRematch ? { wantsGame: s.wantsGame || room.variant } : {}) } : null), // wantsGame: the game that seat asked for next (web/nextgame.js); tag: each phone's random tag, for block (web/block.js)
+      players: room.seats.map((s, i) => s ? { seat: i, name: s.name, ...(s.tag ? { tag: s.tag } : {}), online: s.online, ...(!s.online ? { awayMs: Math.max(0, this.now() - (s.awaySince ?? this.now())) } : {}), wantsRematch: s.wantsRematch, ...(s.wantsRematch ? { wantsGame: s.wantsGame || room.variant } : {}) } : null), // wantsGame: the game that seat asked for next (web/nextgame.js); tag: each phone's random tag, for block (web/block.js)
       knocks: room.knocks.map((k) => ({ id: k.id, name: k.name, ...(k.tag ? { tag: k.tag } : {}) })), // who is at the door (the host's board shows them; never shown to the knockers)
       ask: room.ask ? { seat: room.ask.seat, n: room.ask.n } : null, // a "take it back?" waiting for its answer (a rejoin sees it)
       drawAsk: room.drawAsk ? { seat: room.drawAsk.seat, n: room.drawAsk.n } : null, // a draw offered and not yet answered
@@ -441,7 +465,7 @@ export class Rooms {
 // The game as the clients see it. moves lets a client rebuild the position with the shared engine (replay) and check it matches;
 // quiet (moves since the last capture) is sent too, so a board that applies the next move itself ends a stalemate on the same move the server does.
 export function publicState(g) {
-  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, resigned: g.resigned ?? null, ...(g.agreed ? { agreed: true } : {}), first: g.first ?? 0, variant: g.variant, rules: { ...g.rules } };
+  return { pits: g.pits.slice(), stores: g.stores.slice(), turn: g.turn, moves: g.moves.slice(), quiet: g.quiet || 0, over: g.over, winner: g.winner, resigned: g.resigned ?? null, ...(g.agreed ? { agreed: true } : {}), ...(g.away ? { away: true } : {}), first: g.first ?? 0, variant: g.variant, rules: { ...g.rules } };
 }
 
 // What travels for a move: the seat, the pit, how many moves have been played and both scores — a few dozen bytes.
@@ -452,8 +476,9 @@ export function moveMessage({ seat, pit, state, sig }) {
   const m = { t: "move", seat, pit, n: state.moves.length, stores: state.stores.slice() }; if (sig) m.sig = sig; return m;
 }
 // Giving up travels as small as a move: the seat and how many moves had been played (a board that disagrees asks for the room).
-export function resignMessage({ seat, state, sig }) {
-  const m = { t: "resign", seat, n: state.moves.length }; if (sig) m.sig = sig; return m;
+// away: the game was taken from a seat gone from the board (Rooms.claim), not given up.
+export function resignMessage({ seat, state, sig, away }) {
+  const m = { t: "resign", seat, n: state.moves.length }; if (away) m.away = true; if (sig) m.sig = sig; return m;
 }
 // "Take it back?" travels as small: who asked (or whose move went back) and the move count.
 export function backMessage({ seat, yes, n, sig }) { return yes === undefined ? { t: "askback", seat, n } : yes ? { t: "takeback", seat, n, ...(sig ? { sig } : {}) } : { t: "backno", seat, n }; }

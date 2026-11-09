@@ -56,6 +56,15 @@ export const FR_ROOMS = nb({
   'Give up this game': 'Abandonner cette partie',
   'Tap again to give up': 'Touchez encore pour abandonner',
   'Click again to give up': 'Cliquez encore pour abandonner',
+  // a friend gone from the board (web/claim.js)
+  'Tap again to take the game': 'Touchez encore pour prendre la partie',
+  'Click again to take the game': 'Cliquez encore pour prendre la partie',
+  'Take the game — press again to confirm': 'Prendre la partie — appuyez encore pour confirmer',
+  'You were away': 'Vous n’étiez plus là',
+  'you were away': 'vous n’étiez plus là',
+  'the game is yours': 'la partie est à vous',
+  'Your friend is back at the board': 'Votre ami est de retour au plateau',
+  'Give your friend a few minutes to come back': 'Laissez à votre ami quelques minutes pour revenir',
   'press again to confirm': 'appuyez encore pour confirmer',
   'Ask to take back your move': 'Demander à reprendre votre coup',
   'Ask to take back your move · U': 'Demander à reprendre votre coup · U',
@@ -239,6 +248,14 @@ export function roomPatterns({ who, item, need }) {
   const R = (s) => new RegExp('^' + s + '$');
   const L = `(${LOOKS})`; // a look's name, so a line about anything else is never caught
   return [
+    // a friend gone from the board (web/claim.js)
+    [R(`away (\\d+) min — their seat is held`), (m) => `pas là depuis ${m[1]} min — sa place est gardée`],
+    [R(`away (1 hour|\\d+ hours) — their seat is held`), (m) => `pas là depuis ${m[1] === '1 hour' ? '1 heure' : m[1].replace('hours', 'heures')} — sa place est gardée`],
+    [R(`Take the game · ${N} away (\\d+) min`), (m) => `Prendre la partie · ${who(m[1])} absent depuis ${m[2]} min`],
+    [R(`Take the game · ${N} away (1 hour|\\d+ hours)`), (m) => `Prendre la partie · ${who(m[1])} absent depuis ${m[2] === '1 hour' ? '1 heure' : m[2].replace('hours', 'heures')}`],
+    [R(`${N} has been away a while — you can take the game \\(the speech chip\\)`), (m) => `${who(m[1])} n’est plus là depuis un moment — vous pouvez prendre la partie (la bulle)`],
+    [R(`${N} took the game while you were away`), (m) => `${who(m[1])} a pris la partie pendant votre absence`],
+    [R(`${N} was away`), (m) => `${who(m[1])} n’était plus là`],
     // the Rooms screen and the door
     [R(`playing as (.+)`), (m) => `votre nom : ${m[1]}`],
     [R(`Knocking on room ([A-Z]{4}|[^·—]+?)…`), (m) => `On frappe à la salle ${m[1]}…`],

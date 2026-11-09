@@ -1,8 +1,8 @@
 // Ayo & Nchò server: serves the web app and runs the online rooms (WebSockets at /ws, the same rules engine as the board).
 // Protocol (JSON, one object per message):
-//   client → {t:"watch", code, key, name} (family round the board: follow the game, no seat) | {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch", game?} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"offerdraw"} | {t:"drawanswer", yes} | {t:"shout", id} | {t:"peek", pit} | {t:"call", kind, data} | {t:"ping"}
+//   client → {t:"watch", code, key, name} (family round the board: follow the game, no seat) | {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch", game?} | {t:"resign"} | {t:"claim"} (take the game from a friend gone CLAIM_MS) | {t:"askback"} | {t:"backanswer", yes} | {t:"offerdraw"} | {t:"drawanswer", yes} | {t:"shout", id} | {t:"peek", pit} | {t:"call", kind, data} | {t:"ping"}
 //   server → {t:"joined", code, token, seat, room} | {t:"knocked", code, id, host, hostOnline} | {t:"knock", id, name} | {t:"room", room} (presence, a knock, rematch, new game; resync:true when asked for)
-//            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n} (that seat gave up) | {t:"askback", seat, n} (that seat asks to take its move back) | {t:"takeback", seat, n} (yes: that move is gone, n moves remain) | {t:"backno", seat, n} | {t:"drawoffer", seat, n} (that seat offers a draw) | {t:"draw", seat, n} (yes: the game ended level) | {t:"drawno", seat, n} | {t:"shout", seat, id} | {t:"peek", seat, pit, n} (to the other seat only: the pit the seat to move has picked, -1 put back) | {t:"error", code, msg} | {t:"pong"} | {t:"restart", msg} (this server is stopping for a new one; the socket closes with 1012)
+//            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n, away?} (that seat gave up; away: it was taken from them, gone from the board) | {t:"askback", seat, n} (that seat asks to take its move back) | {t:"takeback", seat, n} (yes: that move is gone, n moves remain) | {t:"backno", seat, n} | {t:"drawoffer", seat, n} (that seat offers a draw) | {t:"draw", seat, n} (yes: the game ended level) | {t:"drawno", seat, n} | {t:"shout", seat, id} | {t:"peek", seat, pit, n} (to the other seat only: the pit the seat to move has picked, -1 put back) | {t:"error", code, msg} | {t:"pong"} | {t:"restart", msg} (this server is stopping for a new one; the socket closes with 1012)
 // The door: {t:"join"} does not seat anyone. It KNOCKS: the knocker gets {t:"knocked"} and waits; the host's board gets {t:"knock"} (and a
 // {t:"room"} whose room.knocks lists everyone at the door, so a host who reconnects still sees them). The host answers {t:"let", id, in:true}
 // and the knocker is seated ({t:"joined"}), or in:false and the knocker gets {t:"error", code:"notlet"}. A member who holds a token rejoins
@@ -182,6 +182,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
           case "let": return answerDoor(ws, m);
           case "move": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.move(ws.room, ws.token, m.pit); return broadcast(ws.room, moveMessage(r)); }
           case "resign": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.resign(ws.room, ws.token); return broadcast(ws.room, resignMessage(r)); }
+          case "claim": { if (!ws.room) throw new RoomError("unseated", "join a room first"); for (const s of sockets.get(ws.room) || []) if (s.seat !== ws.seat && s.readyState === s.OPEN) { rooms.setOnline(ws.room, s.token, true); throw new RoomError("here", "your friend is at the board"); } const r = rooms.claim(ws.room, ws.token); return broadcast(ws.room, resignMessage(r)); }
           case "askback": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.askBack(ws.room, ws.token); return broadcast(ws.room, backMessage(r)); }
           case "offerdraw": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.offerDraw(ws.room, ws.token); return broadcast(ws.room, drawMessage(r)); }
           case "drawanswer": { if (!ws.room) throw new RoomError("unseated", "join a room first"); const r = rooms.answerDraw(ws.room, ws.token, !!m.yes); return broadcast(ws.room, drawMessage(r)); }
@@ -208,7 +209,8 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
       if (ws.watch) leaveWatch(ws);
       if (!ws.room) return;
       const set = sockets.get(ws.room); if (set) { set.delete(ws); if (!set.size) sockets.delete(ws.room); }
-      if (rooms.has(ws.room) && rooms.setOnline(ws.room, ws.token, false) !== null) {
+      const still = set && [...set].some((s) => s.token === ws.token && s.readyState === s.OPEN); // the same seat open in another tab is still at the board
+      if (!still && rooms.has(ws.room) && rooms.setOnline(ws.room, ws.token, false) !== null) {
         try { broadcast(ws.room, { t: "room", room: rooms.snapshot(ws.room) }); } catch {}
       }
     });

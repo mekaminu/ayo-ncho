@@ -104,6 +104,7 @@ import { makeSender as peekSender, peekShown, peekWords, OPACITY as PEEK_OP, GLI
 import { ponderOn, ponderPlan, ponderAt, GLANCE_MS, SETTLE_MS as PONDER_SETTLE_MS, GLIDE as PONDER_GLIDE } from './ponder.js';
 import { mayOfferDraw, drawButton, drawWords } from './draw.js';
 import { makeGuard, BUTTON as GIVEUP, BUTTON_KEYS as GIVEUP_KEYS, gaveUpWords, mayGiveUp, ARM_MS as GIVEUP_MS } from './giveup.js';
+import { awayFor, awayLine, mayClaim, claimButton, claimReady, claimWords } from './claim.js';
 import { oneTapOn, pressAction } from './onetap.js';
 import { afterUndo as redoAfterUndo, ready as redoReady, step as redoStep, afterMove as redoAfterMove, gameKey, chipWords as redoWords, CHIP as REDO_CHIP, TITLE as REDO_TITLE, HINT as REDO_HINT } from './redo.js';
 import { makeGuard as makeKeepGuard, ARM_MS as KEEP_MS, playAsks, askWords as keepAsk } from './keepgame.js';
@@ -630,6 +631,7 @@ const roomParam = params.get('still') ? null : params.get('room');
 // family round the board (web/spectate.js): ?watch=CODE-KEY follows a friend's game live with no seat (a game sent as a link, web/watch.js, has its own ?watch=)
 const watchParam = params.get('still') ? null : parseWatch(params.get('watch'));
 let online = false, roomWanted = null; // online while a room is open, knocked on or joined (from the Rooms screen, or ?room=CODE from an invite link); roomWanted: 'NEW' or the code asked for
+let friendAt = 0, claimSaid = null; // a friend gone from the board (web/claim.js): when their seat as the server showed it arrived; the away spell already told "you can take the game"
 let net = null, friend = null, meSeat = null; // friend: the other seat as the server shows it {name, online, wantsRematch}, or null while the room waits
 // your move, even in another tab: what the friend does while this page is out of sight is said on the tab's title, icon and the app's badge
 let awayIcon = null; const awayIconLoad = () => { if (awayIcon === null) { awayIcon = ''; fetch('./icon.svg').then((r) => r.text()).then((t) => { awayIcon = t; }).catch(() => {}); } };
@@ -936,7 +938,7 @@ function showTurnOnline() {
   const waiting = !friend; const mine = !waiting && state.turn === you && !state.over && !busy; const link = net.status !== 'open';
   $('#turn').textContent = state.over ? 'game over' : waiting ? 'waiting' : mine ? 'your move' : '…';
   $('#oppSub').textContent = link ? linkWords(net.status, net.updating)
-    : waiting ? `room ${net.code || ''}` : !friend.online ? 'away — their seat is held' : state.over ? '' : mine ? 'waiting' : peekNow() ? peekWords(peekIn.pit, you) : 'their move';
+    : waiting ? `room ${net.code || ''}` : !friend.online ? awayLine(awayFor(friend, friendAt, Date.now())) : state.over ? '' : mine ? 'waiting' : peekNow() ? peekWords(peekIn.pit, you) : 'their move';
   $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine && heldMv ? heldWords('hint', heldMv.pit, you, { keys: keysLikely() }) : mine ? pickHint('pick') : backAsk.pending && backAsk.n === state.moves.length ? backWords(friend.name).asked : '';
   $('#undo').disabled = link || !mayAskBack({ online, friend, seated: true, over: state.over, busy, moves: state.moves, turn: state.turn, you, pending: !!backAsk.pending, askedN: backAsk.askedN });
   $('#undo').classList.toggle('asking', !!backAsk.pending); undoLabel(true); $('#hintBtn').disabled = true; $('#shoutBtn').disabled = waiting || link;
@@ -985,6 +987,7 @@ for (const s of SHOUTS) { const b = document.createElement('button'); b.classNam
 const watchPill = document.createElement('button'); watchPill.className = 'pill watchlink'; watchPill.type = 'button'; watchPill.id = 'watchPill'; watchPill.textContent = 'Send a watch link'; shoutMenu.appendChild(watchPill);
 watchPill.addEventListener('click', () => { toggleShoutMenu(false); shareWatch(); });
 const drawBtn = document.createElement('button'); drawBtn.className = 'pill drawoffer'; drawBtn.type = 'button'; drawBtn.id = 'drawBtn'; shoutMenu.appendChild(drawBtn);
+const claimBtn = document.createElement('button'); claimBtn.className = 'pill giveup claim'; claimBtn.type = 'button'; claimBtn.id = 'claimBtn'; claimBtn.hidden = true; shoutMenu.appendChild(claimBtn);
 const giveUp = document.createElement('button'); giveUp.className = 'pill giveup'; giveUp.type = 'button'; giveUp.id = 'giveUpBtn'; shoutMenu.appendChild(giveUp);
 let cardMode = 'back'; // the door-like card on this board answers a "take it back?" or a draw offered
 const drawAsk = { pending: false, theirs: false, offeredN: -1 }; // this board's offer out, theirs waiting on this board, the move count last offered at
@@ -1007,9 +1010,30 @@ giveUp.addEventListener('click', () => {
   if (r === 'armed') { paintGiveUp(); click(0.7, 0.08); buzz(15); giveTimer = setTimeout(() => { giveGuard.reset(); paintGiveUp(); }, GIVEUP_MS); return; }
   toggleShoutMenu(false); if (net.resign()) { click(0.55, 0.1); buzz([30, 40, 30]); }
 });
+// A friend gone from the board (web/claim.js): "Take the game · Tete away 5 min", two taps like Give up; the server referees.
+const claimGuard = makeGuard(); let claimTimer = null;
+const claimState = () => ({ online, friend, seated: !!(net && net.seat !== null), over: state.over, awayMs: awayFor(friend, friendAt, Date.now()) });
+function paintClaim() {
+  const c = claimState(); claimBtn.hidden = !mayClaim(c); if (claimBtn.hidden) { claimGuard.reset(); return; }
+  const armed = claimGuard.armed; claimBtn.textContent = claimButton(friend.name, c.awayMs, armed, keysLikely()); claimBtn.classList.toggle('armed', armed);
+  claimBtn.setAttribute('aria-label', armed ? 'Take the game — press again to confirm' : claimBtn.textContent);
+}
+claimBtn.addEventListener('click', () => {
+  if (!mayClaim(claimState())) { paintClaim(); return; }
+  const r = claimGuard.tap(performance.now()); clearTimeout(claimTimer);
+  if (r === 'armed') { paintClaim(); click(0.7, 0.08); buzz(15); claimTimer = setTimeout(() => { claimGuard.reset(); paintClaim(); }, GIVEUP_MS); return; }
+  toggleShoutMenu(false); if (net.claim()) { click(0.55, 0.1); buzz([30, 40, 30]); }
+});
+// While the friend is away the line under their name counts the minutes, and the moment the game can be taken it says so once.
+setInterval(() => {
+  if (!online || !net || net.seat === null || !friend || friend.online || state.over || document.hidden) return;
+  showTurnOnline(); if (!shoutMenu.hidden) paintClaim();
+  const spell = Math.round((friendAt - (friend.awayMs || 0)) / 10000); // this away spell (when their line went, to ten seconds)
+  if (mayClaim(claimState()) && claimSaid !== spell) { claimSaid = spell; toast(claimReady(friend.name)); }
+}, 15000);
 function toggleShoutMenu(open = shoutMenu.hidden) {
   shoutMenu.hidden = !open; $('#shoutBtn').setAttribute('aria-expanded', String(open));
-  clearTimeout(giveTimer); giveGuard.reset(); paintGiveUp();
+  clearTimeout(giveTimer); giveGuard.reset(); paintGiveUp(); clearTimeout(claimTimer); claimGuard.reset(); paintClaim();
   watchPill.hidden = !mayShareWatch({ online, seated: !!(net && net.seat !== null), key: net && net.room && net.room.watch });
   giveUp.hidden = !mayGiveUp({ online, friend, over: state.over, seated: net && net.seat !== null }); // only while a game with a friend is in play
   paintDraw();
@@ -1194,7 +1218,7 @@ function callRoom() { if (call.f.phase !== 'idle' && (!friend || !friend.online)
 function callEnd() { if (call.f.phase !== 'idle') { const e = call.f.hangUp(); callDo(e); } callMenu.hidden = true; $('#callCard').hidden = true; }
 
 function syncRoom(room) { // the room as the server shows it: the friend's seat and the whole game
-  friend = room.players[them] || null; meSeat = room.players[you] || null; tableRoom = room.rid ? { code: room.code, rid: room.rid, games: room.games || 0 } : null;
+  friend = room.players[them] || null; friendAt = Date.now(); meSeat = room.players[you] || null; tableRoom = room.rid ? { code: room.code, rid: room.rid, games: room.games || 0 } : null;
   const s = stateFrom(room.state);
   const same = state && state.moves.length === s.moves.length && state.pits.join() === s.pits.join() && state.stores.join() === s.stores.join();
   state = s; if (!same) { layoutFromState(state); peekIn.pit = -1; peekOut.reset(); }
@@ -1240,9 +1264,9 @@ async function showMove({ seat, pit, events, state: pub }) {
   if (state.over) { await winMoment(); gameOver(); } else { if (before.over) $('#gameover').hidden = true; if (seat === them) explain(before, pit, events); } // a friend's move, explained too
 }
 // someone gave up: the giver's row of seeds is pushed a little toward the winner, as when a board is pushed across, then the card
-async function showResign({ seat, state: pub }) {
+async function showResign({ seat, state: pub, away: taken }) {
   state = stateFrom(pub); busy = true; deselect(); hideExplain(); $('#undo').disabled = true; selected = null;
-  const w = gaveUpWords(seat, you, friend ? friend.name : undefined); toast(w.toast);
+  const w = (taken || state.away ? claimWords : gaveUpWords)(seat, you, friend ? friend.name : undefined); toast(w.toast);
   if (seat === them) { const f = $('#oppFace'); if (!reduceMotion) { f.classList.remove('react'); void f.offsetWidth; f.classList.add('react'); } buzz([20, 40, 20]); }
   [0.9, 0.7].forEach((p, k) => setTimeout(() => click(p, 0.09), k * 160)); // two low knocks on the wood
   if (!reduceMotion) {
@@ -2507,7 +2531,7 @@ async function winMoment() {
 function gameOver() {
   safeAsk(true).catch(() => {}); // kept safe: a game finished is worth keeping
   const a = state.stores[you], b = state.stores[them]; const win = state.winner === you; const draw = state.winner === 'draw';
-  const gave = online && state.resigned != null ? gaveUpWords(state.resigned, you, oppLabel()) : online && state.agreed ? { ...drawWords(oppLabel()), title: 'A draw' } : null; // a game someone gave up (or both agreed level): the result is theirs to give, whatever the seeds say
+  const gave = online && state.resigned != null ? (state.away ? claimWords : gaveUpWords)(state.resigned, you, oppLabel()) : online && state.agreed ? { ...drawWords(oppLabel()), title: 'A draw' } : null; // a game someone gave up (or both agreed level): the result is theirs to give, whatever the seeds say
   const out = playingOut(); // a play-out: no record, rating, review, story, replay or clip (the moves before the puzzle were nobody's)
   $('#goEyebrow').textContent = out ? (isRetry(playout) ? retryEyebrow(state.variant, playout.n, playedOut(playout, state)) : isTakeover(playout) ? takeoverEyebrow(state.variant, playout.n, playedOut(playout, state)) : playoutEyebrow(state.variant, playedOut(playout, state))) + (endedCircling(state) ? ' · ' + circlingEnded() : '') : `${state.variant === 'ncho' ? 'Nchò' : 'Ayo'} · ${state.moves.length} moves${gave ? ' · ' + gave.who : endedCircling(state) ? ' · ' + circlingEnded() : ''}`; // a called game says why it ended
   $('#goTitle').textContent = gave ? gave.title : local ? localTitle(state) : draw ? 'A draw' : win ? 'You win' : `${online ? oppLabel() : names[level]} wins`;
@@ -2620,7 +2644,7 @@ function paintStory() {
     + `<path class="ln" pathLength="1" d="${p.line}"/>`
     + (p.big ? `<circle class="big pop" style="animation-delay:1.35s" cx="${p.big.x}" cy="${p.big.y}" r="5"/>` : '')
     + (p.mark ? `<circle class="good pop" style="animation-delay:1.55s" cx="${p.mark.x}" cy="${p.mark.y}" r="3.4"/>` : '');
-  const words = storyWords(st, { me, them: other, gaveUp: online && state.resigned != null ? gaveUpWords(state.resigned, you, other).story : online && state.agreed ? drawWords(other).story : undefined }); $('#goStoryWords').textContent = words; $('#goStoryMe').textContent = me === 'You' ? 'you' : me; $('#goStoryThem').textContent = other;
+  const words = storyWords(st, { me, them: other, gaveUp: online && state.resigned != null ? (state.away ? claimWords : gaveUpWords)(state.resigned, you, other).story : online && state.agreed ? drawWords(other).story : undefined }); $('#goStoryWords').textContent = words; $('#goStoryMe').textContent = me === 'You' ? 'you' : me; $('#goStoryThem').textContent = other;
   box.querySelector('.words svg').style.display = st.biggest ? '' : 'none'; box.disabled = !st.biggest;
   box.setAttribute('aria-label', `How the game went: ${words}${st.biggest ? '. Tap to watch that move again' : ''}`);
   box.hidden = false; story = st;

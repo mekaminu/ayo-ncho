@@ -8,7 +8,7 @@
 //   net.on('move',   ({ seat, pit, events, state }) => …) // events and state rebuilt here with the engine from the small message the server sends
 //   net.on('room',   ({ room, started, resync }) => …) // presence, a knock, a rematch asked for, a new game started; resync: the whole room after this board fell behind
 //   net.on('resync', ({ why }) => …)           // this board could not rebuild a move and has asked for the room (a 'room' with resync follows)
-//   net.on('resign', ({ seat, events, state }) => …) // that seat gave up the game: the other seat wins (events: one 'end')
+//   net.on('resign', ({ seat, events, state, away }) => …) // that seat gave up the game (away: it was taken from them, gone from the board): the other seat wins (events: one 'end')
 //   net.on('askback', ({ seat, n }) => …)     // that seat asks to take back the move it just played (n: moves played); the other seat answers
 //   net.on('takeback', ({ seat, state, undone, before }) => …) // yes: that seat's last move (pit `undone`) is gone, state is the position before it
 //   net.on('backno', ({ seat }) => …)          // no: the move stands
@@ -23,7 +23,7 @@
 //   net.on('ticket', ({ code, token, ticket }) => …) // the room as this board holds it, sealed by the server: keep it (with the token) so a reload can rebuild the room after a restart
 //   net.on('watching', ({ code, room }) => …) // family round the board: following the game from a watch link, no seat (room: the watch view; again after a reconnect)
 //   net.watch(code, key, name) — follow a game without a seat; every 'move', 'resign', 'takeback', 'draw', 'shout' … then arrives as for a seat
-//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token, ticket?) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch(game?) / net.resign() / net.askBack() / net.answerBack(yes) / net.offerDraw() / net.answerDraw(yes) / net.leave()
+//   net.create({ variant, rules, name }) / net.join(code, name) (knocks) / net.rejoin(code, token, ticket?) / net.let(id, yes) / net.move(pit) / net.shout(id) / net.rematch(game?) / net.resign() / net.claim() / net.askBack() / net.answerBack(yes) / net.offerDraw() / net.answerDraw(yes) / net.leave()
 
 import { applyMove, resign, takeBack, mayTakeBack, agreeDraw, firstMover } from '../engine/ayo.js';
 
@@ -47,11 +47,11 @@ export function linkWords(status, updating = false) {
 
 // The game as the server shows it, made into an engine-shaped state the board can read (legalMoves, replay for undo-less play).
 export function stateFrom(pub) {
-  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null, resigned: pub.resigned ?? null, ...(pub.agreed ? { agreed: true } : {}), first: pub.first ?? firstMover(pub.moves, pub.moves.length ? 0 : pub.turn) };
+  return { variant: pub.variant, rules: { ...pub.rules }, pits: pub.pits.slice(), stores: pub.stores.slice(), turn: pub.turn, moves: pub.moves.slice(), quiet: pub.quiet || 0, over: !!pub.over, winner: pub.over ? pub.winner : null, resigned: pub.resigned ?? null, ...(pub.agreed ? { agreed: true } : {}), ...(pub.away ? { away: true } : {}), first: pub.first ?? firstMover(pub.moves, pub.moves.length ? 0 : pub.turn) };
 }
 // The other way round: an engine state as the server would show it (what a 'move' carries once rebuilt).
 export function publicFrom(s) {
-  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, resigned: s.resigned ?? null, ...(s.agreed ? { agreed: true } : {}), first: s.first ?? 0, variant: s.variant, rules: { ...s.rules } };
+  return { pits: s.pits.slice(), stores: s.stores.slice(), turn: s.turn, moves: s.moves.slice(), quiet: s.quiet || 0, over: !!s.over, winner: s.over ? s.winner : null, resigned: s.resigned ?? null, ...(s.agreed ? { agreed: true } : {}), ...(s.away ? { away: true } : {}), first: s.first ?? 0, variant: s.variant, rules: { ...s.rules } };
 }
 
 // A move arrives small — {seat, pit, n, stores} — because every board has the same engine as the server. Rebuild the
@@ -70,6 +70,7 @@ export function rebuildMove(pub, m) {
 export function rebuildResign(pub, m) {
   if (!pub || !Array.isArray(pub.moves) || pub.moves.length !== m.n || pub.over) return null;
   let r; try { r = resign(stateFrom(pub), m.seat); } catch { return null; }
+  if (m.away) r.state.away = true; // taken from a seat gone from the board (web/claim.js), not given up
   return { events: r.events, state: publicFrom(r.state) };
 }
 
@@ -136,6 +137,7 @@ export const ERROR_TEXT = {
   notlet: 'Not let in this time', knocking: 'Already at the door', busy: 'Too many people at the door — try again in a minute',
   host: 'Only the host decides who comes in', noknock: 'They have gone from the door',
   noback: 'Only the move you just played can be taken back', asked: 'Already asked — waiting for an answer', askedonce: 'You have asked once for this move',
+  here: 'Your friend is back at the board', notyet: 'Give your friend a few minutes to come back',
   noask: 'Too late — they played on', ownask: 'Your friend answers this one',
   crowd: 'Enough people are watching this game already — try again later',
 };
@@ -176,6 +178,7 @@ export class Online {
   move(pit) { return this.send({ t: 'move', pit }); }
   rematch(game) { return this.send(game ? { t: 'rematch', game } : { t: 'rematch' }); } // game: 'ncho' or 'ayo' to ask for that one next (web/nextgame.js); none = the same again
   resign() { return this.send({ t: 'resign' }); } // give up the game in play
+  claim() { return this.send({ t: 'claim' }); } // take the game from a friend gone from the board CLAIM_MS (web/claim.js)
   askBack() { return this.send({ t: 'askback' }); } // ask to take back the move just played
   answerBack(yes) { return this.send({ t: 'backanswer', yes: !!yes }); }
   offerDraw() { return this.send({ t: 'offerdraw' }); } // offer the friend a draw
@@ -270,7 +273,7 @@ export class Online {
         const r = rebuildResign(this.room && this.room.state, m);
         if (!r) { this.send({ t: 'sync' }); return this.emit('resync', { why: 'resign' }); }
         if (this.room) { this.room.state = r.state; this.sealed(m.sig); }
-        return this.emit('resign', { seat: m.seat, events: r.events, state: r.state });
+        return this.emit('resign', { seat: m.seat, events: r.events, state: r.state, away: !!m.away });
       }
       case 'askback': if (this.room) this.room.ask = { seat: m.seat, n: m.n }; return this.emit('askback', { seat: m.seat, n: m.n });
       case 'backno': if (this.room) this.room.ask = null; return this.emit('backno', { seat: m.seat, n: m.n });
