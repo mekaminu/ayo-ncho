@@ -2,7 +2,7 @@
 // Protocol (JSON, one object per message):
 //   client → {t:"watch", code, key, name} (family round the board: follow the game, no seat) | {t:"create", variant, rules, name} | {t:"join", code, name} | {t:"rejoin", code, token, ticket?} | {t:"let", id, in} | {t:"move", pit} | {t:"sync"} | {t:"rematch", game?} | {t:"resign"} | {t:"askback"} | {t:"backanswer", yes} | {t:"offerdraw"} | {t:"drawanswer", yes} | {t:"shout", id} | {t:"peek", pit} | {t:"call", kind, data} | {t:"ping"}
 //   server → {t:"joined", code, token, seat, room} | {t:"knocked", code, id, host, hostOnline} | {t:"knock", id, name} | {t:"room", room} (presence, a knock, rematch, new game; resync:true when asked for)
-//            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n} (that seat gave up) | {t:"askback", seat, n} (that seat asks to take its move back) | {t:"takeback", seat, n} (yes: that move is gone, n moves remain) | {t:"backno", seat, n} | {t:"drawoffer", seat, n} (that seat offers a draw) | {t:"draw", seat, n} (yes: the game ended level) | {t:"drawno", seat, n} | {t:"shout", seat, id} | {t:"peek", seat, pit, n} (to the other seat only: the pit the seat to move has picked, -1 put back) | {t:"error", code, msg} | {t:"pong"}
+//            | {t:"move", seat, pit, n, stores} | {t:"resign", seat, n} (that seat gave up) | {t:"askback", seat, n} (that seat asks to take its move back) | {t:"takeback", seat, n} (yes: that move is gone, n moves remain) | {t:"backno", seat, n} | {t:"drawoffer", seat, n} (that seat offers a draw) | {t:"draw", seat, n} (yes: the game ended level) | {t:"drawno", seat, n} | {t:"shout", seat, id} | {t:"peek", seat, pit, n} (to the other seat only: the pit the seat to move has picked, -1 put back) | {t:"error", code, msg} | {t:"pong"} | {t:"restart", msg} (this server is stopping for a new one; the socket closes with 1012)
 // The door: {t:"join"} does not seat anyone. It KNOCKS: the knocker gets {t:"knocked"} and waits; the host's board gets {t:"knock"} (and a
 // {t:"room"} whose room.knocks lists everyone at the door, so a host who reconnects still sees them). The host answers {t:"let", id, in:true}
 // and the knocker is seated ({t:"joined"}), or in:false and the knocker gets {t:"error", code:"notlet"}. A member who holds a token rejoins
@@ -31,6 +31,8 @@
 // The page carries Open Graph tags written per address (server/preview.js), so a shared invite or puzzle link shows the board,
 // who is asking and today's ask in WhatsApp's card.
 // GET /api/rooms/:code answers the invite link: does the room exist, who is there, is a seat free.
+// A new game, mid-game (server/drain.js): on SIGTERM (a deploy) every socket hears {t:"restart"} and is closed with 1012, and a
+// board comes straight back to the new server; a connection arriving while this one stops is sent off the same way.
 // Floods (server/guard.js): each connection has a pace ({t:"error", code:"slow"} past it, closed if it keeps on); each address may hold
 // 40 connections, open 20 rooms in ten minutes and knock at 6 doors at once ({t:"error", code:"full"} / "busy" past those).
 import express from "express";
@@ -45,6 +47,7 @@ import { mountSearch } from "./search.js";
 import { compressedStatic, sendText } from "./compress.js";
 import { baseHeaders, lockPage } from "./headers.js";
 import { Pace, Doorman, addressOf, GUARD } from "./guard.js";
+import { sendOff, drainAll, onStopSignals } from "./drain.js";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 
@@ -81,7 +84,8 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   app.get("/vendor/three.module.min.js", (req, res, next) => { if (!haveLocal) return res.status(404).end(); three(req, res, next); });
   app.use("/engine", compressedStatic(ENGINE), express.static(ENGINE));
   app.use(compressedStatic(WEB), express.static(WEB));
-  app.get("/healthz", (_req, res) => res.json({ ok: true, rooms: rooms.size }));
+  let draining = false;
+  app.get("/healthz", (_req, res) => { if (draining) return res.status(503).json({ ok: false, draining: true }); res.json({ ok: true, rooms: rooms.size }); });
   app.get("/api/rooms/:code", (req, res) => {
     const code = normaliseCode(req.params.code);
     if (!rooms.has(code)) return res.status(404).json({ ok: false, code: "notfound", msg: "no room with that code" });
@@ -154,6 +158,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   const G = { ...GUARD, ...guard };
   const doorman = new Doorman({ now, ...G });
   wss.on("connection", (ws, req) => {
+    if (draining) return sendOff(ws); // this server is stopping: the new one has the game
     ws.addr = addressOf(req);
     if (!doorman.open(ws.addr, ws)) { send(ws, { t: "error", code: "full", msg: "too many connections from here right now, try again in a minute" }); ws.close(1013, "busy"); return; }
     ws.pace = new Pace({ now, burst: G.burst, perSecond: G.perSecond, closeAfter: G.closeAfter });
@@ -222,11 +227,14 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   timer.unref();
 
   const close = () => new Promise((res) => { clearInterval(timer); for (const ws of wss.clients) ws.terminate(); wss.close(() => server.close(() => res())); });
-  return { app, server, wss, rooms, close, build, doorman };
+  const drain = (opts = {}) => { draining = true; clearInterval(timer); return drainAll({ wss, server, ...opts }); };
+  return { app, server, wss, rooms, close, drain, build, doorman };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = process.env.PORT || 3000;
   if (!process.env.ROOM_SECRET) console.warn("ROOM_SECRET is not set: online games will not survive a restart of this server");
-  createServer().server.listen(port, () => console.log(`ayo-ncho listening on ${port}`));
+  const s = createServer();
+  s.server.listen(port, () => console.log(`ayo-ncho listening on ${port}`));
+  onStopSignals(() => s.drain());
 }

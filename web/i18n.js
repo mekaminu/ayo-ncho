@@ -83,6 +83,7 @@ export const FR = {
   'watching': 'regarde',
   'connecting…': 'connexion…',
   'reconnecting…': 'reconnexion…',
+  'updating the game…': 'mise à jour du jeu…', // a deploy: the board comes straight back to the new server (web/online.js comeBack)
   'catching up…': 'mise à jour…',
   'at the door': 'à la porte',
   'Home': 'Accueil',

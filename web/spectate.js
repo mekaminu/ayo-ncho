@@ -21,7 +21,7 @@ export function spectateWords(state, room, link = 'open') {
     return state.turn === seat ? 'to move' : '';
   };
   let hint;
-  if (link !== 'open') hint = link === 'reconnecting' ? 'Watching · reconnecting…' : 'Watching · no connection';
+  if (link !== 'open') hint = link === 'reconnecting' ? 'Watching · reconnecting…' : link === 'updating' ? 'Watching · updating the game…' : 'Watching · no connection'; // updating: the server is being replaced (web/online.js comeBack)
   else if (!b) hint = `Watching · waiting for ${a || 'the host'}'s friend`;
   else if (state.over) hint = 'Watching · the game is over';
   else { const who = nameOf(room, state.turn); hint = who ? `Watching · ${who}'s move` : 'Watching'; }

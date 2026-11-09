@@ -19,6 +19,7 @@
 //   net.on('call',   ({ seat, kind, data }) => …) // a call message from the friend (web/call.js): video and voice at the board
 //   net.on('error',  ({ code, msg, re }) => …) // a refused move, a full room, a code nobody opened, not let in …
 //   net.on('status', (s) => …)                 // 'connecting' | 'open' | 'reconnecting' | 'closed'
+//   net.on('restart', () => …)                 // the server is being replaced by a newer one (a deploy): net.updating stays true until we are back
 //   net.on('ticket', ({ code, token, ticket }) => …) // the room as this board holds it, sealed by the server: keep it (with the token) so a reload can rebuild the room after a restart
 //   net.on('watching', ({ code, room }) => …) // family round the board: following the game from a watch link, no seat (room: the watch view; again after a reconnect)
 //   net.watch(code, key, name) — follow a game without a seat; every 'move', 'resign', 'takeback', 'draw', 'shout' … then arrives as for a seat
@@ -27,6 +28,22 @@
 import { applyMove, resign, takeBack, mayTakeBack, agreeDraw, firstMover } from '../engine/ayo.js';
 
 export const BACKOFF_MS = [800, 1600, 3200, 6400, 10000]; // between reconnect attempts, then every 10 s
+// A new game, mid-game (server/drain.js): a server stopping for a deploy says {t:"restart"} and closes with 1012. The board comes
+// straight back rather than waiting out the backoff — after RESTART_DELAY_MS and a random part of RESTART_JITTER_MS, so every
+// board in the world does not knock on the new server in the same instant — and says "updating the game…" meanwhile. At most
+// RESTART_TRIES of these in a row (a server that keeps saying restart falls back to the ordinary backoff).
+export const RESTART_CODE = 1012;
+export const RESTART_DELAY_MS = 400;
+export const RESTART_JITTER_MS = 1200;
+export const RESTART_TRIES = 3;
+
+// What a board says about its line: the connection's status, and whether the server is being updated.
+export function linkWords(status, updating = false) {
+  if (status === 'open') return '';
+  if (status === 'reconnecting') return updating ? 'updating the game…' : 'reconnecting…';
+  if (status === 'connecting') return 'connecting…';
+  return 'no connection';
+}
 
 // The game as the server shows it, made into an engine-shaped state the board can read (legalMoves, replay for undo-less play).
 export function stateFrom(pub) {
@@ -124,7 +141,8 @@ export const ERROR_TEXT = {
 };
 
 export class Online {
-  constructor(url, { WebSocketImpl = typeof WebSocket !== 'undefined' ? WebSocket : null, setTimeoutFn = (fn, ms) => setTimeout(fn, ms), clearTimeoutFn = (t) => clearTimeout(t), tag = null } = {}) {
+  constructor(url, { WebSocketImpl = typeof WebSocket !== 'undefined' ? WebSocket : null, setTimeoutFn = (fn, ms) => setTimeout(fn, ms), clearTimeoutFn = (t) => clearTimeout(t), tag = null, randomFn = Math.random } = {}) {
+    this.random = randomFn; this.updating = false; this.restartTries = 0; this.restartSeen = false;
     this.tag = tag; // this phone's random tag (web/block.js), sent with create / join / rejoin
     this.url = url; this.WS = WebSocketImpl; this.setTimeout = setTimeoutFn; this.clearTimeout = clearTimeoutFn;
     this.ws = null; this.status = 'closed'; this.seat = null; this.code = null; this.token = null; this.room = null;
@@ -183,7 +201,12 @@ export class Online {
     ws.onopen = () => { this.attempts = 0; this.setStatus('open'); if (this.intent) ws.send(JSON.stringify(this.wire(this.intent))); };
     ws.onmessage = (ev) => { let m; try { m = JSON.parse(typeof ev.data === 'string' ? ev.data : String(ev.data)); } catch { return; } this.handle(m); };
     ws.onerror = () => {}; // the close that follows does the work
-    ws.onclose = () => { if (this.ws !== ws) return; this.ws = null; if (this.left) return this.setStatus('closed'); this.scheduleReconnect(); };
+    ws.onclose = (ev) => {
+      if (this.ws !== ws) return; this.ws = null; if (this.left) return this.setStatus('closed');
+      const restart = this.restartSeen || (ev && ev.code === RESTART_CODE); this.restartSeen = false;
+      if (restart && this.comeBack()) return;
+      this.updating = false; this.scheduleReconnect();
+    };
   }
   scheduleReconnect() {
     if (this.left) return;
@@ -200,18 +223,35 @@ export class Online {
     this.setStatus('reconnecting');
     this.timer = this.setTimeout(() => { this.timer = null; this.connect(); }, delay);
   }
+  // the server said it is being replaced: come straight back to the new one (false: nothing to come back for, or tried enough)
+  comeBack() {
+    if (this.restartTries >= RESTART_TRIES || !(this.token || this.knock || this.watching)) return false;
+    this.restartTries += 1;
+    if (this.token) this.intent = { t: 'rejoin', code: this.code, token: this.token };
+    else if (this.watching) this.intent = { t: 'watch', code: this.watching.code, key: this.watching.key, name: this.watching.name };
+    else this.knock = { ...this.knock, id: null };
+    if (!this.attempts) this.attempts = 1; // the status reads 'reconnecting', but the backoff does not grow
+    const first = !this.updating; this.updating = true;
+    this.setStatus('reconnecting'); if (first) this.emit('restart', {});
+    const delay = RESTART_DELAY_MS + Math.floor(Math.max(0, Math.min(1, this.random())) * RESTART_JITTER_MS);
+    this.timer = this.setTimeout(() => { this.timer = null; this.connect(); }, delay);
+    return true;
+  }
   // the page came back to the front (or the phone found signal): try now rather than waiting out the backoff
   wake() { if (this.status === 'reconnecting' && (this.token || this.knock || this.watching)) { this.clearTimeout(this.timer); this.timer = null; this.connect(); } }
 
   handle(m) {
     switch (m.t) {
       case 'joined':
+        this.restartTries = 0; this.updating = false;
         this.seat = m.seat; this.code = m.code; this.token = m.token; this.room = m.room; this.knock = null; this.intent = { t: 'rejoin', code: m.code, token: m.token };
         this.emit('joined', { seat: m.seat, code: m.code, token: m.token, room: m.room }); return this.kept();
       case 'watching':
+        this.restartTries = 0; this.updating = false;
         this.code = m.code; this.room = m.room; this.seat = null; if (this.watching) this.watching.seen = true; this.watchMiss = 0;
         return this.emit('watching', { code: m.code, id: m.id, room: m.room });
       case 'knocked':
+        this.restartTries = 0; this.updating = false;
         this.code = m.code; this.knock = { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline };
         return this.emit('knocked', { code: m.code, id: m.id, host: m.host, hostOnline: !!m.hostOnline, ...(m.hostTag ? { hostTag: m.hostTag } : {}) });
       case 'knock': return this.emit('knock', { id: m.id, name: m.name, ...(m.tag ? { tag: m.tag } : {}) });
@@ -263,6 +303,7 @@ export class Online {
         if (m.code === 'swept' || (m.code === 'notfound' && m.re === 'rejoin') || m.code === 'token') { this.token = null; this.intent = null; this.held = null; } // nothing left to come back to
         if (m.re === 'join' && m.code !== 'knocking') { this.knock = null; this.intent = null; } // turned away, or the door is gone: no knocking again by ourselves
         return this.emit('error', { code: m.code, msg: ERROR_TEXT[m.code] || m.msg || 'Something went wrong', re: m.re });
+      case 'restart': this.restartSeen = true; return; // the close that follows comes straight back (comeBack)
       case 'pong': return;
       default: return;
     }

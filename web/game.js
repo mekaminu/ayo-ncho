@@ -19,7 +19,7 @@ import { canNudge, nudgeOf, nudgeLine, markNudged, solvedBadge, nudgeShare } fro
 import { puzzleQuery, readSent, sentLine } from './sent.js';
 import { parse as parseDaily, record as recordDaily, entry as dailyEntry, solvedRun, cardLine, resultLabel, runLine, dayLabel, dayLine, levelSeeds, canShow, markShown } from './daily.js';
 import { weekStrip, weekLine, weekLabel, letterOf, solvedIn, weekShare } from './week.js';
-import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink, watchLink as roomWatchLink, parseWatch, watchersLine } from './online.js';
+import { Online, stateFrom, inviteLink, cleanCode, inviteText, whatsappLink, watchLink as roomWatchLink, parseWatch, watchersLine, linkWords } from './online.js';
 import { spectateCards, spectateWords, spectateTitle, mayShareWatch, watchText, newWatchers, cameWords } from './spectate.js';
 import { qrMatrix, qrBands, scanWords, QUIET } from './qr.js';
 import { makeBackNav, webStep, ROOM_WORDS } from './backnav.js';
@@ -874,7 +874,7 @@ function paintRoomStatus() { // what the room card says, from the connection and
   if (!roomsShowing()) return;
   if (!net) return setRoomStatus(rooms.state === 'error' ? 'error' : 'idle');
   if (net.seat === null) return setRoomStatus('opening');
-  if (net.status !== 'open') return setRoomStatus('opening', net.status === 'reconnecting' ? 'reconnecting…' : 'connecting…');
+  if (net.status !== 'open') return setRoomStatus('opening', net.status === 'reconnecting' ? linkWords('reconnecting', net.updating) : 'connecting…');
   const knocks = sortKnocks((net.room && net.room.knocks) || [], blocked).shown;
   setRoomStatus(knocks.length ? 'door' : 'open', knocks.length ? `${knocks[0].name} is at the door` : undefined);
 }
@@ -928,14 +928,14 @@ function showTurnOnline() {
     if (net && net.knock) {
       const k = net.knock; const link = net.status !== 'open';
       $('#oppName').textContent = k.host; $('#oppFace').innerHTML = initialFace(k.host);
-      $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : 'no connection') : k.hostOnline ? 'deciding whether to let you in' : 'away — they will see you knocked when they are back';
+      $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? linkWords('reconnecting', net.updating) : 'no connection') : k.hostOnline ? 'deciding whether to let you in' : 'away — they will see you knocked when they are back';
       $('#turn').textContent = 'at the door'; $('#hint').textContent = `Knocked — waiting for ${k.host} to let you in`; $('#shoutBtn').disabled = true;
     }
     return;
   }
   const waiting = !friend; const mine = !waiting && state.turn === you && !state.over && !busy; const link = net.status !== 'open';
   $('#turn').textContent = state.over ? 'game over' : waiting ? 'waiting' : mine ? 'your move' : '…';
-  $('#oppSub').textContent = link ? (net.status === 'reconnecting' ? 'reconnecting…' : net.status === 'connecting' ? 'connecting…' : 'no connection')
+  $('#oppSub').textContent = link ? linkWords(net.status, net.updating)
     : waiting ? `room ${net.code || ''}` : !friend.online ? 'away — their seat is held' : state.over ? '' : mine ? 'waiting' : peekNow() ? peekWords(peekIn.pit, you) : 'their move';
   $('#hint').textContent = state.over ? '' : waiting ? (net.code ? `Room ${net.code} · send your friend this page's link` : '') : mine && heldMv ? heldWords('hint', heldMv.pit, you, { keys: keysLikely() }) : mine ? pickHint('pick') : backAsk.pending && backAsk.n === state.moves.length ? backWords(friend.name).asked : '';
   $('#undo').disabled = link || !mayAskBack({ online, friend, seated: true, over: state.over, busy, moves: state.moves, turn: state.turn, you, pending: !!backAsk.pending, askedN: backAsk.askedN });
@@ -1382,6 +1382,7 @@ function startOnline(code, { stay = false } = {}) {
     $('#hint').textContent = e.msg; showTurn(); click(0.5, 0.05);
   });
   on('status', () => { if (net !== self) return; if (seated || net.knock) showTurn(); paintRoomStatus(); });
+  on('restart', () => { if (net !== self) return; if (seated || net.knock) showTurn(); paintRoomStatus(); }); // a deploy: "updating the game…" until we are back
   document.addEventListener('visibilitychange', () => { if (!document.hidden && net === self) net.wake(); });
   addEventListener('online', () => { if (net === self) net.wake(); });
   body.classList.add('online'); awayIconLoad(); if (!stay) showScreen('play');
@@ -1418,7 +1419,7 @@ async function shareWatch() {
 }
 $('#watchLinkBtn').addEventListener('click', () => shareWatch());
 function paintSpect() {
-  const w = spectateWords(state, spect.room, net ? net.status : 'closed');
+  const w = spectateWords(state, spect.room, net ? (net.updating && net.status === 'reconnecting' ? 'updating' : net.status) : 'closed');
   $('#turn').textContent = state.over ? 'game over' : w.near; $('#oppSub').textContent = w.far; $('#hint').textContent = w.hint;
   $('#undo').disabled = true; $('#hintBtn').disabled = true; $('#shoutBtn').disabled = true;
 }
@@ -1477,6 +1478,7 @@ function startWatching(w) {
   on('shout', ({ seat, id }) => showShout(seat, id));
   on('error', (e) => { if (['notfound', 'swept', 'crowd', 'offline', 'nows', 'bad'].includes(e.code)) spectError(e); });
   on('status', () => { if (spect.room) showTurn(); });
+  on('restart', () => { if (spect.room) showTurn(); });
   document.addEventListener('visibilitychange', () => { if (!document.hidden && net === self) net.wake(); });
   addEventListener('online', () => { if (net === self) net.wake(); });
   body.classList.add('online', 'spectating'); showScreen('play');
