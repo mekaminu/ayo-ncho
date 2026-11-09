@@ -293,6 +293,14 @@ export const FR = {
   'a browser may clear it when the phone is short of space or the game goes unopened for weeks — keep it on your home screen, or Send it to yourself': 'un navigateur peut l’effacer si le téléphone manque de place ou si le jeu reste des semaines sans être ouvert — gardez-le sur votre écran d’accueil, ou Envoyez-le-vous',
   'not being kept · this phone is full — free some space and it is kept again': 'pas gardé · ce téléphone est plein — libérez de la place et il est de nouveau gardé',
   'not being kept · this browser has its storage turned off': 'pas gardé · le stockage de ce navigateur est désactivé',
+  'Something wrong?': 'Un souci ?',
+  'Tell us what went wrong': 'Dites-nous ce qui ne va pas',
+  'one block of text to paste into a message: what this phone is and any trouble the game met since it opened — never your name, your moves, a room code or anything you type ·': 'un bloc de texte à coller dans un message : ce qu’est ce téléphone et les soucis rencontrés par le jeu depuis son ouverture — jamais votre nom, vos coups, un code de salle ni rien de ce que vous tapez ·',
+  'nothing has gone wrong since the game opened': 'rien ne s’est mal passé depuis l’ouverture du jeu',
+  'the game has met 1 problem since it opened': 'le jeu a rencontré 1 souci depuis son ouverture',
+  'Shared — add a line about what happened': 'Partagé — ajoutez une ligne sur ce qui s’est passé',
+  'Copied — paste it into your message, with a line about what happened': 'Copié — collez-le dans votre message, avec une ligne sur ce qui s’est passé',
+  'Could not copy it here': 'Impossible de le copier ici',
   'while a game is in play the phone never goes dark; it may sleep after 3 minutes with nobody touching it (10 while a friend thinks)': 'pendant une partie le téléphone ne s’éteint pas ; il peut se mettre en veille après 3 minutes sans qu’on le touche (10 quand un ami réfléchit)',
   'Daily puzzle reminder': 'Rappel de l’énigme du jour',
   'the phone tells you once a day when a new puzzle is waiting, and never on a day you have played it': 'le téléphone vous prévient une fois par jour qu’une nouvelle énigme attend, jamais un jour où vous l’avez jouée',
@@ -850,6 +858,7 @@ const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
 const spanFr = (w) => w === 'under a minute' ? 'moins d’une minute' : w; // "5 h 12 min" reads the same in French
 export const PATTERNS = [
+  [/^the game has met (\d+) problems since it opened$/, (m) => `le jeu a rencontré ${m[1]} soucis depuis son ouverture`], // tell us what went wrong (web/report.js)
   [/^This week ([●◐○–·]{7}) \((\d) of 7\)$/, (m) => `Cette semaine ${m[1]} (${m[2]} sur 7)`], // the puzzle's share line (web/week.js weekShare)
   [/^This week · (?:none yet|(\d+) of 7)(?: · (Sunday's|today's) the hard one)?$/, (m) => `Cette semaine · ${m[1] ? `${m[1]} sur 7` : 'aucune pour l’instant'}${m[2] ? (m[2] === "Sunday's" ? ' · dimanche, la plus corsée' : ' · aujourd’hui, la plus corsée') : ''}`],
   // the next puzzle (web/nextday.js): "5 h 12 min", "42 min", "under a minute" keep their numbers
