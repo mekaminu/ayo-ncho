@@ -892,6 +892,7 @@ export const PATTERNS = [
   [/^([^·]+?)(?: and ([^·]+))? in the store$/, (m) => (m[2] ? `${look(m[1])} et ${look(m[2])}` : look(m[1])) + ' dans la boutique'],
   [/^river stones at (\d+) days played \((\d+) so far\)$/, (m) => `galets après ${m[1]} jours de jeu (${m[2]} pour l\u2019instant)`],
   [/^Daily puzzle · (Mon|Tue|Wed|Thu|Fri|Sat|Sun) (\d+) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(?: · (gentle|steady|tricky|hard))?$/, (m) => `Énigme du jour · ${DAYS[m[1]]} ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[3]]}` + (m[4] ? ' · ' + PUZZLE_LEVELS[m[4]] : '')],
+  [/^Sent on (Mon|Tue|Wed|Thu|Fri|Sat|Sun) (\d+) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) · this is today's puzzle$/, (m) => `Envoyée le ${DAYS[m[1]]} ${m[2] === '1' ? '1er' : m[2]} ${MONTHS[m[3]]} · voici l’énigme du jour`], // a sent puzzle link from another day (web/sent.js)
   [/^Capture (\d+) in one turn$/, (m) => `Prenez ${m[1]} en un tour`],
   [/^best (\d+) of (\d+)$/, (m) => `meilleur : ${m[1]} sur ${m[2]}`],
   [/^7 days unlocks (.+)$/, (m) => `7 jours ouvrent ${look(m[1])}`],
