@@ -75,6 +75,7 @@ function shell(name, title, body, c, lang = "en") {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0d0906">
+<meta name="color-scheme" content="dark">
 <title>${title} · ${GAME}</title>
 <link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>${CSS}</style>
