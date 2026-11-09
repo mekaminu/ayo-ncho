@@ -1,6 +1,6 @@
 // The game: engine state → 3D seeds, animated move by move. Every move the picture shows comes from engine events.
 import * as THREE from 'three';
-import { newGame, applyMove, legalMoves, replay, owner, firstMover, RULES, totalSeeds } from '/engine/ayo.js';
+import { newGame, applyMove, legalMoves, replay, owner, firstMover, RULES, totalSeeds, isVariant, cleanRules } from '/engine/ayo.js';
 import { SeedSim } from './physics.js';
 import { CHARACTERS, line, faceFor, MOOD_FOR, runLine as runWord, RUN_MOOD } from './characters.js';
 import { parse as parseRecord, record as recordGame, standing, cardLine as recordLine } from './record.js';
@@ -539,11 +539,11 @@ function tickScore(el, n) { el.textContent = n; el.classList.remove('bump'); voi
 // ---------- game state ----------
 // Settings live in prefs; a game carries the rules it started with so changing settings never corrupts a game in progress.
 const settings = {
-  get game() { return prefs.get('game.variant', 'ncho'); },
-  rules() { // explicit switches override the game's bundle
-    const base = RULES[this.game] || RULES.ncho;
+  get game() { const v = prefs.get('game.variant', 'ncho'); return isVariant(v) ? v : 'ncho'; }, // a spoiled save (idea 9 Nov) plays Nchò
+  rules() { // explicit switches override the game's bundle; a switch the save spoiled is the game's own rule (engine cleanRules)
     const cap = prefs.get('rules.capture', ''); const relay = prefs.get('rules.relay', ''); const last8 = prefs.get('rules.last8', '');
-    return { capture: cap ? +cap : base.capture, relay: relay ? relay === '1' : base.relay, last8: last8 ? last8 === '1' : base.last8 };
+    const o = {}; if (cap) o.capture = +cap; if (relay) o.relay = relay === '1'; if (last8) o.last8 = last8 === '1';
+    return cleanRules(this.game, o);
   },
   get level() { return playable(prefs.get('level', firstLevel(newPhone)), owned(), GOLD_PREVIEW); }, // a Gold opponent this phone cannot open falls back to Mama Ngozi
   get speed() { return prefs.get('speed', 'normal'); },
@@ -2272,7 +2272,7 @@ function greet() {
   // the rematch, remembered (web/rematch.js): straight after a game against them, their word for how it went comes first —
   // after coming back from days away, before the hour's greeting (which is kept as said, so the next game does not greet)
   const kept = prefs.get('rematch', ''); const rm = g.moment === 'back' ? null : rematchMoment(kept, level, Date.now(), prefs.get('rematch.said', null));
-  if (rm) { const l = JSON.parse(kept); if (l.id != null) prefs.set('rematch.said', l.id); }
+  if (rm) { try { const l = JSON.parse(kept); if (l && l.id != null) prefs.set('rematch.said', l.id); } catch {} }
   if (g.moment !== 'start') prefs.set('greet.last', g.key);
   const moment = rm || g.moment; keep(greeted.log, { moment, key: g.key }); say(moment);
 }

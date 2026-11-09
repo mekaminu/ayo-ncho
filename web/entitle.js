@@ -26,7 +26,12 @@ export function levelOpen(level, owned, preview = null) {
   return !GOLD_LEVELS.includes(level) || owns(owned, 'gold') || previewed(level, preview);
 }
 // The opponent to play: a Gold one this phone cannot open falls back to Mama Ngozi (Hard).
-export function playable(level, owned, preview = null) { return levelOpen(level, owned, preview) ? level : 'hard'; }
+// A level this build does not know (a spoiled save, or a name an older build used) is Nnamdi (Medium), as for a player who never chose.
+export const ALL_LEVELS = ['easy', 'steady', 'medium', 'hard', 'master'];
+export function playable(level, owned, preview = null) {
+  if (typeof level !== 'string' || !ALL_LEVELS.includes(level)) return 'medium';
+  return levelOpen(level, owned, preview) ? level : 'hard';
+}
 
 // Whether a Gold feature (the review) can be used on this phone.
 export function featureOpen(feature, owned, preview = null) {
