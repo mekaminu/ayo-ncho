@@ -671,6 +671,21 @@ html.tabletop #tip{bottom:calc(var(--fold-up,50vh) + 70px)}
 main#game{display:contents}
 /* a card (How to play, Game over, the door) above the chips under the board: Watch their move, Put it back and the review sat over its buttons (z-index 2, a card had none), so a tap on "Got it" could replay their move; the opponent's bubble stays above, as before */
 .sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);clip-path:inset(50%);white-space:nowrap;border:0}
+/* stronger words when asked (tools/contrast.py): a phone or Mac set to "Increase contrast" says prefers-contrast: more, and then the soft greys come up, the outlines firm up and the glass behind words laid over the board darkens — the same wood, lamp and brass, read at arm's length. A media query, so it follows the setting live */
+@media (prefers-contrast:more){
+:root{--muted:#e2d3bc;--line:rgba(243,233,215,.45);--soft:rgba(243,233,215,.1);--card:rgba(18,11,6,.98)}
+.dailyCard{background:rgba(18,11,6,.9);border-color:rgba(230,183,111,.75)}
+.gamePick .segbtn{background:rgba(18,11,6,.88)}.gamePick .segbtn[aria-pressed="true"]{background:var(--brass)}.gamePick .segbtn[aria-pressed="true"] small{opacity:1}
+.pill{background:rgba(13,9,6,.8)}
+.segbtn:disabled,.btn:disabled,.pill:disabled{opacity:.6}
+#hint,.badge,#lastMove,#take,#watchOn,#redoBtn{background:rgba(13,9,6,.92)}
+.badge.zero{opacity:.7}.badge.barred{opacity:.75}
+.pzRow span.o{color:rgba(230,183,111,.75)}
+.play small{opacity:1}
+.goldCard li em,.storeBody .h small,.storeFoot p,#glLost small,html #bootWait small{color:var(--muted)}
+.pill small.rec{opacity:1}.code.empty span{color:rgba(230,183,111,.6)}
+.nowCard{background:linear-gradient(120deg,#331408 0%,#4e2210 35%,#3c1a0b 60%,#532613 100%);border-color:rgba(230,183,111,.7)}.nowCard .tag{color:#f3d9a4}.nowCard span:last-child{opacity:1}
+}
 </style>
 <script>/* bigger words (web/textsize.js): the saved word size before the page paints, so it never flashes small first */try{var ts={large:1.15,larger:1.3}[localStorage.getItem('ayo.textsize')];if(ts)document.documentElement.style.setProperty('--ts',ts)}catch(e){}</script>
 </head>

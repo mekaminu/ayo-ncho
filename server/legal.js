@@ -62,7 +62,8 @@ ul{padding-left:22px}li{margin:4px 0}
 a{color:var(--brass);text-underline-offset:3px}
 .box{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:6px 18px;margin:16px 0}
 .soon{color:var(--muted);font-style:italic}
-footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}`;
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+@media (prefers-contrast:more){:root{--muted:#e2d3bc;--line:rgba(243,233,215,.45)}}`;
 
 function shell(name, title, body, c, lang = "en") {
   const fr = lang === "fr";
