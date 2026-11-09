@@ -439,6 +439,8 @@ html:not(.wide) .lesson #hint{top:auto;bottom:calc(env(safe-area-inset-bottom,0p
 .streak.rating[hidden]{display:none}
 .streak.fresh{display:flex;align-items:center;justify-content:center;gap:6px;margin:2px auto 0;padding:6px 12px;border:1px solid rgba(200,147,47,.45);border-radius:999px;background:rgba(200,147,47,.10);color:#f1d79a;font:inherit;font-size:calc(11.5px*var(--ts));cursor:pointer;animation:pop .35s ease-out}
 .streak.fresh[hidden]{display:none}
+.streak.fresh.install{cursor:default;padding:0;gap:0;max-width:100%}.streak.fresh.install button{display:flex;align-items:center;gap:6px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;padding:6px 8px 6px 12px;text-align:left;min-height:32px}
+#installNo{opacity:.75;padding:6px 12px 6px 10px!important;border-left:1px solid rgba(200,147,47,.35)!important;white-space:nowrap}
 .streak.fresh.back{margin:0 auto 2px;background:linear-gradient(rgba(200,147,47,.14),rgba(200,147,47,.14)),rgba(24,15,9,.78);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);max-width:100%;font-size:calc(12.5px*var(--ts));padding:8px 14px}.streak.fresh.back #backWords{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.streak.fresh.back svg{flex:none;opacity:.8}.streak.fresh.back .rv{flex:none;animation:backPulse 2.2s ease-in-out infinite}
 @keyframes backPulse{0%,100%{box-shadow:0 0 0 0 rgba(246,213,142,.55)}50%{box-shadow:0 0 0 5px rgba(246,213,142,0)}}
 @media (prefers-reduced-motion:reduce){.streak.fresh.back .rv{animation:none}}
@@ -730,6 +732,7 @@ main#game{display:contents}
     <p class="streak rating" id="ratingLine" hidden><span class="rv" aria-hidden="true"></span><span id="ratingText"></span></p>
     <p class="streak" id="streakLine" aria-live="polite"></p>
     <button class="streak fresh" id="freshLine" type="button" hidden><span class="rv" aria-hidden="true"></span><span id="freshWords">A newer version is ready · tap to update</span></button>
+    <div class="streak fresh install" id="installLine" hidden><button id="installGo" type="button"><span class="rv" aria-hidden="true"></span><span id="installWords">Keep it on your home screen · plays offline</span></button><button id="installNo" type="button">Not now</button></div>
   </div>
 </section>
 
@@ -1006,6 +1009,7 @@ addEventListener('load',function(){var c=document.getElementById('c');if(c)c.add
 window.__ayo3d=window.__ayo3dLocal?'./vendor/three.module.min.js':'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.170.0/three.module.min.js';
 document.write('<script type="importmap">{"imports":{"three":"'+window.__ayo3d+'"}}<\/script>');</script>
 <script type="module" src="./game.js"></script>
+<script>/* on your home screen (web/install.js): the browser's own install question, kept for the brass line on Home */addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__bip = e; try { dispatchEvent(new Event('ayo-install')); } catch (x) {} });</script>
 <script>if ('serviceWorker' in navigator && location.protocol === 'https:') addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));</script>
 </body>
 </html>
