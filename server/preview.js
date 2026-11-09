@@ -11,6 +11,7 @@
 import { dailyPuzzle, todayKey } from "../engine/puzzle.js";
 import { normaliseCode } from "./rooms.js";
 import { esc, pageLang } from "./legal.js";
+import { searchTags } from "./search.js";
 
 export const MARK = "<!-- ayo-preview -->"; // where index.html takes the tags
 export const IMAGE = { en: "share-board.jpg", fr: "share-board-fr.jpg" };
@@ -102,5 +103,6 @@ export function pageWithPreview(page, req, rooms) {
     if (!rooms || !rooms.has(code)) return null;
     try { const s = rooms.snapshot(code); const host = s.players[0] && s.players[0].name; return { host: host && host !== "Host" ? host : null, variant: s.variant }; } catch { return null; } // "Host": nobody typed a name
   };
-  return page.replace(MARK, previewTags(previewOf({ query: req.query || {}, lang, origin: originOf(req), room })));
+  const query = req.query || {}, origin = originOf(req);
+  return page.replace(MARK, () => previewTags(previewOf({ query, lang, origin, room })) + "\n" + searchTags({ query, lang, origin })); // + found by search (server/search.js)
 }

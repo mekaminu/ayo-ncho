@@ -20,6 +20,8 @@
 // {t:"room"} (a watch view) whenever who is at the board or watching changes; nothing they send can touch the game. Both boards' rooms
 // list the watchers by name. Eight at most per game ({t:"error", code:"crowd"}); a wrong key is "notfound", like a room that is gone.
 // /privacy, /terms and /support are the pages the stores ask for (server/legal.js).
+// Found by search (server/search.js): /robots.txt and /sitemap.xml; the page names its canonical address, and a private link
+// (an invite, a watch link, a turn to beat, the puzzle) says noindex in a tag and an X-Robots-Tag header.
 // Locked doors (server/headers.js): the page goes out with a fresh nonce on its scripts and a Content-Security-Policy naming it;
 // every response says nosniff, a same-origin referrer and the Permissions-Policy, and HSTS over HTTPS.
 // GET /version says which build of the game this server carries (a hash of web/ and engine/), and the page is served with the
@@ -38,7 +40,8 @@ import { fileURLToPath } from "node:url";
 import { WebSocketServer } from "ws";
 import { Rooms, RoomError, normaliseCode, lineText, moveMessage, resignMessage, backMessage, drawMessage } from "./rooms.js";
 import { mountLegal } from "./legal.js";
-import { pageWithPreview } from "./preview.js";
+import { pageWithPreview, originOf } from "./preview.js";
+import { mountSearch } from "./search.js";
 import { compressedStatic, sendText } from "./compress.js";
 import { baseHeaders, lockPage } from "./headers.js";
 import { Pace, Doorman, addressOf, GUARD } from "./guard.js";
@@ -68,6 +71,7 @@ export function createServer({ rooms = new Rooms({ secret: process.env.ROOM_SECR
   app.disable("x-powered-by");
   app.use(baseHeaders); // nosniff, referrer, permissions, HSTS over HTTPS (server/headers.js)
   mountLegal(app, env);
+  mountSearch(app, originOf); // robots.txt, sitemap.xml, noindex on private links (server/search.js)
   const build = buildId(), page = pageWithBuild(fs.readFileSync(path.join(WEB, "index.html"), "utf8"), build);
   app.get("/version", (_req, res) => { res.set("Cache-Control", "no-store"); res.json({ v: build }); });
   const haveLocal = fs.existsSync(THREE_FILE);
