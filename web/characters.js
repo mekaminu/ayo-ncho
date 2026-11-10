@@ -217,8 +217,30 @@ export const CHARACTERS = {
 };
 for (const k in CHARACTERS) CHARACTERS[k].face = faceFor(k, 'calm');
 
-export function line(level, moment) {
-  const c = CHARACTERS[level] || CHARACTERS.medium; const arr = c.lines[moment] || [];
+// Their words say what happened (idea 10 Nov): a few lines name a number — "Did you see that? Four!" after a capture,
+// "Homework: count to four" after a win — written for Nchò, where a pit of 4 is taken. Said after a capture of 8, or in Ayo
+// (captures on 2 and 3), the number was wrong. `ctx` says what the line is about: `got`, the seeds they just won (a capture
+// line names exactly that; under 2 it is not said); `capture`, the game's capture rule (4, or 23 for 2 and 3: the homework is
+// counting to four, or to three). Without `ctx` a line that names a number is never chosen, so words never claim a count.
+const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+export const numberWord = (n) => (n >= 0 && n < WORDS.length ? WORDS[n] : String(n));
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+// each line that names a number: what the number is, given ctx (null: not said)
+export const COUNTED = {
+  'Did you see that? Four!': (x) => (x.got >= 2 ? cap(numberWord(x.got)) : null),
+  'Four. Now you see why we count.': (x) => (x.got >= 2 ? cap(numberWord(x.got)) : null),
+  'Four seeds, no stress.': (x) => (x.got >= 2 ? cap(numberWord(x.got)) : null),
+  'Homework: count to four, carefully.': (x) => (x.capture === 4 ? 'four' : x.capture === 23 ? 'three' : null),
+};
+export function fitLine(text, ctx) {
+  const f = COUNTED[text]; if (!f) return text;
+  const n = ctx ? f(ctx) : null; if (n == null) return null;
+  return text.replace(/Four|four/, n);
+}
+
+export function line(level, moment, ctx = null) {
+  const c = CHARACTERS[level] || CHARACTERS.medium;
+  const arr = (c.lines[moment] || []).map((t) => fitLine(t, ctx)).filter(Boolean);
   return arr[Math.floor(Math.random() * arr.length)] || '';
 }
 

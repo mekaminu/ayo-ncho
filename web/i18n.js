@@ -667,6 +667,7 @@ const SAYS = {
   'Correction is allowed. Once.': 'On a droit à une correction. Une seule.',
   'Rub it out, then. Neatly.': 'Effacez, alors. Proprement.',
   'Homework: count to four, carefully.': 'Devoir : compter jusqu’à quatre, soigneusement.',
+  'Homework: count to three, carefully.': 'Devoir : compter jusqu’à trois, soigneusement.', // Ayo's captures are on 2 and 3 (web/characters.js fitLine)
   'Well tried. Again tomorrow.': 'Bien essayé. On recommence demain.',
   'Excellent. Top of the class.': 'Excellent. En tête de la classe.',
   'You were listening after all.': 'Vous écoutiez, finalement.',
@@ -867,7 +868,13 @@ const who = (s) => FR[s] || s; // a name stays a name; "Player 2" becomes "Joueu
 const ROOMS = roomPatterns({ who, item, need: (s) => need(s) });
 // Lines built from parts: [the English shape, its French]. Each part goes through translate again.
 const spanFr = (w) => w === 'under a minute' ? 'moins d’une minute' : w; // "5 h 12 min" reads the same in French
+// their words say what happened (web/characters.js fitLine): the seeds just won, as a word to twelve, then figures
+const NUM_FR = { Two: 'Deux', Three: 'Trois', Four: 'Quatre', Five: 'Cinq', Six: 'Six', Seven: 'Sept', Eight: 'Huit', Nine: 'Neuf', Ten: 'Dix', Eleven: 'Onze', Twelve: 'Douze' };
+const numFr = (w) => { if (/^\d+$/.test(w)) return w; if (!NUM_FR[w]) throw NO; return NUM_FR[w]; };
 export const PATTERNS = [
+  [/^Did you see that\? (\w+)!$/, (m) => `Tu as vu ça ? ${numFr(m[1])} !`], // Adaeze's capture
+  [/^(\w+)\. Now you see why we count\.$/, (m) => `${numFr(m[1])}. Vous voyez pourquoi on compte.`], // Auntie Bisi's
+  [/^(\w+) seeds, no stress\.$/, (m) => `${numFr(m[1])} graines, pas de stress.`], // Nnamdi's
   [/^the game has met (\d+) problems since it opened$/, (m) => `le jeu a rencontré ${m[1]} soucis depuis son ouverture`], // tell us what went wrong (web/report.js)
   [/^This week ([●◐○–·]{7}) \((\d) of 7\)$/, (m) => `Cette semaine ${m[1]} (${m[2]} sur 7)`], // the puzzle's share line (web/week.js weekShare)
   [/^This week · (?:none yet|(\d+) of 7)(?: · (Sunday's|today's) the hard one)?$/, (m) => `Cette semaine · ${m[1] ? `${m[1]} sur 7` : 'aucune pour l’instant'}${m[2] ? (m[2] === "Sunday's" ? ' · dimanche, la plus corsée' : ' · aujourd’hui, la plus corsée') : ''}`],

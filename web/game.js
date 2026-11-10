@@ -1920,7 +1920,7 @@ async function play(pit) {
   }
   tipFor(events);
   const aiGot = state.stores[1] - prevStores[1], meGot = state.stores[0] - prevStores[0];
-  if (!local) { if (mover === them && aiGot > 0) setTimeout(() => say('capture'), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400); }
+  if (!local) { if (mover === them && aiGot > 0) setTimeout(() => say('capture', { got: aiGot }), 400); else if (mover === you && meGot >= 4) setTimeout(() => say('lost'), 400); }
   await animate(events, prevStores); if (!state.over) matchEngine(state); /* a game's end sweeps its last seeds itself */
   busy = false; refreshStatic(); save();
   if (!local || state.over) sayTurn(before, pit); // the turn, read out for a screen reader (two of us: once the board has turned)
@@ -2395,9 +2395,9 @@ function greet() {
   if (g.moment !== 'start') prefs.set('greet.last', g.key);
   const moment = rm || g.moment; keep(greeted.log, { moment, key: g.key }); say(moment);
 }
-function say(moment) {
+function say(moment, ctx = null) { // ctx: what a line that names a number is about (web/characters.js fitLine)
   if (online || local) return; // a friend speaks for themselves, and two of us need no third voice
-  sayText(line(level, moment), MOOD_FOR[moment] || 'calm', 2600, moment);
+  sayText(line(level, moment, { capture: state.rules && state.rules.capture, ...ctx }), MOOD_FOR[moment] || 'calm', 2600, moment);
 }
 function sayText(text, mood = 'calm', ms = 2600, moment = 'chat') { // the opponent says these words, with the face to match
   if (online || local) return; react(mood);
