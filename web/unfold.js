@@ -49,3 +49,23 @@ export function unfoldAt(a, b, t) {
     y: a.y + ((b.y || 0) - a.y) * k,
   };
 }
+
+// Never left half way (10 Nov, Meka's Fold opened mid-game: the board came to rest off to one side, a little turned and the
+// wrong size, under the buttons). A glide could end early — a second resize while it ran (opening the Fold sends more than one),
+// or a finger on the board — and each left the turn, the tilt or the distance where the glide happened to be while the picture's
+// place jumped to the new framing. Now whatever ends a glide early sends the board to where it was going. What a resize does
+// to a glide still on its way: a new shape glides on from where the board is seen ('glide'); the same shape a little changed
+// (the browser's bar, the page settling once the Fold is open) sends the glide on to the new framing ('retarget'); with no glide
+// under way the framing simply changes ('snap').
+export function afterResize({ gliding = false, prev = null, next = null, reduce = false } = {}) {
+  if (shouldGlide(prev, next, { reduce })) return 'glide';
+  return gliding && !reduce ? 'retarget' : 'snap';
+}
+
+// Has the framing moved enough to be seen? (the page settling a moment after a resize: the room the bars leave measured again)
+export const SETTLE_MS = 400;
+export function framingMoved(a, b, { px = 1.5, share = 0.005, tilt = 0.005 } = {}) {
+  if (!a || !b) return true;
+  return Math.abs((a.x || 0) - (b.x || 0)) > px || Math.abs((a.y || 0) - (b.y || 0)) > px
+    || Math.abs(a.dist / b.dist - 1) > share || Math.abs(a.phi - b.phi) > tilt;
+}

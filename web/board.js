@@ -128,6 +128,17 @@ export function buildBoard(scene, finish = 'mahogany', q = {}) {
   const mayG = new THREE.RingGeometry(PIT_R * 0.84, PIT_R * 0.9, 96);
   const may = pitCenters.map(([x, z]) => { const m = new THREE.Mesh(mayG, new THREE.MeshBasicMaterial({ color: 0xf0c27a, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }));
     m.rotation.x = -Math.PI / 2; m.position.set(x, BT + 0.0022, z); m.visible = false; m.renderOrder = 2; group.add(m); return m; });
+  // whose move (web/turncue.js, 10 Nov): on your move a soft warm light round the rim of every pit you may play, fading off the
+  // wood on both sides of the rim, softer than a picked pit's ring
+  const glowTex = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'), r = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+    r.addColorStop(0, 'rgba(255,214,150,0)'); r.addColorStop(0.66, 'rgba(255,214,150,0)'); r.addColorStop(0.79, 'rgba(255,218,158,1)');
+    r.addColorStop(0.87, 'rgba(255,200,128,0.42)'); r.addColorStop(1, 'rgba(255,190,118,0)');
+    g.fillStyle = r; g.fillRect(0, 0, 128, 128); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const turnG = new THREE.PlaneGeometry(PIT_R * 2.6, PIT_R * 2.6); // the light's peak (0.79 of its radius) sits on the rim
+  const turn = pitCenters.map(([x, z]) => { const m = new THREE.Mesh(turnG, new THREE.MeshBasicMaterial({ map: glowTex, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide }));
+    m.rotation.x = -Math.PI / 2; m.position.set(x, BT + 0.0016, z); m.visible = false; m.renderOrder = 1; group.add(m); return m; });
 
   // clear marks (web/clearmarks.js): the marks' colours in place, and the capture ring's second ring inside it on or off
   const tint = { pal: WARM, double: false };
@@ -141,7 +152,7 @@ export function buildBoard(scene, finish = 'mahogany', q = {}) {
   }
   setFinish(finish);
   scene.add(group);
-  return { group, targets, ring, glow, hover, woodMat, marks, may, setFinish, setMarks, get tint() { return { ...tint }; }, get finish() { return look.finish; } };
+  return { group, targets, ring, glow, hover, woodMat, marks, may, turn, setFinish, setMarks, get tint() { return { ...tint }; }, get finish() { return look.finish; } };
 }
 
 // Where the seeds will go (shown on the first tap, from the engine's own events): a faint brass ring just inside the rim of

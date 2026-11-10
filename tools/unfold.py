@@ -47,10 +47,15 @@ def move(pg):
         pg.mouse.click(x, y); pg.wait_for_timeout(350)
     pg.wait_for_function("window.__ayo.state.over || (window.__ayo.state.moves.length >= %d && window.__ayo.state.turn === 0 && !window.__ayo.busy)" % (n + 2), timeout=150000)
 
+# the page has had its resize: in slow headless Chromium the event can come a good while after the window changed, and a check
+# made before it would see no glide, or the board still at its start
+def seen_size(pg, w, h): pg.wait_for_function("(() => { const p = window.__ayo.unfold.prev; return !!p && p.w === %d && p.h === %d; })()" % (w, h), timeout=60000)
+def rested(pg, t=60000): pg.wait_for_function("window.__ayo.tweens === 0 && !window.__ayo.unfold.gliding", timeout=t)
+
 def reshape(pg, w, h, samples=0, gap=60):
-    before = logn(pg); pg.set_viewport_size({"width": w, "height": h}); seen = []
+    before = logn(pg); pg.set_viewport_size({"width": w, "height": h}); seen_size(pg, w, h); seen = []
     for _ in range(samples): seen.append(cam(pg)); pg.wait_for_timeout(gap)
-    pg.wait_for_function("window.__ayo.tweens === 0", timeout=20000); pg.wait_for_timeout(120)
+    rested(pg); pg.wait_for_timeout(120)
     log = pg.evaluate("window.__ayo.unfold.log"); return (log[-1] if len(log) > before else None), seen
 
 def glide_ok(pg, what, w, h):
@@ -86,17 +91,26 @@ def main():
         e4 = glide_ok(pg, "4. a phone on its side (844x390)", 844, 390)
         check(abs(e4["start"]["theta"] - e4["end"]["theta"]) > 1.0, "4. on its side: the quarter turn is part of the glide")
         pits_ok(pg, "4. on its side")
-        # a finger on the board stops a glide where it is
-        pg.evaluate("window.__unfoldPace = 6"); pg.set_viewport_size({"width": 390, "height": 760}); pg.wait_for_timeout(500)
+        # a finger on the board while it glides: the board goes straight to where it was going, never left half way (10 Nov: on
+        # Meka's Fold, opened mid-game, a tap during the glide left the board off to one side, a little turned and the wrong size)
+        n0 = logn(pg); pg.evaluate("window.__unfoldPace = 6"); pg.set_viewport_size({"width": 390, "height": 760}); seen_size(pg, 390, 760)
+        pg.wait_for_function("window.__ayo.unfold.log.length > %d" % n0, timeout=60000); pg.wait_for_timeout(300)
+        g = [e for e in pg.evaluate("window.__ayo.unfold.log")[n0:] if "end" in e]; target = g[-1]["end"] if g else None
         pg.mouse.move(12, 380); pg.mouse.down(); pg.mouse.up(); pg.wait_for_timeout(60)  # wood at the screen's edge, no pit
-        held = cam(pg); pg.wait_for_timeout(400)
-        now = cam(pg); check(all(abs(now[k] - held[k]) < 1e-6 for k in ("theta", "phi", "dist")) and not near(now, e4["end"]), "4. a finger on the board stops the glide where it is")
-        pg.wait_for_function("window.__ayo.tweens === 0", timeout=20000); pg.evaluate("window.__unfoldPace = 1")
-        reshape(pg, 844, 390); reshape(pg, 390, 760); ready(pg)  # straight again: a change through the wide layout faces you
+        held = cam(pg); pg.wait_for_timeout(400); now = cam(pg)
+        check(target is not None and near(held, target) and near(now, target) and not pg.evaluate("window.__ayo.unfold.gliding"), "4. a finger on the board mid-glide: the board goes straight to its new framing, never left half way")
+        rested(pg); pg.evaluate("window.__unfoldPace = 1"); ready(pg)
+        # a second resize while it glides (opening the Fold sends more than one): it glides on to the newest framing and rests there
+        n0 = logn(pg); pg.evaluate("window.__unfoldPace = 6"); pg.set_viewport_size({"width": 832, "height": 690}); seen_size(pg, 832, 690); pg.wait_for_timeout(300)
+        pg.set_viewport_size({"width": 832, "height": 640}); seen_size(pg, 832, 640); rested(pg, 120000); pg.evaluate("window.__unfoldPace = 1")
+        pg.wait_for_timeout(700); end = cam(pg); look = pg.evaluate("window.__ayo.look")
+        check(abs(end["phi"] - look["fitPhi"]) < 1e-6 and abs(end["dist"] - look["fitDist"]) < 1e-6 and abs(math.cos(end["theta"]) - 1) < 1e-6, "5. a second resize mid-glide: it rests at the newest framing, facing you")
+        pits_ok(pg, "5. after two resizes")
+        reshape(pg, 390, 760); ready(pg)
 
         # the picture: the Fold opening, slowed, three moments side by side
         pg.evaluate("window.__unfoldPace = 5"); shots = []
-        pg.set_viewport_size({"width": 832, "height": 690})
+        pg.set_viewport_size({"width": 832, "height": 690}); seen_size(pg, 832, 690)
         for k in range(3):
             path = out + ".%d.png" % k; pg.screenshot(path=path); shots.append(path); pg.wait_for_timeout(700)
         pg.wait_for_function("window.__ayo.tweens === 0", timeout=150000); pg.evaluate("window.__unfoldPace = 1")
@@ -112,7 +126,7 @@ def main():
         ctx2 = b.new_context(viewport={"width": 390, "height": 760}, has_touch=True, is_mobile=True, reduced_motion="reduce")
         ctx2.add_init_script("localStorage.setItem('ayo.tutorial','3'); localStorage.setItem('ayo.lesson','done');")
         q = page(ctx2); q.goto(URL + "&stay=home"); q.wait_for_function("window.__ayoUp === true && !!window.__ayo", timeout=180000)
-        q.wait_for_timeout(300); n0 = logn(q); q.set_viewport_size({"width": 832, "height": 690}); q.wait_for_timeout(400)
+        q.wait_for_timeout(300); n0 = logn(q); q.set_viewport_size({"width": 832, "height": 690}); seen_size(q, 832, 690); q.wait_for_timeout(200)
         check(logn(q) == n0 and q.evaluate("window.__ayo.unfold.prev.w") == 832, "5. Reduce motion: the new shape is framed at once")
         check(not errs, "6. no page error" + ((": " + "; ".join(errs)) if errs else ""))
         b.close()

@@ -25,6 +25,18 @@ button{font-family:inherit}
 .hud{position:fixed;left:0;right:0;padding:0 max(18px,env(safe-area-inset-right,0px)) 0 max(18px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:center;pointer-events:none;transition:opacity .25s}
 .hud.top{top:calc(env(safe-area-inset-top,0px) + 14px)}
 .hud.bottom{bottom:calc(env(safe-area-inset-bottom,0px) + 70px)}
+/* whose move (web/turncue.js, 10 Nov, Meka: "most times I'm not sure whether it's mine or the opponent's turn"): the card of the player
+   to move lights — its line becomes a brass badge, a face gets a brass ring — and the other card steps back */
+.hud .who,.hud>.col{transition:opacity .35s ease}
+.hud.rest .who,.hud.rest>.col{opacity:.5}
+.hud.turn .sub{display:inline-block;width:fit-content;margin-top:3px;padding:2px 9px 3px;border-radius:999px;font-size:calc(10.5px*var(--ts));font-weight:700;letter-spacing:.08em;text-transform:uppercase;line-height:1.35;animation:turnIn .45s cubic-bezier(.2,1.5,.4,1) both}
+.hud.bottom.turn .sub{background:var(--brass);color:#1d1209;box-shadow:0 0 0 1px rgba(255,226,170,.35),0 0 14px rgba(230,183,111,.5)}
+.hud.top.turn .sub{color:var(--brass);background:rgba(230,183,111,.1);box-shadow:inset 0 0 0 1px rgba(230,183,111,.6)}
+.hud.top.turn .face{box-shadow:0 0 0 2px var(--brass),0 0 14px 3px rgba(230,183,111,.45);animation:turnFace 1.8s ease-in-out 3}
+.hud.turn .name{color:#fff8ec}
+@keyframes turnIn{0%{opacity:0;transform:scale(.6)}100%{opacity:1;transform:none}}
+@keyframes turnFace{50%{box-shadow:0 0 0 2px var(--brass),0 0 22px 6px rgba(230,183,111,.65)}}
+@media (prefers-reduced-motion:reduce){.hud.turn .sub,.hud.top.turn .face{animation:none}}
 .name{font-size:calc(14px*var(--ts));font-weight:600}.sub{font-size:calc(12px*var(--ts));color:var(--muted)}
 .score{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:700;line-height:1;display:inline-block}
 .score.bump{animation:bump .35s ease-out}

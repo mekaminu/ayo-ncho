@@ -56,3 +56,26 @@ test('a slow first frame cannot eat the glide', () => {
   const d = glideClock(500, 100); assert.equal(d.tick(90), 0, 'a clock never runs backwards');
   assert.equal(glideClock(0, 0).tick(1), 1);
 });
+
+import { afterResize, framingMoved, SETTLE_MS } from '../web/unfold.js';
+
+test('a glide is never left half way: what a resize does to one still on its way', () => {
+  const opened = shapeOf(816, 505, { wide: true, side: Math.PI / 2 }), barGone = shapeOf(816, 530, { wide: true, side: Math.PI / 2 });
+  assert.equal(afterResize({ gliding: false, prev: folded, next: opened }), 'glide', 'the Fold opened: it glides');
+  assert.equal(afterResize({ gliding: true, prev: folded, next: opened }), 'glide', 'a new shape while gliding: glides on from where it is seen');
+  assert.equal(afterResize({ gliding: true, prev: opened, next: barGone }), 'retarget', 'the same shape a little changed: the glide goes on to the new framing');
+  assert.equal(afterResize({ gliding: false, prev: opened, next: barGone }), 'snap', 'nothing gliding: reframed at once');
+  assert.equal(afterResize({ gliding: true, prev: opened, next: barGone, reduce: true }), 'snap', 'Reduce motion: never a glide');
+  assert.equal(afterResize({ gliding: false, prev: null, next: folded }), 'snap', 'the first framing');
+});
+
+test('the page settling after a resize: only a change you could see reframes the board', () => {
+  const v = { phi: 0.5, dist: 2, x: -77, y: -25 };
+  assert.equal(framingMoved(v, { ...v }), false);
+  assert.equal(framingMoved(v, { ...v, x: -76 }), false, 'a pixel is nothing');
+  assert.equal(framingMoved(v, { ...v, x: -70 }), true, 'the room moved: the picture moves with it');
+  assert.equal(framingMoved(v, { ...v, dist: 2.04 }), true, 'a 2% bigger board');
+  assert.equal(framingMoved(v, { ...v, phi: 0.52 }), true, 'a new tilt');
+  assert.equal(framingMoved(null, v), true);
+  assert.ok(SETTLE_MS >= 200 && SETTLE_MS <= 800);
+});
