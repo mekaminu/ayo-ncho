@@ -3,7 +3,7 @@
 #      "that's their side · your pits are the lit ones" (no move played);
 #   2. while they think, a tap on a pit pulses their card and the line names whose move it is;
 #   3. coming back to the page after a while on your move sweeps the glow once (a glance away does not);
-#   4. in French, the line is French;
+#   4. in French, the line is French; and on the Mac a key (1-6, Enter) pressed while they think answers as a tap does;
 #   5. no page error.
 # Usage: python3 tools/whosetap.py [picture.png]  -> the picture (default docs/render-2026-11-10-whosetap.png): the tap on their
 #        side with the glow sweeping, and the tap while they think
@@ -86,6 +86,20 @@ with sync_playwright() as p:
     check(seen, "a tap while they think answers ('wait')")
     check(hint.endswith("'s move · your pits light up when it's yours"), "the line names whose move: " + hint)
     check(poke, "their card pulses")
+
+    # the keys on the Mac ask too: 1-6 or Enter while they think
+    seen = False
+    for key in ["3", "Enter", "1", "Enter", "2", "Enter"]:
+        if pg.evaluate("window.__ayo.state.over"): break
+        ready(pg); n = pg.evaluate("window.__ayo.state.moves.length"); pit = pg.evaluate("window.__ayo.legal[0]"); x, y = at(pg, pit)
+        for _ in range(4):
+            if pg.evaluate("window.__ayo.state.moves.length !== %d || window.__ayo.busy" % n): break
+            pg.mouse.click(x, y); pg.wait_for_timeout(250)
+        try: pg.wait_for_function("window.__ayo.turnCue.side === 'far' && !window.__ayo.hurry.playing && window.__ayo.state.turn === 1", timeout=60000, polling=10)
+        except Exception: continue
+        before = len(taps(pg)); pg.keyboard.press(key); t = taps(pg)
+        if len(t) == before + 1 and t[-1].get("tap") == "wait": seen = key; break
+    check(bool(seen), "a key while they think answers ('wait'): " + str(seen))
     pg.close()
 
     fr = open_game(ctx, "&lang=fr"); their_tap(fr)

@@ -3411,8 +3411,8 @@ addEventListener('keydown', (e) => {
   if (!keysUsed) { keysUsed = true; body.classList.add('keys'); showTurn(); } // from now on the hint line talks keys and your pits' badges show their key
   e.preventDefault();
   if (a.type === 'help') { if ($('#rules').hidden) openRules(true); else $('#rules').hidden = true; return; } // ? opens How to play at its keys, and closes it
-  if (a.type === 'pit') { if (canPress()) pressPit(a.pit, 'key'); else click(0.5, 0.04); }
-  else if (a.type === 'sow') { if (selected !== null) pressPit(selected, 'key'); else if (canPress()) $('#hint').textContent = hintText('pick', { keys: true }); }
+  if (a.type === 'pit') { if (canPress()) pressPit(a.pit, 'key'); else { click(0.5, 0.04); if (turnCue.side === 'far') whoseTap(a.pit); } } // their move: the key asks whose move, as a tap does
+  else if (a.type === 'sow') { if (selected !== null) pressPit(selected, 'key'); else if (canPress()) $('#hint').textContent = hintText('pick', { keys: true }); else if (turnCue.side === 'far') whoseTap(you * 6); }
   else if (a.type === 'undo') undo();
   else if (a.type === 'redo') { if (!online) redo(); }
   else if (a.type === 'hint') hint();
