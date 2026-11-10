@@ -442,6 +442,7 @@ export const FR = {
   'With 8 seeds left, whoever makes the next capture takes them all. Most seeds wins.': 'Quand il reste 8 graines, la prise suivante les emporte toutes. Le plus de graines gagne.',
   "If your last seed makes an opponent's pit 2 or 3, you capture it, and every pit behind it that is also 2 or 3.": 'Si votre dernière graine fait 2 ou 3 dans un trou adverse, vous le prenez, ainsi que chaque trou derrière lui qui a aussi 2 ou 3.',
   'If the other side is empty, you must give them seeds when you can.': 'Si l’autre côté est vide, vous devez lui donner des graines quand vous le pouvez.',
+  'It is the seeds you lift that must reach them: a pit that gets there only by the relay does not count.': 'Ce sont les graines que vous soulevez qui doivent y arriver : un trou qui n’y arrive que par le relais ne compte pas.',
   'First to 25 seeds wins.': 'Le premier à 25 graines gagne.',
   // how to play says the rules you play (idea 10 Nov, web/rulesays.js): the lines a mix of Settings → Rules adds
   'With 12 or more in your hand, the pit you picked up from is skipped as they go round.': 'Avec 12 graines ou plus en main, le trou d’où elles viennent est sauté au passage.',
@@ -1001,6 +1002,8 @@ export const PATTERNS = [
   [/^you must feed them: (pits? .+)$/, (m) => `vous devez nourrir l’autre côté : ${need(m[1])}`],
   [/^(pits? .+) would leave them nothing$/, (m) => `${cap(the(m[1]))} ne laisserai${m[1].startsWith('pits') ? 'en' : ''}t rien à l’autre côté`],
   [/^play (pits? .+)$/, (m) => `jouez ${the(m[1])}`],
+  [/^(pit \d) reaches them only by the relay$/, (m) => `${cap(the(m[1]))} n’atteint l’autre côté que par le relais`],
+  [/^the seeds you lift must reach them: play (pits? .+)$/, (m) => `les graines soulevées doivent y arriver : jouez ${the(m[1])}`],
   [/^(pit \d) doesn't reach them$/, (m) => `${cap(the(m[1]))} n’atteint pas l’autre côté`],
   [/^they have no seeds: play (pits? .+)$/, (m) => `l’autre côté n’a plus de graines : jouez ${the(m[1])}`],
   [/^(your|their) trough$/, (m) => (m[1] === 'your' ? 'votre réserve' : 'la réserve d’en face')], // count a trough by touch (web/count.js)

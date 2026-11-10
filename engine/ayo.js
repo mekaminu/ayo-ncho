@@ -108,18 +108,8 @@ export function legalMoves(state) {
   return feeding.length ? feeding : mine;
 }
 
-// Apply a move. Returns a NEW state plus an `events` list the UI animates:
-//   {type:"pickup", pit, n} {type:"drop", pit} … {type:"capture", pits:[...], by, n} {type:"end", winner}
-//   (an Ayo grand slam, voided, marks the last drop: {type:"drop", pit, slam:{pits, n}} — the pits and seeds it would have taken)
-//   (the Nchò last-8 / bankruptcy sweep is a capture with last8: true)
-//   (round and round, relay sowing: a relay pickup of a position the hand has already been in this turn carries round: 2; the
-//    last drop of a turn stopped because the same position came a third time carries round: 3)
-export function applyMove(state, pit) {
-  if (state.over) throw new Error("game over");
-  if (owner(pit) !== state.turn) throw new Error("not your pit");
-  if (state.pits[pit] === 0) throw new Error("empty pit");
-  if (!legalMoves(state).includes(pit)) throw new Error("must feed the opponent");
-
+// The turn's sowing, captures and last-8 sweep, with no check that the move is allowed (applyMove checks first).
+function sowTurn(state, pit) {
   const me = state.turn;
   const rules = state.rules || RULES[state.variant] || RULES.ncho;
   const events = [{ type: "pickup", pit, n: state.pits[pit] }];
@@ -180,6 +170,34 @@ export function applyMove(state, pit) {
     }
   }
 
+  return { pits, stores, events, captured };
+}
+
+// Reaches them only by the relay (idea 10 Nov): their side is empty and the feed rule counts the seeds you lift (one lap,
+// sow above), so a pit whose first lap stops short of their side is barred, even when its relay would go on into their pits.
+// True for such a pit, so the board can say why it is barred rather than "doesn't reach them". It changes no rule: the pit
+// stays barred (legalMoves), and a pit the rule allows is never this.
+export function reachesByRelay(state, pit) {
+  if (!state || state.over || !Number.isInteger(pit) || pit < 0 || pit >= PITS || owner(pit) !== state.turn || !state.pits[pit]) return false;
+  const rules = state.rules || RULES[state.variant] || RULES.ncho; const them = opponent(state.turn);
+  if (!rules.relay || seedsOnSide(state, them) !== 0 || legalMoves(state).includes(pit)) return false;
+  return sowTurn(state, pit).events.some((e) => e.type === "drop" && owner(e.pit) === them);
+}
+
+// Apply a move. Returns a NEW state plus an `events` list the UI animates:
+//   {type:"pickup", pit, n} {type:"drop", pit} … {type:"capture", pits:[...], by, n} {type:"end", winner}
+//   (an Ayo grand slam, voided, marks the last drop: {type:"drop", pit, slam:{pits, n}} — the pits and seeds it would have taken)
+//   (the Nchò last-8 / bankruptcy sweep is a capture with last8: true)
+//   (round and round, relay sowing: a relay pickup of a position the hand has already been in this turn carries round: 2; the
+//    last drop of a turn stopped because the same position came a third time carries round: 3)
+export function applyMove(state, pit) {
+  if (state.over) throw new Error("game over");
+  if (owner(pit) !== state.turn) throw new Error("not your pit");
+  if (state.pits[pit] === 0) throw new Error("empty pit");
+  if (!legalMoves(state).includes(pit)) throw new Error("must feed the opponent");
+
+  const { pits, stores, events, captured } = sowTurn(state, pit);
+  const me = state.turn;
   const next = {
     ...state,
     pits,

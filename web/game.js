@@ -75,7 +75,7 @@ import { hoverAt } from './hover.js';
 import { countPref, countWord, withIgbo, countNote, countToast, countLang } from './igbo.js';
 import { HOLD_MS, COUNT_STAY_MS, countPlan, canCount, stillHolding, countWords, troughWords, troughAt, isTrough, countOf } from './count.js';
 import { mayAsk as mayAskBack, backWords, planReturn, undoPlan, undoWords } from './takeback.js';
-import { narrowOf, feedWords, onlyLead } from './feed.js';
+import { narrowOf, feedWords, onlyLead, relayWords } from './feed.js';
 import { clearOn, marksPalette, doubleCaps, clearNote } from './clearmarks.js';
 import { circling as circlingOf, began as beganCircling, circlingRest, circlingWords, beganWords as circlingBegan, endedCircling, endedWords as circlingEnded, CALLING } from './circling.js';
 import { makeWake, wakeNote } from './wake.js';
@@ -3256,7 +3256,7 @@ function pressPit(pit, via = 'tap') {
   if (!canPress()) return false;
   if (lesson.on && pit !== lesson.steps[lesson.k].pit) { shake(pit); $('#hint').textContent = LESSON_WRONG; return false; } // the lesson plays its own pit
   const legal = legalMoves(state);
-  if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) { $('#hint').textContent = feedWords(narrowOf(state, you), { you }) || 'you must give the other side seeds'; shake(pit); } else shake(pit); return false; }
+  if (!legal.includes(pit)) { if (owner(pit) === you && state.pits[pit] > 0) { $('#hint').textContent = relayWords(state, pit, { you }) || feedWords(narrowOf(state, you), { you }) || 'you must give the other side seeds'; shake(pit); } else shake(pit); return false; }
   if (pressAction({ pit, selected, via, oneTap: oneTapOn(prefs), lesson: lesson.on }) === 'sow') sow(pit); else select(pit);
   return true;
 }

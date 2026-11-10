@@ -21,6 +21,7 @@ export const LINES = {
   twoThree: "If your last seed makes an opponent's pit 2 or 3, you capture it, and every pit behind it that is also 2 or 3.",
   slam: 'But a move that would take every seed they have takes nothing.',
   feed: 'If the other side is empty, you must give them seeds when you can.',
+  feedLap: 'It is the seeds you lift that must reach them: a pit that gets there only by the relay does not count.',
   last8: 'With 8 seeds left, whoever makes the next capture takes them all. Most seeds wins.',
   win: 'First to 25 seeds wins.',
 };
@@ -36,7 +37,8 @@ export function ruleKeys(rules) {
   const k = ['pits', 'sow', 'lap'];
   if (r.relay) k.push(r.capture === 4 ? 'relay4' : 'relay23', 'round'); else k.push('oneLap');
   if (r.capture === 4) k.push('four', 'fourLast'); else k.push('twoThree', 'slam');
-  k.push('feed', r.last8 ? 'last8' : 'win');
+  k.push('feed'); if (r.relay) k.push('feedLap'); // relay sowing: the feed counts the seeds you lift (engine legalMoves)
+  k.push(r.last8 ? 'last8' : 'win');
   return k;
 }
 export function ruleLines(rules) { return ruleKeys(rules).map((k) => LINES[k]); }

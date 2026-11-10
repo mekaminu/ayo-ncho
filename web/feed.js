@@ -7,7 +7,10 @@
 //   only one move at all           it is picked for you, its path shows, and the line starts "only move · …" (or
 //                                  "only pit 5 reaches them · …"), so one more tap sows it
 //   the pits a rule bars           their count badges go dim
-import { legalMoves, sideOf, opponent, seedsOnSide } from '../engine/ayo.js';
+//   a barred pit tapped (or under   "pit 3 reaches them only by the relay — the seeds you lift must reach them: play pits 2 or 5"
+//   the mouse) whose relay would    when its first lap stops short but the relay would carry on into their pits (Nchò's relay
+//   reach them                      sowing): the feed rule counts the seeds you lift, so it is barred, and "doesn't reach them" was wrong
+import { legalMoves, sideOf, opponent, seedsOnSide, reachesByRelay } from '../engine/ayo.js';
 import { pitName } from './path.js';
 
 // What narrows the move for the player in seat `you`, or null when every pit with seeds may be played (or it is not their move).
@@ -42,4 +45,11 @@ export function onlyLead(n, { you = 0 } = {}) {
   if (!n || n.only === null) return '';
   if (n.kind === 'only') return 'only move';
   return n.hungry ? `only ${pitList([n.only], you)} reaches them` : 'the only pit that leaves them seeds';
+}
+
+// A barred pit pressed: why. Their side empty and this pit gets there only by the relay (engine reachesByRelay) — the words say
+// that the seeds you lift are what count; '' for any other pit (the board keeps its usual feed words).
+export function relayWords(state, pit, { you = 0 } = {}) {
+  if (!state || state.turn !== you || !reachesByRelay(state, pit)) return '';
+  return `${pitList([pit], you)} reaches them only by the relay — the seeds you lift must reach them: play ${pitList(legalMoves(state), you)}`;
 }
