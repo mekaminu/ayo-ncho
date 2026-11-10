@@ -114,6 +114,7 @@ import { tabWatch, mayWrite as tabMayWrite, followNow as tabFollowNow, followWor
 import { startOldCss } from './oldcss.js'; // older phones (idea 9 Nov): the :has rules kept as classes where the browser has no :has
 try { startOldCss(); } catch {} // before anything is drawn; nothing at all on a browser that knows :has
 import { motionWatch, physicsNote } from './still.js'; // still, if you ask (idea 9 Nov, night)
+import { rulesCard } from './rulesays.js'; // how to play says the rules you play (idea 10 Nov)
 import { keep } from './bounded.js'; // a long evening (idea 8 Nov): the page's own records keep their last few entries
 // the day's share line, with "· with a nudge" on a solve that had one (web/nudge.js)
 const shareText = (p, got) => nudgeShare(dayShareText(p, got), dailyEntry(daily, p.key, p.variant));
@@ -3005,7 +3006,12 @@ async function redo() {
   return true;
 }
 redoBtn.addEventListener('click', () => { redo(); });
-function paintRules() { $('#lessonRow').textContent = LESSON_ROW[lessonGame(settings.game)]; $('#rulesNcho').hidden = state.variant !== 'ncho'; $('#rulesAyo').hidden = state.variant !== 'ayo'; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
+// how to play says the rules you play (idea 10 Nov, web/rulesays.js): one line per switch of the game on the board (Settings → Rules, a room's own)
+function paintRules() {
+  $('#lessonRow').textContent = LESSON_ROW[lessonGame(settings.game)];
+  const card = rulesCard(state.variant, state.rules); const ul = $('#rulesList'); const now = [...ul.children].map((li) => li.dataset.en || '');
+  if (now.join('|') !== card.lines.join('|')) ul.replaceChildren(...card.lines.map((l) => { const li = document.createElement('li'); li.dataset.en = l; li.textContent = l; return li; }));
+  const note = $('#rulesNote'); note.hidden = !card.note; note.textContent = card.note || ''; $('#gameName').textContent = state.variant === 'ncho' ? 'Nchò' : 'Ayo'; }
 
 // ---------- first-game tutorial: three tips, then never again ----------
 const TIPS = [
@@ -3257,7 +3263,7 @@ function paintKeys(fresh = true) {
   });
 }
 function openRules(atKeys = false) {
-  paintKeys(true); $('#rules').hidden = false; keyHelp.opened++;
+  paintRules(); paintKeys(true); $('#rules').hidden = false; keyHelp.opened++;
   if (atKeys && keyHelp.shown) requestAnimationFrame(() => $('#rulesKeys').scrollIntoView({ block: 'nearest', behavior: reduceMotion ? 'auto' : 'smooth' }));
 }
 function glintKey(a) {

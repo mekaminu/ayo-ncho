@@ -125,6 +125,8 @@ html:not(.wide) .farturn #words{bottom:auto;top:calc(env(safe-area-inset-top,0px
 .card p{margin:0;color:var(--muted);font-size:calc(14px*var(--ts));line-height:1.5}
 .card ul{margin:0;padding-left:18px;color:var(--fg);font-size:calc(14px*var(--ts));line-height:1.55;display:grid;gap:6px}
 /* the keys, on How to play (web/keyhelp.js): each key a small brass cap, the line glints when its key is pressed */
+/* how to play says the rules you play (web/rulesays.js): a game not played by its name's usual rules says so above the list */
+.card p.rulesNote{color:var(--brass,#e6b76f);font-size:calc(13px*var(--ts))}
 #rulesKeys{display:grid;gap:8px;border-top:1px solid rgba(230,183,111,.2);padding-top:12px}#rulesKeys[hidden]{display:none}
 #rulesKeys h3{margin:0;font:600 calc(15px*var(--ts)) Fraunces,Georgia,serif;color:var(--brass,#e6b76f)}
 #keyRows{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;align-items:center;margin:0}
@@ -998,20 +1000,16 @@ main#game{display:contents}
 <!-- Rules -->
 <div class="card" id="rules" hidden role="dialog" aria-label="How to play">
   <h2>How to play <span id="gameName">Nchò</span></h2>
-  <ul id="rulesNcho">
+  <p id="rulesNote" class="rulesNote" hidden></p>
+  <ul id="rulesList">
     <li>Your six pits are the column on the right. Tap one with seeds to pick them all up.</li>
     <li>They are sown one per pit anticlockwise: up your side, then down the other side.</li>
+    <li>With 12 or more in your hand, the pit you picked up from is skipped as they go round.</li>
     <li>If your last seed lands in a pit that has seeds, you pick that pit up and keep going. Your turn ends when the last seed lands in an empty pit.</li>
     <li>Any pit that reaches 4 seeds is taken by the owner of that side — whoever sowed it.</li>
     <li>Except: if your last seed makes a pit on their side 4, you take it.</li>
-    <li>With 8 seeds left, whoever makes the next capture takes them all. Most seeds wins.</li>
-  </ul>
-  <ul id="rulesAyo" hidden>
-    <li>Your six pits are the column on the right. Tap one with seeds to pick them all up.</li>
-    <li>They are sown one per pit anticlockwise: up your side, then down the other side.</li>
-    <li>If your last seed makes an opponent's pit 2 or 3, you capture it, and every pit behind it that is also 2 or 3.</li>
     <li>If the other side is empty, you must give them seeds when you can.</li>
-    <li>First to 25 seeds wins.</li>
+    <li>With 8 seeds left, whoever makes the next capture takes them all. Most seeds wins.</li>
   </ul>
   <section id="rulesKeys" hidden aria-labelledby="keysTitle"><h3 id="keysTitle">Keys</h3><dl id="keyRows"></dl><p id="keysNote">Press ? on the board any time for this list.</p></section>
   <p>Board, seeds and sounds are made on your device: no downloads, no ads. Fonts: Fraunces and Inter (Open Font Licence).</p>

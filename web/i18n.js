@@ -443,6 +443,13 @@ export const FR = {
   "If your last seed makes an opponent's pit 2 or 3, you capture it, and every pit behind it that is also 2 or 3.": 'Si votre dernière graine fait 2 ou 3 dans un trou adverse, vous le prenez, ainsi que chaque trou derrière lui qui a aussi 2 ou 3.',
   'If the other side is empty, you must give them seeds when you can.': 'Si l’autre côté est vide, vous devez lui donner des graines quand vous le pouvez.',
   'First to 25 seeds wins.': 'Le premier à 25 graines gagne.',
+  // how to play says the rules you play (idea 10 Nov, web/rulesays.js): the lines a mix of Settings → Rules adds
+  'With 12 or more in your hand, the pit you picked up from is skipped as they go round.': 'Avec 12 graines ou plus en main, le trou d’où elles viennent est sauté au passage.',
+  'If your last seed takes nothing and lands in a pit that has seeds, you pick that pit up and keep going. Your turn ends with a capture or in an empty pit.': 'Si votre dernière graine ne prend rien et tombe dans un trou qui a des graines, vous prenez ce trou et continuez. Votre tour s’arrête sur une prise ou dans un trou vide.',
+  'Your turn ends where your last seed lands.': 'Votre tour s’arrête là où tombe votre dernière graine.',
+  'But a move that would take every seed they have takes nothing.': 'Mais un coup qui prendrait toutes les graines d’en face ne prend rien.',
+  'Not the usual Nchò — these are the rules this game is played with.': 'Pas le Nchò habituel — voici les règles de cette partie.',
+  'Not the usual Ayo — these are the rules this game is played with.': 'Pas l’Ayo habituel — voici les règles de cette partie.',
   'Board, seeds and sounds are made on your device: no downloads, no ads. Fonts: Fraunces and Inter (Open Font Licence).': 'Plateau, graines et sons sont faits sur votre appareil : aucun téléchargement, aucune publicité. Polices : Fraunces et Inter (Open Font Licence).',
   'Got it': 'Compris',
   // the keys, on How to play (web/keyhelp.js)
