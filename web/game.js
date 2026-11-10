@@ -116,6 +116,7 @@ import { startOldCss } from './oldcss.js'; // older phones (idea 9 Nov): the :ha
 try { startOldCss(); } catch {} // before anything is drawn; nothing at all on a browser that knows :has
 import { motionWatch, physicsNote } from './still.js'; // still, if you ask (idea 9 Nov, night)
 import { rulesCard } from './rulesays.js'; // how to play says the rules you play (idea 10 Nov)
+import { tick as clockTick, pause as clockPause, resume as clockResume, fresh as clockFresh, timeWords } from './playtime.js'; // time at the board (idea 10 Nov, morning)
 import { keep } from './bounded.js'; // a long evening (idea 8 Nov): the page's own records keep their last few entries
 // the day's share line, with "· with a nudge" on a solve that had one (web/nudge.js)
 const shareText = (p, got) => nudgeShare(dayShareText(p, got), dailyEntry(daily, p.key, p.variant));
@@ -623,7 +624,7 @@ const playAsk = { guard: makeKeepGuard(KEEP_MS), timer: 0 }; // Play keeps your 
 let redoLine = null, redoReply = null; // put it back (web/redo.js): the moves Undo took back, and the computer's reply waiting to be played again
 let state = newGame(settings.game, settings.rules()); let busy = false; let selected = null; let level = settings.level;
 let stepped = parseStepped(prefs.get('stepped', null)), goOffer = null; // the step down taken (web/stepdown.js), until the way back up
-let stats = { biggest: 0, captures: 0, started: Date.now() };
+let stats = { biggest: 0, captures: 0, started: Date.now(), ...clockFresh(Date.now()) };
 // your record against each opponent, kept on this phone (web/record.js): wins–losses and your best win, on their Home pill and the Game over card
 let records = parseRecord(prefs.get('record', null));
 // your best ever (web/bests.js): the biggest turn, the most pick-ups, the widest and quickest win, per game, on this phone
@@ -840,6 +841,9 @@ async function remindTurnOn(from) { // the switch or the puzzle card's offer: as
   return true;
 }
 const teleVs = () => online ? 'friend' : local ? 'local' : level;
+// time at the board (web/playtime.js): each move reads the clock (a gap over 3 minutes counts 3); hidden, it stops
+function playTick() { const now = Date.now(); Object.assign(stats, stats.at == null ? clockResume(stats, now, document.hidden) : clockTick(stats, now)); }
+document.addEventListener('visibilitychange', () => { const now = Date.now(); Object.assign(stats, document.hidden ? clockPause(stats, now) : clockResume(stats, now, state.over)); });
 function teleStart(s) { // a game's first move, whoever made it (never the puzzle or the lesson)
   if (puzzle.on || s.moves.length !== 1) return; const first = prefs.get('tele.first', null) === null; if (first) prefs.set('tele.first', 'started');
   tele.track('game_start', { game: s.variant, vs: teleVs(), first }, online ? null : `s:${stats.started}`);
@@ -1300,7 +1304,7 @@ function releaseHeld() { // the room is back (rejoined, the board as the server 
 async function showMove({ seat, pit, events, state: pub }) {
   if (backAsk.pending && seat === them) { backAsk.pending = false; toast(backWords(friend ? friend.name : undefined).gone); } // playing on is a no
   hideBackCard(); if (drawAsk.theirs && !pub.over) showDrawCard(); // a draw they offered stands through their own move
-  const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; peekIn.pit = -1; deselect(); $('#undo').disabled = true; teleStart(state);
+  const prev = state.stores.slice(); const before = state; state = stateFrom(pub); busy = true; peekIn.pit = -1; deselect(); $('#undo').disabled = true; teleStart(state); playTick();
   if (seat === them) { select(pit); await wait(550); deselect(); }
   else { hideExplain(); const got = state.stores[you] - prev[you]; stats.biggest = Math.max(stats.biggest, got); stats.captures += events.filter((e) => e.type === 'capture' && e.by === you).length; const r = recordDay(streak); streak = r.data; if (r.newDay) prefs.set('streak', JSON.stringify(streak)); }
   tipFor(events);
@@ -1414,7 +1418,7 @@ function startOnline(code, { stay = false } = {}) {
     const had = friend, wanted = wishOf(friend, state && state.variant), wasGame = state && state.variant; syncRoom(room); const switched = !!started && !!wasGame && wasGame !== state.variant; // Ayo next (web/nextgame.js)
     if (resync) { busy = false; deselect(); toast('Caught up with the board'); if (state.over) gameOver(); else $('#gameover').hidden = true; } // this board fell behind a move and asked for the whole room
     if (!had && friend) { tele.track('invite_joined', { as: 'host' }, `j:${net && net.code}`); if (roomsShowing()) showScreen('play'); toast(`${friend.name} joined`); click(1.5, 0.1); buzz(20); awayNote('joined', { mine: state.turn === you && !state.over }); }
-    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); resetDraw(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now() }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); const tl = tableRoom ? tallyStart(tallyOf(tally, roomKey(tableRoom.code, tableRoom.rid)), you, friend ? friend.name : oppLabel()) : ''; if (switched) { click(1.2, 0.08); setTimeout(() => click(1.6, 0.08), 140); } toast((switched ? switchedWords(state.variant) + (tl ? ' · ' + tl : '') : tl ? tl[0].toUpperCase() + tl.slice(1) : 'New game') + ' — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`), tl ? 2600 : 1800); }
+    if (started) { stopReview(); backAsk.pending = false; backAsk.askedN = -1; hideBackCard(); resetDraw(); hideExplain(); stats = { biggest: 0, captures: 0, started: Date.now(), ...clockFresh(Date.now()) }; $('#gameover').hidden = true; $('#rematch').disabled = false; $('#rematch').textContent = 'Play again'; deselect(); const tl = tableRoom ? tallyStart(tallyOf(tally, roomKey(tableRoom.code, tableRoom.rid)), you, friend ? friend.name : oppLabel()) : ''; if (switched) { click(1.2, 0.08); setTimeout(() => click(1.6, 0.08), 140); } toast((switched ? switchedWords(state.variant) + (tl ? ' · ' + tl : '') : tl ? tl[0].toUpperCase() + tl.slice(1) : 'New game') + ' — ' + (state.turn === you ? 'your move' : `${oppLabel()} starts`), tl ? 2600 : 1800); }
     else { const fw = wishOf(friend, state.variant); if (fw && fw !== wanted) { toast(askWords(friend.name, fw, state.variant)); awayNote('rematch'); } if (!$('#gameover').hidden) paintRematch(); } // the friend asked (or asked for the other game): the buttons say so
   });
   on('move', (m) => { drawOnMove(m.seat); if (m.seat === them) { const s = stateFrom(m.state); awayNote(s.over ? 'over' : 'move', s.over ? { result: s.winner === you ? 'won' : s.winner === them ? 'lost' : 'draw', score: [s.stores[you], s.stores[them]] } : { mine: s.turn === you }); } moveQueue = moveQueue.then(() => showMove(m)).catch((e) => console.error(e)); }); // small message, events rebuilt by online.js with the engine
@@ -1933,7 +1937,7 @@ async function sowEvents(events, prevStores, pace) {
 
 async function play(pit) {
   const { state: next, events } = applyMove(state, pit);
-  const prevStores = state.stores; const mover = state.turn; const before = state; state = next; busy = true; deselect(); $('#undo').disabled = true; teleStart(state);
+  const prevStores = state.stores; const mover = state.turn; const before = state; state = next; busy = true; deselect(); $('#undo').disabled = true; teleStart(state); playTick();
   redoLine = redoAfterMove(redoLine, state.moves, gameKey(state)); paintRedo(); if (!redoLine && mover === you) redoReply = null; // put it back: the next move waiting walks the line on, any other ends it
   if (mover === you) {
     hideExplain(); // their last move is old news once you have played
@@ -2077,7 +2081,7 @@ function playOut() { // the card goes, the HUD comes back, and their reply is th
   if (busy || !puzzle.on || !canPlayOut({ played: puzzle.played, mine: puzzle.mine, lesson: lesson.on, online, state })) return;
   playout = playoutOf(puzzle.p.state); puzzle.on = false; puzzle.played = false; puzzle.mine = false; $('#pzCard').hidden = true; $('#puzzle').classList.remove('open');
   stopReview(); hideExplain(); hideTake(); takeSaid = false; local = false; seat(0); hintedAt = -1; mood = 'calm';
-  stats = { biggest: puzzle.got, captures: puzzle.got ? 1 : 0, started: Date.now() }; // your puzzle move is the play-out's first
+  stats = { biggest: puzzle.got, captures: puzzle.got ? 1 : 0, started: Date.now(), ...clockFresh(Date.now()) }; // your puzzle move is the play-out's first
   showScreen('play'); paintRules(); refreshStatic(); deselect();
   setTimeout(() => toast(playoutToast(names[level])), 300); kickAi();
 }
@@ -2597,7 +2601,7 @@ function gameOver() {
   paintRematch();
   $('#goMe').classList.toggle('win', gave ? win : a >= b); $('#goOpp').classList.toggle('win', gave ? state.winner === them : b > a); // an agreed draw lights neither
   $('#goBig').textContent = `${stats.biggest} seeds`; $('#goCaps').textContent = stats.captures;
-  const secs = Math.round((Date.now() - stats.started) / 1000); $('#goTime').textContent = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+  Object.assign(stats, clockPause(stats, Date.now())); $('#goTime').textContent = timeWords(stats.played); // the time it was played, stopped at the end (web/playtime.js)
   $('#replayBtn').hidden = out; $('#clipBtn').hidden = out;
   let word = null;
   if (out) { $('#goRecord').hidden = true; $('#goNext').hidden = true; $('#goRating').hidden = true; $('#goStory').hidden = true; stopReview(); revBtn.hidden = true; story = null; }
@@ -2742,7 +2746,7 @@ async function startRetry() {
   sim.finish(); layoutFromState(before); // every seed goes back from where it lies to where it lay before your move (web/takeback.js)
   await flyBack(before, after, moves[o.at], retryToast(o.n).split(' — ')[0]);
   playout = po; state = after; layoutFromState(state); busy = false; hintedAt = -1; mood = 'calm';
-  stats = { biggest: 0, captures: 0, started: Date.now() };
+  stats = { biggest: 0, captures: 0, started: Date.now(), ...clockFresh(Date.now()) };
   refreshStatic(); deselect(); paintRules(); toast(retryToast(o.n)); buzz([15, 30, 15]);
 }
 $('#goRetry').addEventListener('click', () => startRetry());
@@ -2820,13 +2824,13 @@ function save() { if (online || playingOut()) return; if (!tabMayWrite({ stale: 
 function savedGame() { try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length) { const s = replay(g.moves, g.variant, g.rules); return s.over ? null : { ...s, local: !!g.local }; } } catch {} return null; }
 function resume() {
   tabs.mark(); // what this tab now holds is the save as it stands
-  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = playable(g.level || level, owned(), GOLD_PREVIEW); stats = g.stats || stats; local = !!g.local; seat(local ? seatOf(state) : 0); return !state.over; } } catch {}
+  try { const g = JSON.parse(prefs.get('game', 'null')); if (g && g.moves && g.moves.length && !params.get('still')) { state = replay(g.moves, g.variant, g.rules); level = playable(g.level || level, owned(), GOLD_PREVIEW); stats = g.stats || stats; Object.assign(stats, clockResume(stats, Date.now(), document.hidden)); local = !!g.local; seat(local ? seatOf(state) : 0); return !state.over; } } catch {}
   local = false; seat(0); return false;
 }
 function newRound() {
   playout = null; if (deal.live) { deal.again = true; return; } // a new game is already being dealt: once its seeds are down, start the one asked for
   stopReview(); hideExplain(); takeSaid = false; local = settings.mode === 'local'; const st = comingStart(local);
-  seat(local ? st.first : 0); state = newGame(settings.game, settings.rules(), st.first); redoLine = null; redoReply = null; stats = { biggest: 0, captures: 0, started: Date.now() };
+  seat(local ? st.first : 0); state = newGame(settings.game, settings.rules(), st.first); redoLine = null; redoReply = null; stats = { biggest: 0, captures: 0, started: Date.now(), ...clockFresh(Date.now()) };
   const dp = window.__dealPace || 1; // (the render check slows it down to take its picture on a software-rendered page)
   const plan = dealPlan(homeCounts(), state, { gap: DEAL_GAP_MS * dp, pitGap: DEAL_PIT_GAP_MS * dp, fly: DEAL_FLY_MS * dp }); // where the last game's seeds lie, and what the new one wants
   if (!dealsIn(plan, { reduceMotion, clipping })) layoutFromState(state);
@@ -3357,7 +3361,7 @@ watchOnBtn.addEventListener('click', () => {
 async function takeOver(t) {
   watch.on = false; watch.done = false; hurry.on = false; watch.taken = { n: t.n, side: t.side, flip: t.flip };
   stopReview(); hideExplain(); hideTake(); takeSaid = false; local = false; seat(0); hintedAt = -1; mood = 'calm';
-  playout = t.po; state = t.state; stats = { biggest: 0, captures: 0, started: Date.now() };
+  playout = t.po; state = t.state; stats = { biggest: 0, captures: 0, started: Date.now(), ...clockFresh(Date.now()) };
   sim.finish(); layoutFromState(state); refreshStatic(); deselect(); paintRules();
   if (t.flip) { // the mirrored seeds seen from the far end look exactly as they lay; then the board turns round to face you
     theta += Math.PI; const from = theta, to = baseTheta + Math.round((theta - baseTheta) / (2 * Math.PI)) * 2 * Math.PI;
