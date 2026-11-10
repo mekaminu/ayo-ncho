@@ -574,6 +574,8 @@ export const FR = {
   'tap the board to hurry': 'touchez le plateau pour accélérer',
   'click the board or press Space to hurry': 'cliquez sur le plateau ou appuyez sur Espace pour accélérer',
   'They have no seeds': 'L’autre côté n’a plus de graines',
+  'They have no seeds and no pit of yours gives them any': 'L’autre côté n’a plus de graines et aucun de vos trous ne lui en donne', // nothing they can play (web/feed.js starveWords)
+  'the game ends on this move': 'la partie s’arrête sur ce coup',
   'they have no seeds': 'l’autre côté n’a plus de graines',
   'you must give the other side seeds': 'vous devez donner des graines à l’autre côté',
   'only move': 'seul coup possible',
@@ -1015,6 +1017,7 @@ export const PATTERNS = [
   [/^The seeds are circling — (\d+) moves with no capture and the game ends; each keeps the seeds on their side$/, (m) => `Les graines tournent en rond — ${m[1]} coups sans prise et la partie s’arrête ; chacun garde les graines de son côté`],
   [/^only (pits? .+) (has seeds|reaches them)$/, (m) => `${m[1].startsWith('pits') ? 'seuls les' : 'seul le'} ${need(m[1])} ${m[1].startsWith('pits') ? (m[2] === 'has seeds' ? 'ont des graines' : 'atteignent l’autre côté') : (m[2] === 'has seeds' ? 'a des graines' : 'atteint l’autre côté')}`],
   [/^you must feed them: (pits? .+)$/, (m) => `vous devez nourrir l’autre côté : ${need(m[1])}`],
+  [/^(pits? .+) would leave them none and end the game$/, (m) => `${the(m[1])} ne laisserai${m[1].startsWith('pits') ? 'en' : ''}t rien à l’autre côté et finirai${m[1].startsWith('pits') ? 'en' : ''}t la partie`],
   [/^(pits? .+) would leave them nothing$/, (m) => `${cap(the(m[1]))} ne laisserai${m[1].startsWith('pits') ? 'en' : ''}t rien à l’autre côté`],
   [/^play (pits? .+)$/, (m) => `jouez ${the(m[1])}`],
   [/^(pit \d) reaches them only by the relay$/, (m) => `${cap(the(m[1]))} n’atteint l’autre côté que par le relais`],

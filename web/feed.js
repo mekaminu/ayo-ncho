@@ -10,7 +10,11 @@
 //   a barred pit tapped (or under   "pit 3 reaches them only by the relay — the seeds you lift must reach them: play pits 2 or 5"
 //   the mouse) whose relay would    when its first lap stops short but the relay would carry on into their pits (Nchò's relay
 //   reach them                      sowing): the feed rule counts the seeds you lift, so it is barred, and "doesn't reach them" was wrong
-import { legalMoves, sideOf, opponent, seedsOnSide, reachesByRelay } from '../engine/ayo.js';
+//   their side empty, nothing      "They have no seeds and no pit of yours gives them any — the game ends on this move" when every
+//   barred, and a move that         pit leaves their side empty (none reaches them, or what reaches them is taken back as a 4), or
+//   leaves them none (idea 10 Nov)  "They have no seeds — pit 3 would leave them none and end the game" when only some do: the rule
+//                                   lets you play it, and the board said nothing until the game was over
+import { legalMoves, sideOf, opponent, seedsOnSide, reachesByRelay, applyMove } from '../engine/ayo.js';
 import { pitName } from './path.js';
 
 // What narrows the move for the player in seat `you`, or null when every pit with seeds may be played (or it is not their move).
@@ -52,4 +56,21 @@ export function onlyLead(n, { you = 0 } = {}) {
 export function relayWords(state, pit, { you = 0 } = {}) {
   if (!state || state.turn !== you || !reachesByRelay(state, pit)) return '';
   return `${pitList([pit], you)} reaches them only by the relay — the seeds you lift must reach them: play ${pitList(legalMoves(state), you)}`;
+}
+
+// Nothing they can play (idea 10 Nov, afternoon): their side is empty and the feed rule does not narrow your move — no pit's lifted
+// seeds reach them, so any pit may be played (legalMoves), or every pit does — yet a move that leaves their side empty ends the game
+// (engine finish). The pits that would, played through the engine itself: { all, pits } or null when no such pit, when their side
+// has seeds, when the rule already narrows the move (feedWords speaks), or when only one pit has seeds (it is picked for you and its
+// first tap says how the game ends, web/dry.js).
+export function starveOf(state, you = 0) {
+  if (!state || state.over || state.turn !== you || seedsOnSide(state, opponent(you)) !== 0 || narrowOf(state, you)) return null;
+  const legal = legalMoves(state); if (legal.length < 2) return null;
+  const pits = legal.filter((p) => seedsOnSide(applyMove(state, p).state, opponent(you)) === 0);
+  return pits.length ? { all: pits.length === legal.length, pits } : null;
+}
+export function starveWords(st, { you = 0 } = {}) {
+  if (!st) return '';
+  return st.all ? 'They have no seeds and no pit of yours gives them any — the game ends on this move'
+    : `They have no seeds — ${pitList(st.pits, you)} would leave them none and end the game`;
 }
