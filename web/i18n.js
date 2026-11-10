@@ -1053,6 +1053,10 @@ export const PATTERNS = [
   [/^([^·—:]+?) led for good from move (\d+)$/, (m) => (m[1] === 'You' ? 'Vous avez mené' : `${who(m[1])} a mené`) + ` pour de bon dès le coup ${m[2]}`],
   [/^biggest swing: move (\d+), (\d+) seeds? (your|.+?'s) way$/, (m) => `plus grand basculement : coup ${m[1]}, ${pl(m[2], 'graine', 'graines')} ${m[3] === 'your' ? 'pour vous' : 'pour ' + who(m[3].slice(0, -2))}`],
   [/^(Tap|Click) again — your game ends \((.+)\)$/, (m) => { const k = m[2].match(/^(.+?) leads (\d+)–(\d+)$/); return `${m[1] === 'Tap' ? 'Touchez' : 'Cliquez'} encore — votre partie s’arrête (${k ? `${who(k[1])} mène ${k[2]}–${k[3]}` : need(m[2])})`; }], // Play keeps your game
+  [/^(Tap|Click) again — counts as a loss to (.+?) \((.+)\)$/, (m) => `${m[1] === 'Tap' ? 'Touchez' : 'Cliquez'} encore — comptée comme une défaite face à ${who(m[2])} (${need(m[3])})`], // walking away counts (web/walkaway.js)
+  [/^Start a new game\? Your game in progress counts as a loss to (.+?) — (tap|press) again to start one, or Continue to keep it$/, (m) => `Commencer une nouvelle partie\u00a0? La partie en cours sera comptée comme une défaite face à ${who(m[1])} — ${m[2] === 'tap' ? 'touchez' : 'appuyez'} encore pour en commencer une, ou Continuer pour la garder`],
+  [/^Counted as a loss to (.+?) \((\d+)–(\d+)\)$/, (m) => `Comptée comme une défaite face à ${who(m[1])} (${m[2]}–${m[3]})`],
+  [/^Counted as a loss to (.+?) \((\d+)–(\d+)\) · (.+)$/, (m) => `Comptée comme une défaite face à ${who(m[1])} (${m[2]}–${m[3]}) · ${need(m[4])}`],
   [/^you (lead|trail) (\d+)–(\d+)$/, (m) => `vous ${m[1] === 'lead' ? 'menez' : 'êtes mené'} ${m[2]}–${m[3]}`],
   [/^biggest turn, (\d+) seeds?$/, (m) => `plus grand tour, ${pl(m[1], 'graine', 'graines')}`],
   [/^(\d+) pick-ups? in one turn$/, (m) => `${pl(m[1], 'reprise', 'reprises')} en un tour`],
