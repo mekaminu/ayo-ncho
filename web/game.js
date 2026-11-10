@@ -3072,7 +3072,7 @@ function straighten() {
   if (!viewMay()) return false;
   const fit = viewFit(), from = { theta, phi, dist }, to = restOf(from, fit);
   if (Math.abs(to.theta - from.theta) + Math.abs(to.phi - from.phi) + Math.abs(to.dist - from.dist) < 1e-3) return false; // already straight
-  prefs.set('straightTip', '1'); click(0.85, 0.05); try { navigator.vibrate && navigator.vibrate(8); } catch {}
+  prefs.set('straightTip', '1'); click(0.85, 0.05); buzz(8); // through buzz, so Settings → Haptics off means no buzz, and the apps use their own haptics
   const id = ++viewGlide;
   tween(glideMs(from, fit), (t) => { if (id !== viewGlide) return; const v = glideAt(from, to, t); theta = v.theta; phi = v.phi; dist = v.dist; }, easeInOut);
   return true;
