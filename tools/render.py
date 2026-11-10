@@ -1268,7 +1268,7 @@ if sidec:  # a phone held sideways (idea 5 Nov): the board lies across a short, 
         pg.touchscreen.tap(x, y)
         pg.wait_for_function("window.__ayo.state.moves.length >= 2 && !window.__ayo.busy", timeout=240000); pg.wait_for_timeout(900)
         pg.screenshot(path=out, timeout=120000); print("sideways: played pit %d and Nnamdi replied" % pit)
-        pg.set_viewport_size({"width": 390, "height": 844}); pg.wait_for_timeout(600)
+        pg.set_viewport_size({"width": 390, "height": 844}); pg.wait_for_timeout(600); pg.wait_for_function("window.__ayo.tweens === 0", timeout=60000);  # the board glides to its new place (web/unfold.js)
         assert pg.evaluate("window.__ayo.side") == 0 and not pg.evaluate("document.documentElement.classList.contains('sideways')"), "upright again, the board should stand up"
         Q = pits(pg); assert abs(Q[0][0] - Q[5][0]) < 30 and Q[0][1] > Q[5][1] + 100, ("upright, your row runs up the screen", Q)
         pg.set_viewport_size({"width": 1180, "height": 820}); pg.wait_for_timeout(600); assert pg.evaluate("window.__ayo.side") == 0, "the Mac keeps the upright board"
@@ -1540,7 +1540,7 @@ if tablec:  # the Fold half folded on its side (idea 7 Nov): board on the flat h
         # Playwright's own screenshot sets the screen's size again and so would open the fold: take the picture through the same CDP session
         import base64; open(out, "wb").write(base64.b64decode(cdp.send("Page.captureScreenshot", {"format": "png"})["data"]))
         assert pg.evaluate("window.__ayo.table") is not None, "still folded for the picture"; print("table: played pit %d and Nnamdi replied" % pit)
-        fold(False); pg.wait_for_timeout(800)
+        fold(False); pg.wait_for_timeout(800); pg.wait_for_function("window.__ayo.tweens === 0", timeout=60000)  # the board glides to its new place (web/unfold.js)
         assert pg.evaluate("window.__ayo.table") is None and not pg.evaluate("document.documentElement.classList.contains('tabletop')"), "opened flat: one picture again"
         y0 = min(pg.evaluate("window.__ayo.pitAt(%d)" % i)[1] for i in range(12)); assert y0 < TOP, ("flat, the board uses the whole screen again", y0)
         fold(True); pg.wait_for_timeout(800); assert pg.evaluate("window.__ayo.table") is not None, "folded again it lies back down"
