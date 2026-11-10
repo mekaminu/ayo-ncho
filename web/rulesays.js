@@ -7,6 +7,7 @@
 // Pure functions (no DOM), so test/rulesays.test.js checks every mix of the switches against the engine itself.
 // The English here is the source; web/i18n.js has each line's French.
 import { RULES, cleanRules, isVariant } from '../engine/ayo.js';
+import { DRY_RULE } from './dry.js';
 
 export const LINES = {
   pits: 'Your six pits are the column on the right. Tap one with seeds to pick them all up.',
@@ -22,6 +23,7 @@ export const LINES = {
   slam: 'But a move that would take every seed they have takes nothing.',
   feed: 'If the other side is empty, you must give them seeds when you can.',
   feedLap: 'It is the seeds you lift that must reach them: a pit that gets there only by the relay does not count.',
+  dry: DRY_RULE, // a side run dry (idea 10 Nov): the game ends and the other side keeps its own (engine finish)
   last8: 'With 8 seeds left, whoever makes the next capture takes them all. Most seeds wins.',
   win: 'First to 25 seeds wins.',
 };
@@ -38,6 +40,7 @@ export function ruleKeys(rules) {
   if (r.relay) k.push(r.capture === 4 ? 'relay4' : 'relay23', 'round'); else k.push('oneLap');
   if (r.capture === 4) k.push('four', 'fourLast'); else k.push('twoThree', 'slam');
   k.push('feed'); if (r.relay) k.push('feedLap'); // relay sowing: the feed counts the seeds you lift (engine legalMoves)
+  k.push('dry'); // no seeds on your turn: the game ends, they keep theirs
   k.push(r.last8 ? 'last8' : 'win');
   return k;
 }

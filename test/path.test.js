@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { sowPath, pathWords, pickedHint, pitName, playedWords } from "../web/path.js";
 import { newGame, applyMove, legalMoves, replay } from "../engine/ayo.js";
 import { endedCircling } from "../web/circling.js";
+import { dryOf } from "../web/dry.js";
 
 test("the opening move under Ayo: four seeds, one per pit, ending on your own side; under Nchò the same pit relays on", () => {
   const a = sowPath(newGame("ayo"), 0);
@@ -30,7 +31,8 @@ test("a path agrees with the move, every pit and every capture, over hundreds of
       for (let i = 0; i < 12; i++) assert.equal(p.visits[i], drops.filter((d) => d.pit === i).length);
       assert.deepEqual([...new Set(drops.map((d) => d.pit))], p.order, "pits in the order first reached");
       assert.deepEqual(p.captures, [...new Set(events.filter((e) => e.type === "capture").flatMap((e) => e.pits))]);
-      assert.equal(p.got, next.stores[s.turn] - s.stores[s.turn]); assert.equal(p.lost, next.stores[1 - s.turn] - s.stores[1 - s.turn]);
+      const kept = (dryOf(s, next, events) || { n: 0 }).n; // a side run dry: the seeds the mover keeps are not taken (web/dry.js)
+      assert.equal(p.got, next.stores[s.turn] - s.stores[s.turn] - kept); assert.equal(p.lost, next.stores[1 - s.turn] - s.stores[1 - s.turn]);
       assert.equal(p.over, next.over); if (next.over) assert.equal(p.winner, next.winner);
       assert.equal(p.relays.length, events.filter((e) => e.type === "pickup" && e.relay).length);
       if (p.relays.length) relayTurns++; if (p.captures.length) captureTurns++;
@@ -123,15 +125,15 @@ test("what it leaves open: their richest reply, checked against every reply play
         if (next.over) { assert.equal(a, null, "a move that ends the game leaves nothing to answer"); continue; }
         let bestGot = 0, canWin = false;
         for (const r of legalMoves(next)) {
-          const { state: after } = applyMove(next, r);
-          if (!endedCircling(after)) bestGot = Math.max(bestGot, after.stores[next.turn] - next.stores[next.turn]); // a called game takes nothing: each keeps their side
+          const { state: after, events: ev } = applyMove(next, r); const kept = (dryOf(next, after, ev) || { n: 0 }).n; // kept, not taken
+          if (!endedCircling(after)) bestGot = Math.max(bestGot, after.stores[next.turn] - next.stores[next.turn] - kept); // a called game takes nothing: each keeps their side
           if (after.over && after.winner === next.turn) canWin = true;
         }
         assert.equal(a.wins, canWin);
         if (!canWin) assert.equal(a.got, bestGot, "the richest reply");
         if (a.pit !== null) { // the named reply really does take that much, and empties those pits
           const { state: after, events } = applyMove(next, a.pit);
-          assert.equal(a.got, endedCircling(after) ? 0 : after.stores[next.turn] - next.stores[next.turn]);
+          assert.equal(a.got, endedCircling(after) ? 0 : after.stores[next.turn] - next.stores[next.turn] - (dryOf(next, after, events) || { n: 0 }).n);
           if (!endedCircling(after)) assert.deepEqual(a.captures, [...new Set(events.filter((e) => e.type === "capture").flatMap((e) => e.pits))]);
         } else assert.equal(a.got, 0);
         if (a.got) warned++; if (a.wins) wins++; checked++;

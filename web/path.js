@@ -6,6 +6,7 @@ import { sweepOf, sweepWords } from './last8.js';
 import { endedCircling, calledWords } from './circling.js';
 import { slamOf, slamWords } from './slam.js';
 import { roundOf, roundWords } from './round.js';
+import { dryOf, dryWords } from './dry.js';
 
 // The path of a move for the player to move, or null when the pit cannot be played:
 //   order     the pits the hand sows into, in the order they are first reached
@@ -20,6 +21,8 @@ import { roundOf, roundWords } from './round.js';
 //   sweep     the Nchò last-8 sweep, if the move makes one: { by, n, pits } (the engine marks it)
 //   slam      an Ayo grand slam the move makes, if any: { pit, pits, n, by } — every seed of theirs, so nothing taken (the engine marks it)
 //   round     relay sowing that comes back to the same seeds and stops the third time, if so: see web/round.js (the engine marks it)
+//   dry       the move leaves the other side nothing to play and ends the game: { empty, keeper, n, fed } (web/dry.js); the
+//             seeds the mover keeps are not counted in got (they are not taken)
 //   over      whether the move ends the game, and who wins then
 export function sowPath(state, pit) {
   if (!state || state.over || !legalMoves(state).includes(pit)) return null;
@@ -34,9 +37,10 @@ export function sowPath(state, pit) {
       if (!list.includes(p)) list.push(p); const other = mine ? gives : takes, k = other.indexOf(p); if (k >= 0) other.splice(k, 1);
     }
   }
+  const dry = dryOf(state, next, events); // a side run dry: the seeds the mover keeps are not a capture
   return {
-    pit, order, visits, end, relays, captures, takes, gives, drops, sweep: sweepOf(events), slam: slamOf(events), round: roundOf(events),
-    got: next.stores[me] - state.stores[me], lost: next.stores[opponent(me)] - state.stores[opponent(me)],
+    pit, order, visits, end, relays, captures, takes, gives, drops, sweep: sweepOf(events), slam: slamOf(events), round: roundOf(events), dry,
+    got: next.stores[me] - state.stores[me] - (dry && dry.keeper === me ? dry.n : 0), lost: next.stores[opponent(me)] - state.stores[opponent(me)] - (dry && dry.keeper !== me ? dry.n : 0),
     over: next.over, winner: next.over ? next.winner : null,
     called: endedCircling(next), // the game is called on this move: no capture for 60 moves, each keeps their side (web/circling.js)
   };
@@ -61,6 +65,7 @@ export function pathWords(path, { you = 0 } = {}) {
   if (path.slam) parts.push(slamWords(path.slam, { you }));
   if (path.round && path.round.stop !== null) parts.push(roundWords(path.round));
   if (path.called) parts.push(calledWords());
+  if (path.dry) parts.push(dryWords(path.dry, { you }));
   if (path.over) parts.push(path.winner === 'draw' ? 'ends the game level' : path.winner === you ? 'wins the game' : 'ends the game');
   return parts.join(' · ');
 }
@@ -79,6 +84,7 @@ export function playedWords(path, { you = 0 } = {}) {
   if (!parts.length || path.over || round) parts.push(path.end === null ? 'sowed nothing' : `ended in ${pitName(path.end, you)}`);
   if (round) parts.push(roundWords(path.round, { played: true }));
   if (path.called) parts.push(calledWords());
+  if (path.dry) parts.push(dryWords(path.dry, { you, played: true }));
   if (path.over) parts.push(path.winner === 'draw' ? 'the game ends level' : path.winner === you ? 'you win' : 'they win');
   return parts.join(' · ');
 }

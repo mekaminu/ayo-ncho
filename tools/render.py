@@ -131,6 +131,8 @@
 #                  it): Continue, the move is played, a ripple goes round the pits, the "Circling" line comes up with 12 and who keeps what
 #                  (picture <out>), it ticks down through his reply; then a saved game one move from the call: the first tap says the game
 #                  ends here, the move is played and the Game over card says "no capture in 60 moves" (<out>-called.png). --wide for the Mac
+#        --dry: a side run dry — a saved Ayo game, level on the board, where one of your pits leaves them nothing to play and
+#               the seeds you keep win it (the hint, the words as they fly, the Game over card's top line)
 #        --round: round and round — a saved Nchò game where one of your pits sends the hand round the same seeds until the turn stops
 #                the third time (tools/roundpos.js): the words on the first tap, then the sowing comes round, says so and hurries itself,
 #                and stops with its toast (docs/render-*-round.png, -round-stop.png)
@@ -269,6 +271,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  word for three in a row (<out>); the record is checked in storage. --wide for the Mac
 out = sys.argv[1]; talkc = "--talk" in sys.argv; qrc = "--qr" in sys.argv; dealc = "--deal" in sys.argv; winc = "--win" in sys.argv or dealc; sidec = "--sideways" in sys.argv; musicc = "--music" in sys.argv; legal = "--legal" in sys.argv; storec = "--store" in sys.argv; smoke = "--smoke" in sys.argv; wide = "--wide" in sys.argv; home = "--home" in sys.argv; lite = "--lite" in sys.argv; full = "--full" in sys.argv; clip = "--clip" in sys.argv; online = "--online" in sys.argv; nophysics = "--nophysics" in sys.argv; puzzle = "--puzzle" in sys.argv; keys = "--keys" in sys.argv; record = "--record" in sys.argv; path = "--path" in sys.argv; explain = "--explain" in sys.argv; local = "--local" in sys.argv; take = "--take" in sys.argv; hurry = "--hurry" in sys.argv; last8 = "--last8" in sys.argv; answer = "--answer" in sys.argv; story = "--story" in sys.argv; handc = "--hand" in sys.argv; hintc = "--hint" in sys.argv; startsc = "--starts" in sys.argv; hoverc = "--hover" in sys.argv; countc = "--count" in sys.argv; feedc = "--feed" in sys.argv or "--relayfeed" in sys.argv; relayfc = "--relayfeed" in sys.argv; undoc = "--undo" in sys.argv or "--redo" in sys.argv; redoc = "--redo" in sys.argv; circ = "--circling" in sys.argv; givesc = "--gives" in sys.argv; slamc = "--slam" in sys.argv; wakec = "--wake" in sys.argv; restc = "--rest" in sys.argv; lessonc = "--lesson" in sys.argv; masterc = "--master" in sys.argv; reviewc = "--review" in sys.argv; looksc = "--looks" in sys.argv; boardsc = "--boards" in sys.argv; telec = "--telemetry" in sys.argv; remindc = "--remind" in sys.argv; langc = "--lang" in sys.argv; frrooms = "--frrooms" in sys.argv; frlegal = "--frlegal" in sys.argv; freshc = "--fresh" in sys.argv; playoutc = "--playout" in sys.argv; retryc = "--retry" in sys.argv; waitc = "--waiting" in sys.argv; ponderc = "--ponder" in sys.argv; lastc = "--lastmark" in sys.argv; nextc = "--nextday" in sys.argv; cdnc = "--cdn" in sys.argv; racec = "--race" in sys.argv; tsc = "--textsize" in sys.argv; straightc = "--straight" in sys.argv; battc = "--battery" in sys.argv; glc = "--glloss" in sys.argv; greetc = "--greet" in sys.argv; rematchc = "--rematch" in sys.argv; watchc = "--watch" in sys.argv; onetapc = "--onetap" in sys.argv; keepc = "--keep" in sys.argv; backc = "--back" in sys.argv; saidc = "--said" in sys.argv; volc = "--volume" in sys.argv; troughc = "--trough" in sys.argv; arrowc = "--arrows" in sys.argv; clearc = "--clear" in sys.argv; takec = "--takeover" in sys.argv; weekc = "--weekly" in sys.argv; wstripc = "--week" in sys.argv; tablec = "--table" in sys.argv; leftyc = "--lefty" in sys.argv; warmc = "--warm" in sys.argv; givesc = givesc or clearc; legal = legal or frlegal; online = online or frrooms; story = story or reviewc; bestsc = "--bests" in sys.argv; ratedc = "--rated" in sys.argv; fullc = "--fullscreen" in sys.argv; record = record or story or bestsc
 roundc = "--round" in sys.argv
+dryc = "--dry" in sys.argv
 keyhelpc = "--keyhelp" in sys.argv
 carryc = "--carry" in sys.argv
 sbackc = "--settingsback" in sys.argv
@@ -2481,6 +2484,10 @@ with sync_playwright() as p:
         rpos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "roundpos.js")]).decode())
         rsave = json.dumps(json.dumps({"moves": rpos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "easy", "stats": {"biggest": 4, "captures": 2, "started": int(time.time() * 1000) - 4 * 60 * 1000}}))
         pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'easy'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.gives.told', '1'); localStorage.setItem('ayo.speed', 'fast');" % rsave)
+    if dryc:  # a saved Ayo game against Adaeze where one of your pits leaves them nothing to play and the seeds you keep win it
+        dpos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "drypos.js")]).decode())
+        dsave = json.dumps(json.dumps({"moves": dpos["moves"], "variant": "ayo", "rules": {"capture": 23, "relay": False, "last8": False}, "level": "easy", "stats": {"biggest": 3, "captures": 6, "started": int(time.time() * 1000) - 9 * 60 * 1000}}))
+        pg.add_init_script("localStorage.setItem('ayo.game', %s); localStorage.setItem('ayo.level', 'easy'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.gives.told', '1');" % dsave)
     if givesc:  # a saved game against Adaeze where one of your pits hands a 4 to the other side
         gpos = json.loads(subprocess.check_output(["node", os.path.join(root, "tools", "givespos.js")]).decode())
         gsave = json.dumps(json.dumps({"moves": gpos["moves"], "variant": "ncho", "rules": {"capture": 4, "relay": True, "last8": True}, "level": "easy", "stats": {"biggest": 4, "captures": 1, "started": int(time.time() * 1000) - 2 * 60 * 1000}}))
@@ -2491,7 +2498,7 @@ with sync_playwright() as p:
     if explain: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3')")  # past the first-game tips, so the picture shows the words alone
     if take: pg.add_init_script("localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.level', 'hard')")
     if leanc: pg.add_init_script("if (!sessionStorage.getItem('leaned')) { sessionStorage.setItem('leaned', '1'); localStorage.setItem('ayo.tutorial', '3'); localStorage.setItem('ayo.lean', '1'); }")  # Who's ahead on from the start  # across the board from Mama Ngozi herself, so she says her word
-    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or winc or pairc or record or ratedc or local or masterc or last8 or racec or troughc or startsc or feedc or circ or givesc or slamc or roundc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
+    pg.goto("http://127.0.0.1:8766/web/index.html" + ("?capture=1&stay=home&lesson=1" if lessonc else "?capture=1&puzzle=1" if puzzle else "?capture=1" if smoke else "?capture=1&stay=home" if home or winc or pairc or record or ratedc or local or masterc or last8 or racec or troughc or startsc or feedc or circ or givesc or slamc or roundc or dryc else "?still=1") + ("&lite=1" if lite else "&lite=0" if full else "") + ("&physics=0" if nophysics else "") + ("&try=review" if reviewc else ""), wait_until="load")
     pg.wait_for_function("window.__done===true", timeout=180000)
     q = pg.evaluate("window.__ayo.quality"); print("quality:", json.dumps(q))
     assert q["physics"] == (False if nophysics else not q["lite"]), "the seed-physics setting did not take (auto follows the lighter board)"
@@ -2776,6 +2783,29 @@ with sync_playwright() as p:
         pg.wait_for_function("!window.__ayo.busy && (window.__ayo.state.turn === 0 || window.__ayo.state.over)", timeout=240000)
         mv = pg.evaluate("window.__ayo.state.moves"); assert mv[len(rpos["moves"])] == rpos["pit"]
         assert pg.evaluate("window.__ayo.caught.relaid") == 0, "the board ended as the engine did"
+        b.close()
+        if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
+        srv.shutdown(); print("wrote", out); sys.exit(0)
+    if dryc:
+        def shot(path):
+            pg.evaluate("window.__freeze=true"); pg.wait_for_timeout(300); pg.screenshot(path=path, timeout=120000, animations="disabled"); pg.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
+        pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
+        assert pg.evaluate("window.__ayo.state.moves") == dpos["moves"], "the saved game did not come back"
+        x, y = pg.evaluate("window.__ayo.pitAt(%d)" % dpos["pit"]); pg.mouse.click(x, y)
+        pg.wait_for_function("document.querySelector('#hint').textContent.includes('nothing to play')", timeout=20000)
+        h = pg.evaluate("document.querySelector('#hint').textContent"); assert "leaves them nothing to play · you keep the %d on your side" % dpos["n"] in h and "wins the game" in h, h
+        assert "takes %d" % dpos["n"] not in h, ("the seeds kept are not a capture", h)
+        print("dry: pit", dpos["pit"], "·", dpos["stores"], "→", dpos["after"], "·", h)
+        pg.wait_for_timeout(600); shot(out)
+        pg.mouse.click(x, y)  # sow it
+        pg.wait_for_function("window.__ayo.dry.said===1", timeout=240000); pg.wait_for_timeout(500)
+        w = pg.evaluate("window.__ayo.dry.words"); assert w == "No seeds left on Adaeze's side — you keep the %d on yours" % dpos["n"], w
+        shot(out[:-4] + "-fly.png")
+        pg.wait_for_function("!document.querySelector('#gameover').hidden", timeout=240000); pg.wait_for_timeout(1500)
+        eb = pg.evaluate("document.querySelector('#goEyebrow').textContent"); assert eb.endswith(" · their side ran dry"), eb
+        assert pg.evaluate("window.__ayo.state.stores") == dpos["after"]
+        assert pg.evaluate("window.__ayo.win.swept") == dpos["n"], "the kept seeds flew into your trough"
+        shot(out[:-4] + "-over.png"); print("dry: said as they flew:", w, "· Game over:", eb)
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)

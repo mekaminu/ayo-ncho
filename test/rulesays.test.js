@@ -37,8 +37,8 @@ function play(rules, seed, games = 40) {
 }
 
 test("one line per switch, in the order a player meets them", () => {
-  assert.deepEqual(ruleKeys(RULES.ncho), ["pits", "sow", "lap", "relay4", "round", "four", "fourLast", "feed", "feedLap", "last8"]);
-  assert.deepEqual(ruleKeys(RULES.ayo), ["pits", "sow", "lap", "oneLap", "twoThree", "slam", "feed", "win"]);
+  assert.deepEqual(ruleKeys(RULES.ncho), ["pits", "sow", "lap", "relay4", "round", "four", "fourLast", "feed", "feedLap", "dry", "last8"]);
+  assert.deepEqual(ruleKeys(RULES.ayo), ["pits", "sow", "lap", "oneLap", "twoThree", "slam", "feed", "dry", "win"]);
   for (const r of MIXES) {
     const k = ruleKeys(r);
     assert.equal(k.includes("relay4") || k.includes("relay23"), r.relay, JSON.stringify(r));
