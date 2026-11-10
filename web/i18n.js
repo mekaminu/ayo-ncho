@@ -453,6 +453,9 @@ export const FR = {
   'their side ran dry': 'le côté d’en face s’est vidé',
   'No seeds left on your side': 'Plus une graine de votre côté',
   'First to 25 seeds wins.': 'Le premier à 25 graines gagne.',
+  // every way a game ends (idea 10 Nov, evening, web/rulesays.js)
+  'If 60 moves go by with no capture, the game is called: each side keeps the seeds on its own side.': 'Si 60 coups passent sans prise, la partie est arrêtée : chaque camp garde les graines de son côté.',
+  '24 each is a draw.': '24 partout, c’est une partie nulle.',
   // how to play says the rules you play (idea 10 Nov, web/rulesays.js): the lines a mix of Settings → Rules adds
   'With 12 or more in your hand, the pit you picked up from is skipped as they go round.': 'Avec 12 graines ou plus en main, le trou d’où elles viennent est sauté au passage.',
   'If your last seed takes nothing and lands in a pit that has seeds, you pick that pit up and keep going. Your turn ends with a capture or in an empty pit.': 'Si votre dernière graine ne prend rien et tombe dans un trou qui a des graines, vous prenez ce trou et continuez. Votre tour s’arrête sur une prise ou dans un trou vide.',

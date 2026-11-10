@@ -4,6 +4,10 @@
 // game of Nchò with one lap, or Ayo with captures on 4, read rules it was not being played by. Now the card's lines are
 // built from the rules the game on the board is played with (state.rules, the same object engine/ayo.js applies), one
 // line per switch, and a game whose rules are not its name's usual ones says so at the top of the list.
+// Every way a game ends (idea 10 Nov, evening): the card never said that 60 moves with no capture calls the game (about one
+// random Nchò game in five ends so, one Ayo game in ten), that 24 each is a draw (one Nchò game in five), or, in a game with
+// the last 8, that 25 still wins — so a called game or a draw came with no rule a player had read. Now every game's card
+// ends with the call, the 25 and the draw, each checked against the engine in test/rulesays.test.js.
 // Pure functions (no DOM), so test/rulesays.test.js checks every mix of the switches against the engine itself.
 // The English here is the source; web/i18n.js has each line's French.
 import { RULES, cleanRules, isVariant } from '../engine/ayo.js';
@@ -24,8 +28,10 @@ export const LINES = {
   feed: 'If the other side is empty, you must give them seeds when you can.',
   feedLap: 'It is the seeds you lift that must reach them: a pit that gets there only by the relay does not count.',
   dry: DRY_RULE, // a side run dry (idea 10 Nov): the game ends and the other side keeps its own (engine finish)
+  call: 'If 60 moves go by with no capture, the game is called: each side keeps the seeds on its own side.',
   last8: 'With 8 seeds left, whoever makes the next capture takes them all. Most seeds wins.',
   win: 'First to 25 seeds wins.',
+  level: '24 each is a draw.',
 };
 export const NOT_USUAL = {
   ncho: 'Not the usual Nchò — these are the rules this game is played with.',
@@ -41,7 +47,9 @@ export function ruleKeys(rules) {
   if (r.capture === 4) k.push('four', 'fourLast'); else k.push('twoThree', 'slam');
   k.push('feed'); if (r.relay) k.push('feedLap'); // relay sowing: the feed counts the seeds you lift (engine legalMoves)
   k.push('dry'); // no seeds on your turn: the game ends, they keep theirs
-  k.push(r.last8 ? 'last8' : 'win');
+  k.push('call'); // 60 moves with no capture: the game is called, each keeps its own side (engine finish, QUIET_LIMIT)
+  if (r.last8) k.push('last8');
+  k.push('win', 'level'); // every game ends at 25 (engine finish, WIN_SEEDS), and 48 seeds level is 24 each: a draw
   return k;
 }
 export function ruleLines(rules) { return ruleKeys(rules).map((k) => LINES[k]); }

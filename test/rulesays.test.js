@@ -3,7 +3,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { newGame, applyMove, legalMoves, RULES, RULE_VALUES, VARIANTS } from "../engine/ayo.js";
+import { newGame, applyMove, legalMoves, RULES, RULE_VALUES, VARIANTS, QUIET_LIMIT, WIN_SEEDS, TOTAL_SEEDS } from "../engine/ayo.js";
 import { ruleKeys, ruleLines, rulesCard, usual, LINES, NOT_USUAL } from "../web/rulesays.js";
 import { translate } from "../web/i18n.js";
 
@@ -37,15 +37,17 @@ function play(rules, seed, games = 40) {
 }
 
 test("one line per switch, in the order a player meets them", () => {
-  assert.deepEqual(ruleKeys(RULES.ncho), ["pits", "sow", "lap", "relay4", "round", "four", "fourLast", "feed", "feedLap", "dry", "last8"]);
-  assert.deepEqual(ruleKeys(RULES.ayo), ["pits", "sow", "lap", "oneLap", "twoThree", "slam", "feed", "dry", "win"]);
+  assert.deepEqual(ruleKeys(RULES.ncho), ["pits", "sow", "lap", "relay4", "round", "four", "fourLast", "feed", "feedLap", "dry", "call", "last8", "win", "level"]);
+  assert.deepEqual(ruleKeys(RULES.ayo), ["pits", "sow", "lap", "oneLap", "twoThree", "slam", "feed", "dry", "call", "win", "level"]);
   for (const r of MIXES) {
     const k = ruleKeys(r);
     assert.equal(k.includes("relay4") || k.includes("relay23"), r.relay, JSON.stringify(r));
     assert.equal(k.includes("oneLap"), !r.relay);
     assert.equal(k.includes("four") && k.includes("fourLast"), r.capture === 4);
     assert.equal(k.includes("twoThree") && k.includes("slam"), r.capture === 23);
-    assert.equal(k.includes("last8"), r.last8); assert.equal(k.includes("win"), !r.last8);
+    assert.equal(k.includes("last8"), r.last8);
+    assert.deepEqual(k.slice(-3), r.last8 ? ["last8", "win", "level"] : ["call", "win", "level"], "every game ends with how it ends");
+    assert.ok(k.includes("call") && k.includes("win") && k.includes("level"));
     assert.ok(k.includes("feed") && k.includes("lap"));
     assert.equal(new Set(k).size, k.length);
   }
@@ -116,4 +118,38 @@ test("every line, in French", () => {
   for (const l of [...Object.values(LINES), ...Object.values(NOT_USUAL)]) {
     const f = translate(l, "fr"); assert.notEqual(f, l, "French for: " + l); assert.ok(!/\b(the|your|seeds?|pit)\b/.test(f), f);
   }
+});
+
+// Every way a game ends (idea 10 Nov, evening): the call, the 25 and the draw, for every mix, as the engine plays them.
+test("every mix: 60 moves with no capture calls the game, each side keeping its own; 25 wins; 24 each is a draw", () => {
+  MIXES.forEach((r, n) => {
+    const name = JSON.stringify(r); const rand = rng(7000 + n); let called = 0, at25 = 0, level = 0;
+    for (let g = 0; g < 60; g++) {
+      let s = newGame("ncho", r, g % 2);
+      while (!s.over) {
+        const ms = legalMoves(s); const before = s; const { state, events } = applyMove(s, ms[Math.floor(rand() * ms.length)]);
+        if (state.over && (state.quiet || 0) >= QUIET_LIMIT) {
+          called++;
+          assert.ok(!events.some((e) => e.type === "capture"), name + ": the calling move captured nothing");
+          assert.deepEqual(state.pits, Array(12).fill(0), name + ": every seed left went to a side");
+          for (const p of [0, 1]) assert.ok(state.stores[p] >= before.stores[p], name);
+          assert.equal(state.stores[0] + state.stores[1], 48, name);
+        }
+        s = state;
+      }
+      if (Math.max(...s.stores) >= 25 && (s.quiet || 0) < QUIET_LIMIT) { at25++; assert.equal(s.winner, s.stores[0] > s.stores[1] ? 0 : 1, name); }
+      if (s.stores[0] === 24 && s.stores[1] === 24) { level++; assert.equal(s.winner, "draw", name); }
+    }
+    assert.ok(at25 > 0, name + " 25 wins"); assert.ok(called + level > 0, name + " called " + called + " level " + level);
+  });
+  // set up on the board: the 60th quiet move calls it and each keeps the seeds on its own side
+  for (const r of MIXES) {
+    const s = newGame("ncho", r); s.pits = [1, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0]; s.stores = [22, 22]; s.quiet = QUIET_LIMIT - 1;
+    const { state } = applyMove(s, 0); const name = JSON.stringify(r);
+    assert.ok(state.over, name); assert.deepEqual(state.stores, [23, 25], name); assert.equal(state.winner, 1, name);
+    const t = newGame("ncho", r); t.pits = [1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0]; t.stores = [22, 22]; t.quiet = QUIET_LIMIT - 1;
+    const u = applyMove(t, 0).state; assert.ok(u.over, name); assert.deepEqual(u.stores, [24, 24], name); assert.equal(u.winner, "draw", name);
+  }
+  assert.equal(QUIET_LIMIT, 60, "the line says 60"); assert.equal(WIN_SEEDS, 25, "the line says 25");
+  assert.ok(LINES.call.includes(String(QUIET_LIMIT)) && LINES.win.includes(String(WIN_SEEDS)) && LINES.level.startsWith(String(TOTAL_SEEDS / 2)));
 });
