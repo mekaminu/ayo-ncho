@@ -32,7 +32,7 @@ test('an unrated game leaves the rating where it was', () => {
 });
 
 test('French', () => {
-  assert.equal(translate(UNDO_NOTE, 'fr'), 'Coup repris · cette partie ne comptera pas pour votre classement');
+  assert.equal(translate(UNDO_NOTE, 'fr'), 'Coup repris · une victoire ou une nulle ne comptera plus pour votre classement, une défaite si');
   assert.equal(translate(unratedWords({ undos: 1 }), 'fr'), 'Non classée · vous avez repris un coup');
   assert.equal(translate(unratedWords({ undos: 4 }), 'fr'), 'Non classée · vous avez repris 4 coups');
 });

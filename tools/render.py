@@ -254,7 +254,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                 Opponent → Their talk → Off (<out>, the row) and an Undo makes the face react with no bubble; Few, after a reload, greets
 #                 again and keeps the Undo line back; kept in storage
 #        --rated: a fair rating (web/rated.js) — a settled rating of 1180 and a saved game one move from beating Mama Ngozi: Continue,
-#                  Undo (your move and her reply fly back) must toast "Taken back · this game won't count for your rating" once and keep
+#                  Undo (your move and her reply fly back) must toast "Taken back · a win or draw won't count for your rating now, a loss still will" once and keep
 #                  the count over a reload; then the game is put back one move from the win (the count still 1), the winning move is
 #                  played, and the Game over card shows 1180 dimmed with "Not rated · you took back a move" (<out>); the rating is unchanged
 #        --bests: as --record with a phone that has played 5 Nchò games and has smaller bests: the Game over card must say "Your best
@@ -2547,9 +2547,9 @@ with sync_playwright() as p:
         pg.click("#continueBtn"); pg.wait_for_function("document.querySelector('#home').hidden && !window.__ayo.busy", timeout=20000)
         n0 = len(pg.evaluate("window.__ayo.state")["moves"]); assert n0 == len(end["moves"]) and pg.evaluate("window.__ayo.rated")["counts"], "a fresh game is rated"
         pg.click("#undo")
-        pg.wait_for_function("[...document.querySelectorAll('.toast')].some((t) => t.textContent === \"Taken back · this game won't count for your rating\")", timeout=60000, polling=50)
+        pg.wait_for_function("[...document.querySelectorAll('.toast')].some((t) => t.textContent === \"Taken back · a win or draw won't count for your rating now, a loss still will\")", timeout=60000, polling=50)
         pg.wait_for_function("!window.__ayo.busy", timeout=60000)
-        rt = pg.evaluate("window.__ayo.rated"); assert rt["undos"] == 1 and not rt["counts"], rt
+        rt = pg.evaluate("window.__ayo.rated"); assert rt["undos"] == 1 and not rt["counts"] and rt["lossCounts"], rt  # a take-back hides no loss
         assert len(pg.evaluate("window.__ayo.state")["moves"]) == n0 - 2, "your move and her reply are taken back"
         assert json.loads(pg.evaluate("localStorage.getItem('ayo.game')"))["stats"]["undos"] == 1, "the count is saved with the game"
         print("rated: Undo said it once, the game is no longer rated")

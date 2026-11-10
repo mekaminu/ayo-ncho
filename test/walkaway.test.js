@@ -8,7 +8,7 @@ import { walkedOf, walkAsk, walkToast } from "../web/walkaway.js";
 import { KEEP_MIN_MOVES, playAsks } from "../web/keepgame.js";
 import { record, parse as parseRecord } from "../web/record.js";
 import { rate, parse as parseRating } from "../web/rating.js";
-import { counts } from "../web/rated.js";
+import { counts, countsFor } from "../web/rated.js";
 import { translate } from "../web/i18n.js";
 
 const seeded = (seed = 7) => () => { seed = (seed * 9301 + 49297) % 233280; return seed / 233280; };
@@ -32,13 +32,13 @@ test("only a game against the computer, a few moves in, still on, and you behind
   assert.equal(walkedOf(null, newGame()), null); assert.equal(walkedOf({ moves: [] }, null), null);
 });
 
-test("counted as a loss: the record and the rating come down, once per game, and not rated after a take-back", () => {
+test("counted as a loss: the record and the rating come down, once per game, and a take-back hides no loss", () => {
   const kept = { level: "hard", stats: { started: 42 } }; const s = { moves: [0, 6, 1, 7, 2], stores: [4, 12], over: false, first: 0 };
   const w = walkedOf(kept, s); assert.ok(w);
   const r = record(parseRecord(null), w.level, w.you, w.them, w.id); assert.equal(r.outcome, "loss"); assert.equal(r.entry.l, 1); assert.equal(r.entry.run, -1);
   assert.equal(record(r.data, w.level, w.you, w.them, w.id).counted, false, "never twice");
   const q = rate(parseRating(null), w.level, w.you, w.them, w.id); assert.ok(q.change < 0);
-  assert.equal(counts(w.stats), true); assert.equal(counts({ ...w.stats, undos: 2 }), false, "a game with a take-back stays out of the rating");
+  assert.equal(counts(w.stats), true); assert.equal(counts({ ...w.stats, undos: 2 }), false); assert.equal(countsFor({ ...w.stats, undos: 2 }, "loss"), true, "a take-back hides no loss: still rated");
   assert.equal(walkedOf({ ...kept }, { ...s, stores: [8, 8] }), null, "level: left out"); assert.equal(walkedOf(kept, { ...s, stores: [9, 3] }), null, "ahead: left out");
   assert.equal(walkedOf(kept, { ...s, over: true }), null); assert.equal(walkedOf(kept, { ...s, moves: [0, 6, 1] }), null);
 });
