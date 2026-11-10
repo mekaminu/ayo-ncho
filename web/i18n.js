@@ -80,6 +80,9 @@ export const FR = {
   'your move': 'à vous',
   'where it turned': 'là où la partie a basculé',
   'thinking…': 'réfléchit…',
+  "that's their side": 'c’est le côté d’en face', // a tap that says whose move (web/turncue.js)
+  'your pits are the lit ones': 'les vôtres sont ceux qui brillent',
+  "your pits light up when it's yours": 'vos trous s’allument quand c’est à vous',
   'watching': 'regarde',
   'connecting…': 'connexion…',
   'reconnecting…': 'reconnexion…',
