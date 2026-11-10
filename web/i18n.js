@@ -1057,6 +1057,10 @@ export const PATTERNS = [
   [/^Start a new game\? Your game in progress counts as a loss to (.+?) — (tap|press) again to start one, or Continue to keep it$/, (m) => `Commencer une nouvelle partie\u00a0? La partie en cours sera comptée comme une défaite face à ${who(m[1])} — ${m[2] === 'tap' ? 'touchez' : 'appuyez'} encore pour en commencer une, ou Continuer pour la garder`],
   [/^Counted as a loss to (.+?) \((\d+)–(\d+)\)$/, (m) => `Comptée comme une défaite face à ${who(m[1])} (${m[2]}–${m[3]})`],
   [/^Counted as a loss to (.+?) \((\d+)–(\d+)\) · (.+)$/, (m) => `Comptée comme une défaite face à ${who(m[1])} (${m[2]}–${m[3]}) · ${need(m[4])}`],
+  // Who you play, you finish with (web/keepopp.js): a pick that waits for the next game, and Continue's line saying who the kept game is with
+  [/^(.+?) next game · (.+?) finishes this one$/, (m) => `${who(m[1])} à la prochaine partie · ${who(m[2])} termine celle-ci`],
+  [/^with (Adaeze|Auntie Bisi|Nnamdi|Mama Ngozi|Papa Ike)$/, (m) => `contre ${m[1]}`],
+  [/^(you lead|you trail|level) (\d+) – (\d+)$/, (m) => `${m[1] === 'you lead' ? 'vous menez' : m[1] === 'you trail' ? 'vous êtes mené' : 'à égalité'} ${m[2]} – ${m[3]}`], // Continue's line on Home
   [/^you (lead|trail) (\d+)–(\d+)$/, (m) => `vous ${m[1] === 'lead' ? 'menez' : 'êtes mené'} ${m[2]}–${m[3]}`],
   [/^biggest turn, (\d+) seeds?$/, (m) => `plus grand tour, ${pl(m[1], 'graine', 'graines')}`],
   [/^(\d+) pick-ups? in one turn$/, (m) => `${pl(m[1], 'reprise', 'reprises')} en un tour`],
