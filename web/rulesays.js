@@ -14,6 +14,7 @@ export const LINES = {
   lap: 'With 12 or more in your hand, the pit you picked up from is skipped as they go round.',
   relay4: 'If your last seed lands in a pit that has seeds, you pick that pit up and keep going. Your turn ends when the last seed lands in an empty pit.',
   relay23: 'If your last seed takes nothing and lands in a pit that has seeds, you pick that pit up and keep going. Your turn ends with a capture or in an empty pit.',
+  round: 'If the hand comes back to the same seeds in the same pits a third time in one turn, the turn stops there.',
   oneLap: 'Your turn ends where your last seed lands.',
   four: 'Any pit that reaches 4 seeds is taken by the owner of that side — whoever sowed it.',
   fourLast: 'Except: if your last seed makes a pit on their side 4, you take it.',
@@ -33,7 +34,7 @@ export const NOT_USUAL = {
 export function ruleKeys(rules) {
   const r = cleanRules('ncho', rules || {});
   const k = ['pits', 'sow', 'lap'];
-  if (r.relay) k.push(r.capture === 4 ? 'relay4' : 'relay23'); else k.push('oneLap');
+  if (r.relay) k.push(r.capture === 4 ? 'relay4' : 'relay23', 'round'); else k.push('oneLap');
   if (r.capture === 4) k.push('four', 'fourLast'); else k.push('twoThree', 'slam');
   k.push('feed', r.last8 ? 'last8' : 'win');
   return k;

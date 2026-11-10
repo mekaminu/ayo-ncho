@@ -112,6 +112,8 @@ export function legalMoves(state) {
 //   {type:"pickup", pit, n} {type:"drop", pit} … {type:"capture", pits:[...], by, n} {type:"end", winner}
 //   (an Ayo grand slam, voided, marks the last drop: {type:"drop", pit, slam:{pits, n}} — the pits and seeds it would have taken)
 //   (the Nchò last-8 / bankruptcy sweep is a capture with last8: true)
+//   (round and round, relay sowing: a relay pickup of a position the hand has already been in this turn carries round: 2; the
+//    last drop of a turn stopped because the same position came a third time carries round: 3)
 export function applyMove(state, pit) {
   if (state.over) throw new Error("game over");
   if (owner(pit) !== state.turn) throw new Error("not your pit");
@@ -158,9 +160,10 @@ export function applyMove(state, pit) {
       // Relay sowing: the last seed landing in an occupied pit picks that pit up and carries on.
       if (rules.relay && pits[i] > 1) {
         const key = pits.join(",") + "|" + i; const times = (seen.get(key) || 0) + 1; seen.set(key, times);
-        if (times >= 3 || drops > 400) break; // the same position three times in one turn: the turn ends here
+        if (times >= 3) { events[events.length - 1].round = 3; break; } // the same position three times in one turn: the turn ends here (the last drop says so)
+        if (drops > 400) break;
         n = pits[i]; pits[i] = 0; origin = i;
-        events.push({ type: "pickup", pit: i, n, relay: true });
+        events.push(times === 2 ? { type: "pickup", pit: i, n, relay: true, round: 2 } : { type: "pickup", pit: i, n, relay: true }); // round: 2 — the hand has been here before this turn
       }
     }
   }
