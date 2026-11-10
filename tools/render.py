@@ -688,6 +688,13 @@ if greetc:  # good morning, at the right time (idea 6 Nov): the first word of a 
         g = play("hour=23", "fr"); fr = pg.evaluate("import('./i18n.js').then(m => m.translate(%s, 'fr'))" % json.dumps(L["night"][0]))
         assert g["log"][-1]["moment"] == "night" and g["bubble"] == fr and g["mood"] == "surprised", (g, fr); print("greet: 23:00 in French —", g["bubble"])
         pg.screenshot(path=out.replace(".png", "-night-fr.png"), timeout=120000)
+        # the weekend (idea 10 Nov): on a Saturday or Sunday Nnamdi's afternoon word has no office in it; a weekday keeps it
+        C = pg.evaluate("import('./characters.js').then(m => m.CHARACTERS)")
+        pg.evaluate("localStorage.setItem('ayo.level', 'medium'); localStorage.removeItem('ayo.greet.last')")
+        g = play("hour=15&weekend=1"); assert g["log"][-1]["moment"] == "afternoon" and g["log"][-1]["weekend"] is True and g["bubble"] in C["medium"]["weekend"]["afternoon"], g
+        print("greet: a Saturday afternoon with Nnamdi —", g["bubble"]); pg.screenshot(path=out.replace(".png", "-weekend.png"), timeout=120000)
+        pg.evaluate("localStorage.removeItem('ayo.greet.last')")
+        g = play("hour=15&weekend=0"); assert g["log"][-1]["weekend"] is False and g["bubble"] in C["medium"]["lines"]["afternoon"], g; print("greet: a weekday afternoon —", g["bubble"])
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)

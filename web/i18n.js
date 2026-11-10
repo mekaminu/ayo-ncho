@@ -798,6 +798,10 @@ const SAYS = {
   "Ụtụtụ ọma. The market can wait one game.": "Ụtụtụ ọma. Le marché peut attendre une partie.",
   "Ehihie ọma. Sit in the shade and count.": "Ehihie ọma. Asseyez-vous à l’ombre et comptez.",
   "Mgbede ọma. The market is closed; the board is open.": "Mgbede ọma. Le marché est fermé ; le plateau est ouvert.",
+  // the weekend's words (web/greet.js isWeekend)
+  "No school today! All afternoon for seeds. Go!": "Pas d’école aujourd’hui ! Tout l’après-midi pour les graines. Vas-y !",
+  "Ẹ káàárọ̀. No class today, but we still count before we sow.": "Ẹ káàárọ̀. Pas de classe aujourd’hui, mais on compte quand même avant de semer.",
+  "Weekend game! No office, no excuses, cousin.": "Partie du week-end ! Pas de bureau, pas d’excuses, cousin.",
   "Still awake? The seeds do not sleep either.": "Encore debout ? Les graines ne dorment pas non plus.",
   "So, you remembered the board. Sit well.": "Alors, vous vous souvenez du plateau. Asseyez-vous bien.",
   "Good morning. A clear head counts further.": "Bonjour. Une tête claire compte plus loin.",

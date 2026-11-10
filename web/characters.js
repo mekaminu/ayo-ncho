@@ -98,6 +98,8 @@ export const CHARACTERS = {
       againLost: ["You want to lose again? OK!"],
       againDrew: ["Nobody won! We have to play again."],
     },
+    // on a Saturday or Sunday (web/greet.js isWeekend): the hour's word where the weekday one talks of school or work
+    weekend: { afternoon: ["No school today! All afternoon for seeds. Go!"] },
     // your record against them: what they say when you are on a run (yours: you keep winning; theirs: they do)
     runs: { yours: { 3: 'Three in a row? I\'m telling Mama.', 5: 'Five! Are you magic?', more: (n) => `${n} in a row. I give up. No I don't.` },
             theirs: { 3: 'Three for me! Hehe.', 5: 'Five! I\'m the champion of everything.', more: (n) => `${n}! Are you letting me win?` } },
@@ -127,6 +129,7 @@ export const CHARACTERS = {
       againLost: ["Back for the lesson again? Sit down."],
       againDrew: ["A draw. We will finish the sum this time."],
     },
+    weekend: { morning: ["Ẹ káàárọ̀. No class today, but we still count before we sow."] },
     runs: { yours: { 3: 'Three in a row. You have been practising.', 5: 'Five! I am telling your mother — good news, this time.', more: (n) => `${n} in a row. Time I moved you up a class.` },
             theirs: { 3: 'Three for me. Count slower.', 5: 'Five. We will go over it again.', more: (n) => `${n}. Patience. Counting is a habit.` } },
   },
@@ -155,6 +158,7 @@ export const CHARACTERS = {
       againLost: ["Back for more? Suya is on you again."],
       againDrew: ["Level. This one decides it."],
     },
+    weekend: { afternoon: ["Weekend game! No office, no excuses, cousin."] },
     runs: { yours: { 3: 'Three straight? Who have you been practising with?', 5: 'Five in a row. OK, I\'m actually trying now.', more: (n) => `${n} in a row. Cousin, leave something for me.` },
             theirs: { 3: 'Three–zero. Suya is on you.', 5: 'Five. I\'m not even looking at the board.', more: (n) => `${n} and counting. Buy a bigger board.` } },
   },
@@ -238,9 +242,12 @@ export function fitLine(text, ctx) {
   return text.replace(/Four|four/, n);
 }
 
+// ctx.weekend (a Saturday or Sunday on the phone's clock): a character's `weekend` word for that moment, where they have one,
+// takes the place of the weekday one — no "After school…" from Adaeze on a Sunday, no office for Nnamdi on a Saturday
 export function line(level, moment, ctx = null) {
   const c = CHARACTERS[level] || CHARACTERS.medium;
-  const arr = (c.lines[moment] || []).map((t) => fitLine(t, ctx)).filter(Boolean);
+  const wk = ctx && ctx.weekend && c.weekend && c.weekend[moment];
+  const arr = ((wk && wk.length ? wk : c.lines[moment]) || []).map((t) => fitLine(t, ctx)).filter(Boolean);
   return arr[Math.floor(Math.random() * arr.length)] || '';
 }
 

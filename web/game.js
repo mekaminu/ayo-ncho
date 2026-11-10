@@ -9,7 +9,7 @@ import { parse as parseRating, rate as rateGame, homeLine as ratingHome, cardWor
 import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { decideSaver, saverPlan, drawDue, toastFor, noteFor, watchBattery } from './battery.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES, dayKey, daysPlayed } from './streak.js';
-import { greetMoment } from './greet.js';
+import { greetMoment, isWeekend } from './greet.js';
 import { keep as keepRematch, rematchMoment } from './rematch.js';
 import { rematchButtons, askWords, switchedWords, wishOf } from './nextgame.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
@@ -2393,7 +2393,9 @@ function greet() {
   const kept = prefs.get('rematch', ''); const rm = g.moment === 'back' ? null : rematchMoment(kept, level, Date.now(), prefs.get('rematch.said', null));
   if (rm) { try { const l = JSON.parse(kept); if (l && l.id != null) prefs.set('rematch.said', l.id); } catch {} }
   if (g.moment !== 'start') prefs.set('greet.last', g.key);
-  const moment = rm || g.moment; keep(greeted.log, { moment, key: g.key }); say(moment);
+  // a Saturday or Sunday on the phone's own date: no school or office in the hour's word (?weekend=1 / 0 tries it)
+  const weekend = params.has('weekend') ? params.get('weekend') === '1' : isWeekend(today);
+  const moment = rm || g.moment; keep(greeted.log, { moment, key: g.key, weekend }); say(moment, { weekend });
 }
 function say(moment, ctx = null) { // ctx: what a line that names a number is about (web/characters.js fitLine)
   if (online || local) return; // a friend speaks for themselves, and two of us need no third voice

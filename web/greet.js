@@ -37,3 +37,12 @@ export function greetMoment({ days = [], today, hour, last = '' } = {}) {
   if (last === key) return { moment: 'start', key };
   return { moment: part, key };
 }
+
+// The weekend (idea 10 Nov): Adaeze said "After school is the best time for seeds" on a Sunday afternoon, Auntie Bisi
+// "Good morning, class" on a Saturday, Nnamdi that he was supposed to be working. On a Saturday or Sunday (the phone's own
+// date, `today` as "YYYY-MM-DD") the hour's greeting comes from the character's weekend words where they have one
+// (web/characters.js `weekend`); every other word is the same any day.
+export function isWeekend(today) {
+  const n = dayNum(today); if (Number.isNaN(n)) return false;
+  const wd = new Date(n * 864e5).getUTCDay(); return wd === 0 || wd === 6;
+}
