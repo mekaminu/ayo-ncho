@@ -53,3 +53,15 @@ export const BACK_MS = 15000;
 export function backSweep({ side = null, canPress = false, selected = null, awayMs = 0 } = {}) {
   return side === 'near' && canPress && selected === null && awayMs >= BACK_MS;
 }
+
+// Whose move, for the family watching (idea 10 Nov, late night): Mum, following a game from the watch link, had none of it — no
+// card lit, the line under the board the only sign, and a tap on a pit did nothing at all (it is not her game), which on a phone
+// reads as a board that has frozen. Now the card of the player to move lights for her as it does for them (seat 0, the host,
+// at the bottom; their friend at the top), the mover's card stays lit while their seeds fly, and a tap or a key on any pit pulses
+// that card and says whose move it is and that she is watching. No pit ever glows on her board: there is nothing for her to play.
+// side: the lit card ('near' | 'far' | null, from turnSide); name: the player to move. pulse: which card pulses.
+export const WATCH_WORDS = "it's their game, you're watching";
+export function watchTap({ side = null, name = '' } = {}) {
+  if (side !== 'near' && side !== 'far') return { kind: null, words: '', pulse: null };
+  return { kind: 'watching', words: `${name ? `${name}'s move` : 'their move'} · ${WATCH_WORDS}`, pulse: side };
+}

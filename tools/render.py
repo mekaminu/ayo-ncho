@@ -2061,6 +2061,9 @@ if familyc:  # family round the board (web/spectate.js): Meka opens a room, Tete
         assert host.evaluate("window.__ayo.room.watchers") == ["Mum"]
         print("family: both boards say", repr(host.evaluate("window.__ayo.spect.chip")))
         for chip in ("#undo", "#hintBtn", "#shoutBtn", "#callBtn"): assert mum.evaluate("getComputedStyle(document.querySelector('%s')).display" % chip) == "none", chip + " shows on a watcher's board"
+        # whose move, for the family watching: the card to move lights on Mum's board too (Meka's, at the bottom), no pit glows
+        mum.wait_for_function("window.__ayo.turnCue.side==='near' && / turn/.test(window.__ayo.turnCue.bottom) && window.__ayo.turnCue.lit.length===0", timeout=20000)
+        print("family: Mum's board lights Meka's card ·", mum.evaluate("window.__ayo.turnCue.bottom"))
         # Meka plays; Mum's board follows, seed for seed
         mum_before = mum.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')")
         tap(host, 2)
@@ -2070,9 +2073,13 @@ if familyc:  # family round the board (web/spectate.js): Meka opens a room, Tete
         assert mum_after != mum_before and mum_after == host.evaluate("[...document.querySelectorAll('.badge')].map(b=>b.textContent).join(',')"), "Mum's board did not follow Meka's move"
         assert mum.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]") == host.evaluate("[document.querySelector('#myScore').textContent, document.querySelector('#oppScore').textContent]")
         mum.wait_for_function("window.__ayo.spect.hint==='Watching · Tete\\'s move'", timeout=20000)
-        # a tap on Mum's board does nothing: it is not her game
+        # Tete's card is lit now; a tap on Mum's board plays nothing (it is not her game) but pulses Tete's card and says so
+        tc = mum.evaluate("window.__ayo.turnCue"); assert tc["side"] == "far" and " turn" in tc["top"] and " rest" in tc["bottom"] and not tc["lit"], tc
         tap(mum, 7); mum.wait_for_timeout(600)
         assert mum.evaluate("window.__ayo.spect.moves") == 1 and host.evaluate("window.__ayo.state.moves.length") == 1, "a watcher's tap must not play"
+        said = mum.evaluate("document.querySelector('#hint').textContent"); tc = mum.evaluate("window.__ayo.turnCue")
+        assert said == "Tete's move · it's their game, you're watching" and " poke" in tc["top"] and tc["log"][-1].get("tap") == "watching", (said, tc)
+        print("family: Mum's tap says", repr(said))
         mum.wait_for_timeout(300)
         outm = out; mum.evaluate("window.__freeze=true"); mum.wait_for_timeout(200); mum.screenshot(path=outm, timeout=120000, animations="disabled"); mum.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")
         outh = out[:-4] + "-host.png"; host.evaluate("window.__freeze=true"); host.wait_for_timeout(200); host.screenshot(path=outh, timeout=120000, animations="disabled"); host.evaluate("window.__freeze=false; document.dispatchEvent(new Event('visibilitychange'))")

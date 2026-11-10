@@ -35,9 +35,11 @@ button{font-family:inherit}
 .hud.top.turn .face{box-shadow:0 0 0 2px var(--brass),0 0 14px 3px rgba(230,183,111,.45);animation:turnFace 1.8s ease-in-out 3}
 .hud.turn .name{color:#fff8ec}
 @keyframes turnIn{0%{opacity:0;transform:scale(.6)}100%{opacity:1;transform:none}}
+@keyframes turnPoke{0%{opacity:.4;transform:scale(.7)}100%{opacity:1;transform:none}}
 @keyframes turnFace{50%{box-shadow:0 0 0 2px var(--brass),0 0 22px 6px rgba(230,183,111,.65)}}
 .hud.top.turn.poke .face{animation:turnFace 1.1s ease-in-out 1}.hud.top.turn.poke .sub{animation:turnIn .5s cubic-bezier(.2,1.5,.4,1) both}
-@media (prefers-reduced-motion:reduce){.hud.turn .sub,.hud.top.turn .face,.hud.top.turn.poke .sub,.hud.top.turn.poke .face{animation:none}}
+.hud.bottom.turn.poke .sub{animation:turnPoke .5s cubic-bezier(.2,1.5,.4,1) both} /* a watcher's tap on the host's move (web/turncue.js watchTap) */
+@media (prefers-reduced-motion:reduce){.hud.turn .sub,.hud.top.turn .face,.hud.top.turn.poke .sub,.hud.top.turn.poke .face,.hud.bottom.turn.poke .sub{animation:none}}
 .name{font-size:calc(14px*var(--ts));font-weight:600}.sub{font-size:calc(12px*var(--ts));color:var(--muted)}
 .score{font-family:Fraunces,Georgia,serif;font-size:28px;font-weight:700;line-height:1;display:inline-block}
 .score.bump{animation:bump .35s ease-out}

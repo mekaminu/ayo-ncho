@@ -48,7 +48,7 @@ import { sidewaysAngle, SIDE_PHI } from './sideways.js';
 import { tableFold, tableRoom as foldRoom, tableVars, TABLE_PHI } from './tabletop.js';
 import { lookPref, lookNow, restPhi, phiFloor, lookNote, lookToast, GLIDE_MS as LOOK_MS } from './look.js';
 import { shapeOf, glideStart, unfoldAt, glideClock, UNFOLD_MS, afterResize, framingMoved, SETTLE_MS as VIEW_SETTLE_MS } from './unfold.js';
-import { turnSide, glowPits, glowOrder, GLOW, GLOW_IN_MS, GLOW_STAGGER_MS, GLOW_OUT_MS, tapCue, backSweep } from './turncue.js';
+import { turnSide, glowPits, glowOrder, GLOW, GLOW_IN_MS, GLOW_STAGGER_MS, GLOW_OUT_MS, tapCue, backSweep, watchTap } from './turncue.js';
 import { handPref, handNow, mirrored, wideRoom, handNote, handToast } from './hand.js';
 import { talkPref, talkNow, speaks, talkNote, talkToast } from './chatter.js';
 import { retryOf, isRetry, retryOffer, retryButton, retryToast, retryEyebrow, retryLine, retryShare } from './retry.js';
@@ -1652,14 +1652,15 @@ function refreshStatic() {
 // the card of the player to move lights (its line a brass badge, a face a brass ring) and the other steps back; on your move the
 // pits you may play glow round their rims, lighting along the row; while a turn plays, its player's card stays lit
 const turnCue = { side: null, lit: Array(12).fill(false), tok: Array(12).fill(0), log: [] };
-const turnQuiet = () => !!(puzzle.on || lesson.on || watch.on || spect.on || replaying || review.on || (online && (!friend || !net || net.seat === null)));
+// a watcher's board (spect) lights the card to move too, once both players are seated (Whose move, for the family watching)
+const turnQuiet = () => !!(puzzle.on || lesson.on || watch.on || replaying || review.on || (spect.on ? !(spect.room && spect.room.players && spect.room.players[1]) : online && (!friend || !net || net.seat === null)));
 function paintTurnCue() {
   // while their seeds are still moving their card stays lit: the engine already says it is your move, the board does not yet
   // (on a shared phone the cards follow whoever holds it, as before)
   const last = state.moves.length ? state.moves[state.moves.length - 1] : null, near = nearCard();
   const mover = busy && last !== null && !local && !tableOn() ? owner(last) : null;
-  const side = turnSide({ over: state.over, turn: state.turn, near, quiet: turnQuiet(), playing: mover !== null && mover !== near ? mover : null });
-  if (side !== turnCue.side) { turnCue.side = side; keep(turnCue.log, { side, moves: state.moves.length }); $('.hud.top').classList.remove('poke'); }
+  const side = turnSide({ over: state.over, turn: state.turn, near, quiet: turnQuiet(), playing: mover !== null && (spect.on || mover !== near) ? mover : null }); // a watcher: either player's seeds still flying
+  if (side !== turnCue.side) { turnCue.side = side; keep(turnCue.log, { side, moves: state.moves.length }); $('.hud.top').classList.remove('poke'); $('.hud.bottom').classList.remove('poke'); }
   const top = $('.hud.top'), bot = $('.hud.bottom');
   top.classList.toggle('turn', side === 'far'); bot.classList.toggle('turn', side === 'near');
   top.classList.toggle('rest', side === 'near'); bot.classList.toggle('rest', side === 'far');
@@ -1683,13 +1684,21 @@ function sweepGlow() {
   lit.forEach((i, k) => { turnCue.tok[i]++; board.turn[i].material.opacity = 0; fadeGlow(i, true, k * GLOW_STAGGER_MS); });
   return lit.length;
 }
+function pokeCard(side) { const el = $(side === 'near' ? '.hud.bottom' : '.hud.top'); el.classList.remove('poke'); void el.offsetWidth; el.classList.add('poke'); }
 function whoseTap(pit) {
+  if (spect.on) { // a watcher's tap: their game, not hers — the card to move pulses and the line says so (web/turncue.js watchTap)
+    if (turnQuiet() || state.over || busy) return null;
+    const c = watchTap({ side: turnCue.side, name: spectateCards(spect.room)[state.turn].name }); if (!c.kind) return null;
+    pokeCard(c.pulse); turnCue.said = { pit, words: c.words, moves: state.moves.length };
+    if (mouse.in && mouse.pit === pit) hoverWords(c.words); else $('#hint').textContent = c.words; keep(turnCue.log, { tap: c.kind, pit, moves: state.moves.length });
+    return c.kind;
+  }
   if (turnQuiet() || state.over || busy && turnCue.side !== 'far') return null;
   const name = online ? (friend ? friend.name : '') : local ? '' : CHARACTERS[level] ? CHARACTERS[level].name : '';
   const c = tapCue({ side: turnCue.side, mine: owner(pit) === you, name });
   if (!c.kind) return null;
   if (c.sweep) sweepGlow();
-  if (c.pulse) { const top = $('.hud.top'); top.classList.remove('poke'); void top.offsetWidth; top.classList.add('poke'); }
+  if (c.pulse) pokeCard('far');
   turnCue.said = { pit, words: c.words, moves: state.moves.length }; // the mouse's own words over that pit give way to the answer (paintHover)
   if (mouse.in && mouse.pit === pit) hoverWords(c.words); else $('#hint').textContent = c.words; keep(turnCue.log, { tap: c.kind, pit, moves: state.moves.length });
   return c.kind;
@@ -3286,7 +3295,7 @@ canvas.addEventListener('pointerup', (e) => {
   if (hurry.depth > 0) { hurryNow(); return; } // a tap while a turn plays hurries it
   const tapAt = { t: performance.now(), x: e.clientX, y: e.clientY }; // two taps on the wood, quick and close: set the board straight
   if (pitUnder(e.clientX, e.clientY) === null) { if (isDoubleTap(woodTap, tapAt) && viewMay()) { woodTap = null; straighten(); return; } woodTap = tapAt; } else woodTap = null;
-  if (!canPress()) { const p = pitUnder(e.clientX, e.clientY); if (p !== null && turnCue.side === 'far') whoseTap(p); return; } // their move: the tap says so
+  if (!canPress()) { const p = pitUnder(e.clientX, e.clientY); if (p !== null && (turnCue.side === 'far' || spect.on)) whoseTap(p); return; } // their move (or a game watched): the tap says so
   ptr.set((e.clientX / canvas.clientWidth) * 2 - 1, -(e.clientY / canvas.clientHeight) * 2 + 1); ray.setFromCamera(ptr, camera);
   const hit = ray.intersectObjects(board.targets)[0]; if (!hit) return deselect();
   pressPit(hit.object.userData.pit, 'tap');
@@ -3411,7 +3420,7 @@ addEventListener('keydown', (e) => {
   if (!keysUsed) { keysUsed = true; body.classList.add('keys'); showTurn(); } // from now on the hint line talks keys and your pits' badges show their key
   e.preventDefault();
   if (a.type === 'help') { if ($('#rules').hidden) openRules(true); else $('#rules').hidden = true; return; } // ? opens How to play at its keys, and closes it
-  if (a.type === 'pit') { if (canPress()) pressPit(a.pit, 'key'); else { click(0.5, 0.04); if (turnCue.side === 'far') whoseTap(a.pit); } } // their move: the key asks whose move, as a tap does
+  if (a.type === 'pit') { if (canPress()) pressPit(a.pit, 'key'); else { click(0.5, 0.04); if (turnCue.side === 'far' || spect.on) whoseTap(a.pit); } } // their move: the key asks whose move, as a tap does
   else if (a.type === 'sow') { if (selected !== null) pressPit(selected, 'key'); else if (canPress()) $('#hint').textContent = hintText('pick', { keys: true }); else if (turnCue.side === 'far') whoseTap(you * 6); }
   else if (a.type === 'undo') undo();
   else if (a.type === 'redo') { if (!online) redo(); }
