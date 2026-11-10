@@ -229,7 +229,7 @@ if os.environ.get("RENDER_LANG") == "fr":  # the French store pictures (tools/st
 #                  against Nnamdi (<out>, and the chip mid-watch <out>-chip.png); a move and his reply, Undo stops at the take-over, the Game over
 #                  eyebrow is checked by playing on, and Home brings this phone's own game back untouched; the chip in French
 #        --greet: good morning at the right time (web/greet.js) — Mama Ngozi greets a phone back after 5 days away (?away=5&hour=8),
-#          then the next game the usual line, an afternoon game her afternoon word, a night game in French her night word
+#          then the next game the usual line, an afternoon game her afternoon word, a night game in French her night word; the weekend (Nnamdi on a Saturday); feast days (Mama Ngozi on Christmas morning, <out>-feast.png; the next game greets as usual; Nnamdi at New Year in French)
 #        --rematch: the rematch, remembered (web/rematch.js) — a game against Mama Ngozi won by 12 a minute ago: the next game opens with
 #          her word for a big win (<out>); the game after says something else; a draw against Nnamdi answered in French (<out>-fr.png)
 #        --glloss: the board comes back (web/glloss.js) — WEBGL_lose_context takes the board away: nothing said for a blink, the canvas
@@ -695,6 +695,14 @@ if greetc:  # good morning, at the right time (idea 6 Nov): the first word of a 
         print("greet: a Saturday afternoon with Nnamdi —", g["bubble"]); pg.screenshot(path=out.replace(".png", "-weekend.png"), timeout=120000)
         pg.evaluate("localStorage.removeItem('ayo.greet.last')")
         g = play("hour=15&weekend=0"); assert g["log"][-1]["weekend"] is False and g["bubble"] in C["medium"]["lines"]["afternoon"], g; print("greet: a weekday afternoon —", g["bubble"])
+        # feast days (idea 10 Nov): the day's first greeting is the day itself; the next game that day greets as usual
+        pg.evaluate("localStorage.setItem('ayo.level', 'hard'); localStorage.removeItem('ayo.greet.last')")
+        g = play("hour=10&feast=christmas"); assert g["log"][-1]["moment"] == "christmas" and g["log"][-1]["feast"] is True and g["bubble"] in C["hard"]["lines"]["christmas"] and g["mood"] == "happy", g
+        print("greet: Christmas morning with Mama Ngozi —", g["bubble"]); pg.screenshot(path=out.replace(".png", "-feast.png"), timeout=120000)
+        g = play("hour=11&feast=christmas"); assert g["log"][-1]["moment"] == "start" and g["bubble"] in C["hard"]["lines"]["start"], g; print("greet: the next game on Christmas —", g["bubble"])
+        pg.evaluate("localStorage.setItem('ayo.level', 'medium'); localStorage.removeItem('ayo.greet.last')")
+        g = play("hour=0&feast=newYear", "fr"); fr = pg.evaluate("import('./i18n.js').then(m => m.translate(%s, 'fr'))" % json.dumps(C["medium"]["lines"]["newYear"][0]))
+        assert g["log"][-1]["moment"] == "newYear" and g["bubble"] == fr, (g, fr); print("greet: just after midnight on New Year's Day, in French —", g["bubble"])
         b.close()
         if errors: print("page errors:", *errors, sep="\n  "); sys.exit(1)
         srv.shutdown(); print("wrote", out); sys.exit(0)

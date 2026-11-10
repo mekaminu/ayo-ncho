@@ -9,7 +9,7 @@ import { parse as parseRating, rate as rateGame, homeLine as ratingHome, cardWor
 import { decideQuality, decidePhysics, browserEnv, tier } from './quality.js';
 import { decideSaver, saverPlan, drawDue, toastFor, noteFor, watchBattery } from './battery.js';
 import { parse as parseStreak, recordDay, unlocked, homeLine, MILESTONES, dayKey, daysPlayed } from './streak.js';
-import { greetMoment, isWeekend } from './greet.js';
+import { greetMoment, isWeekend, feastMoment, FEAST_MOMENTS } from './greet.js';
 import { keep as keepRematch, rematchMoment } from './rematch.js';
 import { rematchButtons, askWords, switchedWords, wishOf } from './nextgame.js';
 import { bestTurn, clipPace, clipCaption } from './clip.js';
@@ -2387,15 +2387,17 @@ function greet() {
   if (online || local) return;
   const now = new Date(); const hour = params.has('hour') ? +params.get('hour') : now.getHours(); const today = dayKey(now);
   let days = streak.days; const aw = +params.get('away'); if (aw > 0) { const d = new Date(now); d.setDate(d.getDate() - aw); days = [...days.filter((k) => k < dayKey(d)), dayKey(d)]; }
-  const g = greetMoment({ days, today, hour, last: prefs.get('greet.last', '') });
+  const lastKey = prefs.get('greet.last', ''); const g = greetMoment({ days, today, hour, last: lastKey });
+  // feast days (web/greet.js feastMoment): the day's first greeting is the day itself; ?feast=christmas tries one, ?feast=0 none
+  const fp = params.get('feast'); const feast = fp != null ? (FEAST_MOMENTS.includes(fp) && !String(lastKey).startsWith(`${today}:`) ? fp : null) : feastMoment(today, lastKey);
   // the rematch, remembered (web/rematch.js): straight after a game against them, their word for how it went comes first —
   // after coming back from days away, before the hour's greeting (which is kept as said, so the next game does not greet)
-  const kept = prefs.get('rematch', ''); const rm = g.moment === 'back' ? null : rematchMoment(kept, level, Date.now(), prefs.get('rematch.said', null));
+  const kept = prefs.get('rematch', ''); const rm = g.moment === 'back' || feast ? null : rematchMoment(kept, level, Date.now(), prefs.get('rematch.said', null));
   if (rm) { try { const l = JSON.parse(kept); if (l && l.id != null) prefs.set('rematch.said', l.id); } catch {} }
   if (g.moment !== 'start') prefs.set('greet.last', g.key);
   // a Saturday or Sunday on the phone's own date: no school or office in the hour's word (?weekend=1 / 0 tries it)
   const weekend = params.has('weekend') ? params.get('weekend') === '1' : isWeekend(today);
-  const moment = rm || g.moment; keep(greeted.log, { moment, key: g.key, weekend }); say(moment, { weekend });
+  const moment = feast || rm || g.moment; keep(greeted.log, { moment, key: g.key, weekend, feast: !!feast }); say(moment, { weekend });
 }
 function say(moment, ctx = null) { // ctx: what a line that names a number is about (web/characters.js fitLine)
   if (online || local) return; // a friend speaks for themselves, and two of us need no third voice

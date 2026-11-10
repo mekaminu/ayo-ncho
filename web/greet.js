@@ -46,3 +46,19 @@ export function isWeekend(today) {
   const n = dayNum(today); if (Number.isNaN(n)) return false;
   const wd = new Date(n * 864e5).getUTCDay(); return wd === 0 || wd === 6;
 }
+
+// Feast days (idea 10 Nov): on Christmas Day the board heard "Good morning, class" like any Friday, and the year turned
+// with no word at all. At a real board the first thing anyone says on those days is the day itself. On a feast day (the
+// phone's own date) the day's first greeting is the opponent's word for the day — Christmas Day (25 Dec), the last day of
+// the year (31 Dec), New Year's Day (1 Jan) and Nigeria's Independence Day (1 Oct) — and later games that day greet for the
+// hour as usual. Feasts whose date follows the moon (Eid) are not here: Nigeria fixes them by the sighting, so no rule can
+// say the day in advance.
+export const FEASTS = { '12-25': 'christmas', '12-31': 'yearEnd', '01-01': 'newYear', '10-01': 'independence' };
+export const FEAST_MOMENTS = Object.values(FEASTS);
+export function feastOf(today) {
+  const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(today || ''); return m ? FEASTS[`${m[1]}-${m[2]}`] || null : null;
+}
+// The feast word, when this is the day's first greeting (`last` is the key kept by greetMoment); null otherwise.
+export function feastMoment(today, last = '') {
+  const f = feastOf(today); return f && !String(last).startsWith(`${today}:`) ? f : null;
+}

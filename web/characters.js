@@ -70,7 +70,7 @@ export function faceFor(level, mood = 'calm') {
 }
 
 // Which face goes with each moment the opponent speaks at.
-export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think', waiting: 'calm', morning: 'happy', afternoon: 'happy', evening: 'happy', night: 'surprised', back: 'happy', againWon: 'sulk', againWonBig: 'sulk', againLost: 'happy', againDrew: 'calm' };
+export const MOOD_FOR = { start: 'happy', capture: 'happy', lost: 'sulk', undo: 'surprised', win: 'happy', lose: 'sulk', firstWin: 'surprised', last8: 'surprised', circling: 'think', waiting: 'calm', morning: 'happy', afternoon: 'happy', evening: 'happy', night: 'surprised', back: 'happy', christmas: 'happy', yearEnd: 'happy', newYear: 'happy', independence: 'happy', againWon: 'sulk', againWonBig: 'sulk', againLost: 'happy', againDrew: 'calm' };
 
 export const CHARACTERS = {
   easy: {
@@ -92,6 +92,11 @@ export const CHARACTERS = {
       evening: ["One game before my bath. Quick!"],
       night: ["Mummy says I should be asleep. Shh. Play!"],
       back: ["Finally! I practised the whole time you were gone."],
+      // feast days (web/greet.js feastOf): the day's first greeting on Christmas, the year's end, New Year's Day, Independence
+      christmas: ["Merry Christmas! I got new shoes. Now I get your seeds!"],
+      yearEnd: ["Last game of the year! Mummy said I can stay up."],
+      newYear: ["Happy New Year! This year I win everything."],
+      independence: ["Happy Independence Day! Green, white, green. Go!"],
       // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
       againWon: ["Again! This time I'm really trying."],
       againWonBig: ["That was practice. This one is real!"],
@@ -123,6 +128,10 @@ export const CHARACTERS = {
       evening: ["Ẹ káalẹ́. One game, then homework."],
       night: ["At this hour? Very well. Quietly."],
       back: ["Ah, there you are. We will revise what we learnt."],
+      christmas: ["Merry Christmas. Even today, we count before we sow."],
+      yearEnd: ["The last lesson of the year. Make it a neat one."],
+      newYear: ["Ẹ kú ọdún! A new year, a new exercise book."],
+      independence: ["Happy Independence Day, class. Stand up straight for Nigeria."],
       // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
       againWon: ["Again? Good. Show me it was not luck."],
       againWonBig: ["Top marks last time. Let us see it twice."],
@@ -152,6 +161,10 @@ export const CHARACTERS = {
       evening: ["Mgbede ọma. Evening seeds, after the traffic."],
       night: ["This hour? You can't sleep either, abi?"],
       back: ["Ehen! Where have you been? The board missed you."],
+      christmas: ["Merry Christmas, cousin! After this game, rice and chicken."],
+      yearEnd: ["Last game of the year, cousin. We cross over with a win, o."],
+      newYear: ["Happy New Year, cousin! New year, same champion."],
+      independence: ["Happy Independence, cousin! Green-white-green, and the seeds are mine."],
       // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
       againWon: ["Rematch. That last one was a warm-up, o."],
       againWonBig: ["Cousin, don't tell anybody about that last one."],
@@ -181,6 +194,10 @@ export const CHARACTERS = {
       evening: ["Mgbede ọma. The market is closed; the board is open."],
       night: ["Still awake? The seeds do not sleep either."],
       back: ["So, you remembered the board. Sit well."],
+      christmas: ["Ekeresimesi ọma. The market is shut; the board never is."],
+      yearEnd: ["The year's last game. Play it well; you will remember it."],
+      newYear: ["Afọ ọhụrụ ọma. A new year, the same old board."],
+      independence: ["Happy Independence Day. Sit well; today we play for the country."],
       // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
       againWon: ["Again. This time I am paying attention."],
       againWonBig: ["You took my pride. Now I take it back."],
@@ -209,6 +226,10 @@ export const CHARACTERS = {
       evening: ["Good evening. The best games are played after dark."],
       night: ["Late games. Mama Ngozi and I once played till dawn."],
       back: ["The board waited. So did I."],
+      christmas: ["Merry Christmas. Mama Ngozi sends no card. I send none back."],
+      yearEnd: ["The last game of the year. I have finished many years at this board."],
+      newYear: ["A new year. Mama Ngozi and I will not speak in this one either."],
+      independence: ["Independence Day. I watched the flag go up, then played till dark."],
       // a rematch straight after a game (web/rematch.js): you won, you won by 10+, they won, a draw
       againWon: ["Again. I have seen how you think."],
       againWonBig: ["Hm. Sit. I will not lend you so much this time."],
