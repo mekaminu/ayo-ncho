@@ -65,3 +65,21 @@ export function watchTap({ side = null, name = '' } = {}) {
   if (side !== 'near' && side !== 'far') return { kind: null, words: '', pulse: null };
   return { kind: 'watching', words: `${name ? `${name}'s move` : 'their move'} · ${WATCH_WORDS}`, pulse: side };
 }
+
+// Your move, felt (idea 11 Nov, early morning, after Meka's "most times am not sure whether its mine or the opponents turn"): the
+// cards and the glow say it to an eye on the board, and a tap answers when asked, but a player looking away while the computer or
+// a friend thinks (at the room, at the phone's other half, at a cousin) had no sign at all the moment it came back to them. Now,
+// as their seeds settle and the bottom card lights, the wood gives one soft double tap — two light knocks rising, quieter than a
+// seed — and the phone a single light buzz, as a hand sliding the board back across the table would. Only when the turn has come
+// over from their side by their own move: never when a game opens on your move or a saved game comes back, never after an Undo (the
+// turn comes back without them playing), never on a shared phone (the board turns to whoever holds it), never for a watcher, in a
+// puzzle, the lesson, a replay or a review, never at the game over, and never with the page out of sight (a room's own away taps
+// say it there). It follows Sound and Haptics as every other sound does.
+// from/to: the lit card before and after (turnSide); lastBy: the seat whose move was played last, you: your seat; played: the game
+// has more moves now than when their card lit (an Undo while they think has fewer).
+export function yourMoveCue({ from = null, to = null, lastBy = null, you = 0, played = false, shared = false, watching = false, hidden = false, over = false } = {}) {
+  if (from !== 'far' || to !== 'near' || !played || over || shared || watching || hidden) return false;
+  return (lastBy === 0 || lastBy === 1) && lastBy !== you;
+}
+export const CUE_TAPS = [[1.55, 0.045, 0], [1.95, 0.04, 95]]; // [pitch, gain, ms after]: two knocks rising, under a seed's (0.12)
+export const CUE_BUZZ = 12; // ms: one light buzz, lighter than a seed landing in your hand
