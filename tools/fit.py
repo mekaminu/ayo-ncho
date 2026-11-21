@@ -126,9 +126,12 @@ def pits(pg, name, results):  # every pit you may play takes a tap: nothing laid
         print("FAIL " + name + "".join("\n       %s: %s (%s)" % (x["kind"], x["what"], x["detail"]) for x in v))
     return v
 
-def tapped(pg, sel, name, results):  # a click a finger could make; if something lies over it, that is the finding
+def tapped(pg, sel, name, results, went=None):  # a click a finger could make; if something lies over it, that is the finding
     try: pg.click(sel, timeout=8000); return []
     except Exception: pass
+    # the click can land after all while Playwright's own wait runs out on a machine busy drawing the board in software (21 Nov: the
+    # daily puzzle was open on the Fold, its card already gone, and the check called that "could not tap"): `went` says it took
+    if went and pg.evaluate(went): return []
     # a busy machine drawing the turning board in software can starve the click's own checks, and a screen can still be fading
     # in (taking no taps until it has): wait up to 20 s for the button to be the thing under its middle, then press it
     probe = "(s => { const e = document.querySelector(s); if (!e) return 'missing'; e.scrollIntoView({ block: 'nearest' }); const r = e.getBoundingClientRect(); const t = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2); return t && (t === e || e.contains(t)) ? '' : (t ? (t.id || t.className || t.tagName) : 'nothing'); })(%s)" % json.dumps(sel)
@@ -161,7 +164,7 @@ def tour(b, size, lang, ts, results):
     bad += check(pg, "Settings · " + tag, results, scroll=pg.evaluate("(() => { const s = document.querySelector('#settings'); const all = [s, ...s.querySelectorAll('*')]; const e = all.find((n) => /(auto|scroll)/.test(getComputedStyle(n).overflowY) && n.scrollHeight > n.clientHeight + 1); return e ? (e.id ? '#' + e.id : null) : null; })()") or "#settings")
     home(pg, qq); pg.click("#homeStore"); pg.wait_for_selector("#store:not([hidden])")
     bad += check(pg, "Store · " + tag, results, scroll="#store")
-    home(pg, qq); miss = tapped(pg, "#puzzleCard", "Daily puzzle · " + tag, results); bad += miss
+    home(pg, qq); miss = tapped(pg, "#puzzleCard", "Daily puzzle · " + tag, results, "document.body.classList.contains('puzzle')"); bad += miss
     if not miss: pg.wait_for_timeout(3500); bad += check(pg, "Daily puzzle · " + tag, results)  # the board turns to the puzzle first
     pg.goto(BASE + "?capture=1" + qq, wait_until="load"); pg.wait_for_function("window.__done===true", timeout=180000)
     pg.wait_for_function("window.__ayo && window.__ayo.state && window.__ayo.state.turn === 0 && !window.__ayo.busy", timeout=30000)
